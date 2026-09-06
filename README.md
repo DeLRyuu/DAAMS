@@ -1,4 +1,5 @@
 # DAAMS
+<<<<<<< HEAD
 ## Digital Asset Access Monitoring and Risk Assessment System
 
 DAAMS is a Windows-based security monitoring utility designed to monitor administrator-selected protected digital assets, assess potential security risks, record activity, and generate security alerts.
@@ -31,3 +32,6 @@ The system is being developed incrementally. Features and components will be add
 - Researcher — Joy Aguirre Jasar eno
 - Documentation Lead — Elna
 - Testing / QA — Melisa Mae Franes
+=======
+Digital Asset Access Monitoring and Risk Assessment System
+>>>>>>> 4f5691ce6c84c70efc9e66d0af6df975e46e15e8
