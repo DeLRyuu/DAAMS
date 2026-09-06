@@ -1,0 +1,9 @@
+2026-09-06 20:59:50 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\New Text Document.txt | Action=Create
+2026-09-06 21:00:06 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\New Text Document.txt | Action=Modify
+2026-09-06 21:00:35 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\New Text Document.txt | Action=Modify
+2026-09-06 21:00:52 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\New Text Document.txt -> C:\Users\whind\Desktop\DAAMS_Test\DAAMS.txt.txt | Action=Rename
+2026-09-06 21:00:52 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\DAAMS.txt.txt | Action=Modify
+2026-09-06 21:01:41 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\DAAMS.txt.txt | Action=Delete
+2026-09-06 21:01:48 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\New Text Document.txt | Action=Create
+2026-09-06 21:01:56 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\New Text Document.txt -> C:\Users\whind\Desktop\DAAMS_Test\HELLO DAAMS.txt | Action=Rename
+2026-09-06 21:01:56 | User=whind | Device=FREZZET | Asset=C:\Users\whind\Desktop\DAAMS_Test\HELLO DAAMS.txt | Action=Modify
