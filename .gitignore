@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Environment / Secrets
+.env
+.env.*
+*.key
+*.pem
+serviceAccountKey.json
+firebase-adminsdk-*.json
+
+# VS Code
+.vscode/
+
+# Visual Studio / C#
+.vs/
+bin/
+obj/
+
+# OS
+.DS_Store
+Thumbs.db
