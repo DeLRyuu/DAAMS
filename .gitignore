@@ -19,6 +19,7 @@ firebase-adminsdk-*.json
 .vs/
 bin/
 obj/
+monitoring_engine/activity_log.jsonl
 
 # OS
 .DS_Store

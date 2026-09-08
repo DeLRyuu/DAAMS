@@ -1,5 +1,0 @@
-{"user": "whind", "device": "FREZZET", "asset": "C:\\Users\\whind\\Desktop\\DAAMS_Test\\HELLO DAAMS.txt", "action": "Delete", "timestamp": "2026-09-06 21:51:24"}
-{"user": "whind", "device": "FREZZET", "asset": "C:\\Users\\whind\\Desktop\\DAAMS_Test\\HELLO DAAMS.txt", "action": "Create", "timestamp": "2026-09-06 21:51:31"}
-{"user": "whind", "device": "FREZZET", "asset": "C:\\Users\\whind\\Desktop\\DAAMS_Test\\HELLO DAAMS.txt", "action": "Modify", "timestamp": "2026-09-06 21:51:31"}
-{"user": "whind", "device": "FREZZET", "asset": "C:\\Users\\whind\\Desktop\\DAAMS_Test\\HELLO DAAMS.txt -> C:\\Users\\whind\\Desktop\\DAAMS_Test\\DAAMS.txt", "action": "Rename", "timestamp": "2026-09-06 21:51:44"}
-{"user": "whind", "device": "FREZZET", "asset": "C:\\Users\\whind\\Desktop\\DAAMS_Test\\DAAMS.txt", "action": "Modify", "timestamp": "2026-09-06 21:51:53"}

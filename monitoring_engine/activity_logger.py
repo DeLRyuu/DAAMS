@@ -2,23 +2,29 @@
 activity_logger.py
 
 Responsible for turning a raw filesystem event into a structured
-"activity record", displaying it to the administrator, and persisting
-it locally.
+"activity record", displaying it to the administrator, persisting it
+locally, and (Phase 3) forwarding it to Firebase Firestore.
 
 Phase 1 scope (unchanged):
 - Build a structured dict for each activity (User, Device, Asset, Action, Time).
 - Print it clearly to the terminal.
 
-Phase 2 scope (this update):
+Phase 2 scope (unchanged):
 - Persist EVERY activity record permanently as its own line in a local
-  JSON Lines (.jsonl) file, so activity history survives across runs and
-  can be reviewed/parsed later (e.g. before Firestore sync exists).
+  JSON Lines (.jsonl) file, so activity history survives across runs.
 - Handle logging failures (e.g. disk full, permissions) without crashing
   the monitoring engine -- a failed log write should never stop detection.
 
-Firebase/Firestore storage, risk scoring, and alerting are still NOT part
-of this file. This module only records "what happened", not "how risky
-it was".
+Phase 3 scope (this update):
+- After the local log write, attempt to also upload the same record to
+  Firebase Firestore via firestore_logger.py.
+- Firestore is entirely optional from this module's point of view: if it
+  is unavailable, misconfigured, or errors out, that is caught here (in
+  addition to being caught inside firestore_logger itself) and reported
+  as a warning. Local logging and terminal display are never affected.
+
+Risk scoring and alerting are still NOT part of this file. This module
+only records "what happened", not "how risky it was".
 """
 
 import getpass
@@ -26,6 +32,8 @@ import json
 import os
 import socket
 from datetime import datetime
+
+import firestore_logger
 
 # JSON Lines format: one JSON object per line. Chosen over a single JSON
 # array because it lets us APPEND new records cheaply and safely without
@@ -155,22 +163,38 @@ def read_all_activities() -> list:
 
 def record_activity(asset_path: str, action: str) -> dict:
     """
-    Convenience function: build, display, and permanently log an activity
-    in one call. Returns the record in case the caller needs it.
+    Build, locally log, upload to Firestore, and display an activity, in
+    that order:
+        A. Build the structured activity record.
+        B. Save it to the local activity log (Phase 2).
+        C. Attempt to upload the same record to Firestore (Phase 3).
+        D. Display the activity in the terminal.
 
-    Display and logging are intentionally isolated with their own error
-    handling (see display_activity / append_to_local_log) so that a
-    problem in one does not prevent the other, and neither can crash the
-    monitoring engine's event loop.
+    Each step is isolated with its own error handling so that a problem
+    in any one of them (local disk, Firestore, terminal encoding) can
+    never crash the monitoring engine or prevent the others from running.
+
+    Returns the record in case the caller needs it.
     """
     record = build_activity_record(asset_path, action)
 
+    # B. Local log (Phase 2) -- always attempted first, since it's the
+    # most reliable storage and has no external dependency.
+    append_to_local_log(record)
+
+    # C. Firestore upload (Phase 3) -- best-effort. firestore_logger
+    # already catches everything internally; this try/except is an extra
+    # safety net in case of an unexpected error outside that module.
+    try:
+        firestore_logger.upload_activity(record)
+    except Exception as e:
+        print(f"[WARNING] Unexpected error during Firestore upload attempt: {e}")
+
+    # D. Terminal display -- last, so the administrator sees the record
+    # only after both storage attempts have already happened.
     try:
         display_activity(record)
     except Exception as e:
-        # Terminal output failing (e.g. encoding issue in some consoles)
-        # should not stop the record from being logged.
         print(f"[WARNING] Could not display activity in terminal: {e}")
 
-    append_to_local_log(record)
     return record
