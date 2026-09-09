@@ -1,0 +1,81 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        DAAMS Control Center palette.
+
+        Design intent: a flat, dark, "security operations" surface.
+        ONE accent color (cyan-blue) is used for interactive/selected state.
+        All other color is reserved for meaning: risk level, alert severity, status.
+        No decorative per-card colors. No gradients.
+    -->
+
+    <!-- Base surfaces -->
+    <Color x:Key="Color.Background">#0B0F14</Color>
+    <Color x:Key="Color.Surface">#12171F</Color>
+    <Color x:Key="Color.SurfaceElevated">#161C26</Color>
+    <Color x:Key="Color.SurfaceAlt">#0E131A</Color>
+    <Color x:Key="Color.Border">#232B37</Color>
+    <Color x:Key="Color.BorderSubtle">#1A212B</Color>
+
+    <!-- Text -->
+    <Color x:Key="Color.TextPrimary">#E6EAF0</Color>
+    <Color x:Key="Color.TextSecondary">#8D98A8</Color>
+    <Color x:Key="Color.TextTertiary">#5C6674</Color>
+    <Color x:Key="Color.TextOnAccent">#06121C</Color>
+
+    <!-- Single controlled accent -->
+    <Color x:Key="Color.Accent">#3FA9F5</Color>
+    <Color x:Key="Color.AccentMuted">#245A82</Color>
+    <Color x:Key="Color.AccentSubtleBg">#132433</Color>
+
+    <!-- Risk / severity semantics — the ONLY place color varies by category -->
+    <Color x:Key="Color.RiskLow">#3DBE72</Color>
+    <Color x:Key="Color.RiskMedium">#D9A93B</Color>
+    <Color x:Key="Color.RiskHigh">#E0762F</Color>
+    <Color x:Key="Color.RiskCritical">#E0453F</Color>
+
+    <Color x:Key="Color.RiskLowBg">#12241B</Color>
+    <Color x:Key="Color.RiskMediumBg">#2A2312</Color>
+    <Color x:Key="Color.RiskHighBg">#2C1C10</Color>
+    <Color x:Key="Color.RiskCriticalBg">#2C1414</Color>
+
+    <!-- Status semantics -->
+    <Color x:Key="Color.StatusPositive">#3DBE72</Color>
+    <Color x:Key="Color.StatusNeutral">#8D98A8</Color>
+    <Color x:Key="Color.StatusWarning">#D9A93B</Color>
+    <Color x:Key="Color.StatusInactive">#4A5361</Color>
+
+    <!-- Brushes (used throughout XAML) -->
+    <SolidColorBrush x:Key="Brush.Background" Color="{StaticResource Color.Background}" />
+    <SolidColorBrush x:Key="Brush.Surface" Color="{StaticResource Color.Surface}" />
+    <SolidColorBrush x:Key="Brush.SurfaceElevated" Color="{StaticResource Color.SurfaceElevated}" />
+    <SolidColorBrush x:Key="Brush.SurfaceAlt" Color="{StaticResource Color.SurfaceAlt}" />
+    <SolidColorBrush x:Key="Brush.Border" Color="{StaticResource Color.Border}" />
+    <SolidColorBrush x:Key="Brush.BorderSubtle" Color="{StaticResource Color.BorderSubtle}" />
+
+    <SolidColorBrush x:Key="Brush.TextPrimary" Color="{StaticResource Color.TextPrimary}" />
+    <SolidColorBrush x:Key="Brush.TextSecondary" Color="{StaticResource Color.TextSecondary}" />
+    <SolidColorBrush x:Key="Brush.TextTertiary" Color="{StaticResource Color.TextTertiary}" />
+    <SolidColorBrush x:Key="Brush.TextOnAccent" Color="{StaticResource Color.TextOnAccent}" />
+
+    <SolidColorBrush x:Key="Brush.Accent" Color="{StaticResource Color.Accent}" />
+    <SolidColorBrush x:Key="Brush.AccentMuted" Color="{StaticResource Color.AccentMuted}" />
+    <SolidColorBrush x:Key="Brush.AccentSubtleBg" Color="{StaticResource Color.AccentSubtleBg}" />
+
+    <SolidColorBrush x:Key="Brush.RiskLow" Color="{StaticResource Color.RiskLow}" />
+    <SolidColorBrush x:Key="Brush.RiskMedium" Color="{StaticResource Color.RiskMedium}" />
+    <SolidColorBrush x:Key="Brush.RiskHigh" Color="{StaticResource Color.RiskHigh}" />
+    <SolidColorBrush x:Key="Brush.RiskCritical" Color="{StaticResource Color.RiskCritical}" />
+
+    <SolidColorBrush x:Key="Brush.RiskLowBg" Color="{StaticResource Color.RiskLowBg}" />
+    <SolidColorBrush x:Key="Brush.RiskMediumBg" Color="{StaticResource Color.RiskMediumBg}" />
+    <SolidColorBrush x:Key="Brush.RiskHighBg" Color="{StaticResource Color.RiskHighBg}" />
+    <SolidColorBrush x:Key="Brush.RiskCriticalBg" Color="{StaticResource Color.RiskCriticalBg}" />
+
+    <SolidColorBrush x:Key="Brush.StatusPositive" Color="{StaticResource Color.StatusPositive}" />
+    <SolidColorBrush x:Key="Brush.StatusNeutral" Color="{StaticResource Color.StatusNeutral}" />
+    <SolidColorBrush x:Key="Brush.StatusWarning" Color="{StaticResource Color.StatusWarning}" />
+    <SolidColorBrush x:Key="Brush.StatusInactive" Color="{StaticResource Color.StatusInactive}" />
+
+</ResourceDictionary>

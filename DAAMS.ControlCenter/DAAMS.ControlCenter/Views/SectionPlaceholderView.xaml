@@ -1,0 +1,34 @@
+<UserControl x:Class="ControlCenter.Views.SectionPlaceholderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="900" d:DesignHeight="600"
+             Background="{StaticResource Brush.Background}">
+    <Grid Style="{StaticResource Layout.PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,24">
+            <TextBlock Text="{Binding Title}" Style="{StaticResource Text.PageTitle}" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource Surface.Card}" VerticalAlignment="Top">
+            <StackPanel MaxWidth="480" HorizontalAlignment="Left">
+                <TextBlock Text="NOT YET IMPLEMENTED" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.Accent}" />
+                <TextBlock Text="{Binding Description}"
+                           Style="{StaticResource Text.Body}"
+                           TextWrapping="Wrap"
+                           Margin="0,10,0,10" />
+                <TextBlock Style="{StaticResource Text.Secondary}">
+                    <Run Text="Planned for " />
+                    <Run Text="{Binding PlannedPhase, Mode=OneWay}" FontWeight="SemiBold" />
+                    <Run Text=" of DAAMS Control Center development." />
+                </TextBlock>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

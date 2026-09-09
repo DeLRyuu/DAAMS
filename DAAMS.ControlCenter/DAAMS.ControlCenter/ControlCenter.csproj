@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ControlCenter</RootNamespace>
+    <AssemblyName>DAAMS.ControlCenter</AssemblyName>
+    <ApplicationIcon></ApplicationIcon>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+</Project>
