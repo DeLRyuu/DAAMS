@@ -1,51 +1,72 @@
 """
 config.py
 
-Configuration for the DAAMS Python Monitoring Engine (Phase 1-3).
-
-For this phase, only ONE protected path is supported, and it must be
-explicitly set by an administrator. The engine will refuse to run
-against the entire disk or an unset/invalid path.
-
-Later phases may extend this to support multiple protected paths and
-per-asset classification (Public/Sensitive/Private/Confidential), but
-Phase 1 intentionally keeps this minimal.
+Configuration for the DAAMS Python Monitoring Engine (Phase 1-4).
 
 Phase 3 adds Firestore configuration. No credential VALUES live in this
 file -- only a path to a locally-stored, gitignored service-account JSON
 file (or an environment variable override). See README.md for setup.
+
+Phase 4 change: monitoring is no longer driven by a single hard-coded
+PROTECTED_PATH. Instead, the Monitoring Engine reads the Protected Asset
+Registry (see asset_registry.py), which is populated via the Windows
+right-click context menu (or, later, the WPF admin console). The
+PROTECTED_PATH variable from Phases 1-3 has been removed -- to monitor
+something, right-click it in File Explorer and choose
+DAAMS -> Protect This File/Folder.
 """
 
 import os
 
 # ---------------------------------------------------------------------------
-# ADMINISTRATOR CONFIGURATION
+# PROTECTED ASSET SAFETY RULES (used by asset_registry.py and monitor.py)
 # ---------------------------------------------------------------------------
-# Set this to the single folder or file you want DAAMS to protect/monitor.
-# Examples (Windows):
-#   PROTECTED_PATH = r"C:\Users\Juan\Documents\ProtectedFolder"
-#   PROTECTED_PATH = r"D:\CompanyFiles\Payroll"
-#
-# Do NOT set this to a drive root (e.g. "C:\\") or the entire filesystem.
-# DAAMS is designed to monitor administrator-selected assets only.
-PROTECTED_PATH = r""  # <-- Set this before running.
-
-# List of path values that are explicitly disallowed because they represent
-# "monitor everything" rather than a specific protected asset.
+# Path values that are explicitly disallowed because they represent
+# "monitor everything" rather than a specific protected asset. No asset
+# may ever be registered or monitored at one of these paths.
 DISALLOWED_ROOTS = {
     "c:\\", "d:\\", "e:\\", "f:\\",
     "/", "c:/", "d:/", "e:/", "f:/",
 }
 
+
+def is_disallowed_root(path: str) -> bool:
+    """
+    Return True if the given path looks like a drive root or filesystem root,
+    which DAAMS must never monitor (whole-disk monitoring is prohibited).
+    """
+    if not path:
+        return False
+    normalized = os.path.normpath(path).lower()
+    # Covers "C:\\" -> normalized as "c:\\" and similar
+    return normalized in DISALLOWED_ROOTS or normalized in {"c:", "d:", "e:", "f:"}
+
+
 # ---------------------------------------------------------------------------
-# FIRESTORE CONFIGURATION (Phase 3)
+# LIVE REGISTRY RELOAD (Phase 4.1)
+# ---------------------------------------------------------------------------
+# How often (in seconds) the running Monitoring Engine re-checks the
+# Protected Asset Registry for changes made via the context menu (or later,
+# the WPF console) -- protect, reclassify, or remove protection -- without
+# needing to restart main.py. This is a simple periodic re-scan of a small
+# local JSON file, not a queue or retry system, so it stays well within
+# "keep this phase simple" while closing the "changes don't show up until
+# restart" gap.
+REGISTRY_RELOAD_INTERVAL_SECONDS = 3
+
+# ---------------------------------------------------------------------------
+# FIRESTORE CONFIGURATION (Phase 3, extended in Phase 4)
 # ---------------------------------------------------------------------------
 # Set to False to turn Firestore uploads off entirely. Local logging
-# (Phase 2) is completely unaffected either way.
+# (Phase 2) and the local Protected Asset Registry (Phase 4) are both
+# completely unaffected either way.
 ENABLE_FIRESTORE = True
 
 # Name of the Firestore collection that stores activity records.
 FIRESTORE_COLLECTION = "activity_logs"
+
+# Name of the Firestore collection that stores protected asset records (Phase 4).
+PROTECTED_ASSETS_COLLECTION = "protected_assets"
 
 # Path to the Firebase service-account JSON credential file.
 #
@@ -65,19 +86,24 @@ FIRESTORE_CREDENTIALS_PATH = os.environ.get(
     os.path.join(os.path.dirname(__file__), "serviceAccountKey.json"),
 )
 
+# ---------------------------------------------------------------------------
+# PIN CONFIRMATION (Phase 4.2)
+# ---------------------------------------------------------------------------
+# Protect / Change Classification / Remove Protection all require the
+# admin to enter this PIN before the action takes effect -- see
+# pin_auth.py. The PIN itself is NEVER stored in plaintext (only a salted
+# hash, in security_settings.json / Firestore); DEFAULT_PIN below is only
+# the STARTING value used the very first time DAAMS runs, before any
+# admin has chosen their own PIN.
+#
+# SECURITY: change this immediately after first use (via change_pin_cli.py)
+# -- DAAMS will keep warning you on every PIN-gated action until you do.
+# Also note this value is public (it's sitting in this source file) --
+# it exists only so the system is usable out of the box, never treat it
+# as a real secret.
+DEFAULT_PIN = "1234"
 
-def get_protected_path() -> str:
-    """Return the configured protected path (as configured, not yet validated)."""
-    return PROTECTED_PATH
-
-
-def is_disallowed_root(path: str) -> bool:
-    """
-    Return True if the given path looks like a drive root or filesystem root,
-    which DAAMS must never monitor (whole-disk monitoring is prohibited).
-    """
-    if not path:
-        return False
-    normalized = os.path.normpath(path).lower()
-    # Covers "C:\\" -> normalized as "c:\\" and similar
-    return normalized in DISALLOWED_ROOTS or normalized in {"c:", "d:", "e:", "f:"}
+# Name of the Firestore collection that mirrors the PIN configuration.
+# Always contains exactly one document -- see pin_auth.py. Stores only a
+# salted hash, never the PIN itself.
+SECURITY_SETTINGS_COLLECTION = "security_settings"
