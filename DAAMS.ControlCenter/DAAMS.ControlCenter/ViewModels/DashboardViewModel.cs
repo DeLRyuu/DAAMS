@@ -6,9 +6,10 @@ using ControlCenter.Models;
 namespace ControlCenter.ViewModels;
 
 /// <summary>
-/// Dashboard: one primary insight, a small row of secondary metrics, then
-/// recent activity / recent alerts. All data here is MockDataProvider sample
-/// data — see Data/MockDataProvider.cs — until Phase 8 Firestore integration.
+/// Dashboard: one primary insight, a row of secondary metrics, risk distribution,
+/// then recent activity / recent alerts. All data here comes from the shared
+/// MockDataProvider — see Data/MockDataProvider.cs — until Phase 8 Firestore
+/// integration replaces it with a live-reading service behind the same shape.
 /// </summary>
 public class DashboardViewModel : ViewModelBase
 {
@@ -21,6 +22,7 @@ public class DashboardViewModel : ViewModelBase
     public int TotalProtectedAssets { get; }
     public int TotalActivitiesThisWeek { get; }
     public int ActiveSecurityAlerts { get; }
+    public int OpenIncidents { get; }
 
     // --- Risk distribution -------------------------------------------------
     public int RiskLowCount { get; }
@@ -35,12 +37,13 @@ public class DashboardViewModel : ViewModelBase
 
     public DashboardViewModel()
     {
-        var activity = MockDataProvider.GetRecentActivity();
-        var alerts = MockDataProvider.GetRecentAlerts();
+        var recentActivity = MockDataProvider.GetRecentActivity(5);
+        var recentAlerts = MockDataProvider.GetRecentAlerts(3);
+        var allAlerts = MockDataProvider.GetSecurityAlerts();
         var distribution = MockDataProvider.GetRiskDistribution();
 
-        RecentActivity = new ObservableCollection<ActivityLog>(activity);
-        RecentAlerts = new ObservableCollection<SecurityAlert>(alerts);
+        RecentActivity = new ObservableCollection<ActivityLog>(recentActivity);
+        RecentAlerts = new ObservableCollection<SecurityAlert>(recentAlerts);
 
         RiskLowCount = distribution.Low;
         RiskMediumCount = distribution.Medium;
@@ -51,6 +54,7 @@ public class DashboardViewModel : ViewModelBase
         HighRiskActivitiesThisWeek = RiskHighCount + RiskCriticalCount;
         TotalProtectedAssets = MockDataProvider.GetTotalProtectedAssets();
         TotalActivitiesThisWeek = MockDataProvider.GetTotalActivitiesThisWeek();
-        ActiveSecurityAlerts = alerts.Count(a => a.Status is AlertStatus.New or AlertStatus.Investigating);
+        ActiveSecurityAlerts = allAlerts.Count(a => a.Status is AlertStatus.New or AlertStatus.Investigating);
+        OpenIncidents = MockDataProvider.GetOpenIncidentsCount();
     }
 }

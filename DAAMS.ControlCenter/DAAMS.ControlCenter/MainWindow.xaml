@@ -20,8 +20,20 @@
         <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
             <views:DashboardView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:SectionPlaceholderViewModel}">
-            <views:SectionPlaceholderView />
+        <DataTemplate DataType="{x:Type vm:ProtectedAssetsViewModel}">
+            <views:ProtectedAssetsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ActivityLogsViewModel}">
+            <views:ActivityLogsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SecurityAlertsViewModel}">
+            <views:SecurityAlertsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:IncidentReportsViewModel}">
+            <views:IncidentReportsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+            <views:SettingsView />
         </DataTemplate>
     </Window.Resources>
 
@@ -54,7 +66,7 @@
                             <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.StatusInactive}" VerticalAlignment="Center" />
                             <TextBlock Text="Firestore: Not Connected" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" />
                         </StackPanel>
-                        <TextBlock Text="Phase 1 — Foundation Build" Style="{StaticResource Text.Secondary}"
+                        <TextBlock Text="Phase 2 — Functional Sections (Mock Data)" Style="{StaticResource Text.Secondary}"
                                    Foreground="{StaticResource Brush.TextTertiary}" Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>

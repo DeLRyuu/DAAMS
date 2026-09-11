@@ -1,0 +1,105 @@
+<UserControl x:Class="ControlCenter.Views.ProtectedAssetsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="clr-namespace:ControlCenter.Converters"
+             mc:Ignorable="d"
+             d:DesignWidth="1100" d:DesignHeight="720"
+             Background="{StaticResource Brush.Background}">
+
+    <UserControl.Resources>
+        <conv:ClassificationToBrushConverter x:Key="ClassBrush" />
+        <conv:StatusToBrushConverter x:Key="StatusBrush" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <Grid Style="{StaticResource Layout.PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+            <TextBlock Text="Protected Assets" Style="{StaticResource Text.PageTitle}" />
+            <Border Background="{StaticResource Brush.SurfaceElevated}"
+                    CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
+                    Visibility="{Binding IsSampleData, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="SAMPLE DATA" Style="{StaticResource Text.Label}" />
+            </Border>
+        </StackPanel>
+        <TextBlock Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Style="{StaticResource Text.Secondary}">
+            <Run Text="{Binding ProtectedCount, Mode=OneWay}" />
+            <Run Text=" of " />
+            <Run Text="{Binding TotalCount, Mode=OneWay}" />
+            <Run Text=" assets currently protected" />
+        </TextBlock>
+
+        <!-- Toolbar -->
+        <Grid Grid.Row="1" Margin="0,16,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="170" />
+            </Grid.ColumnDefinitions>
+
+            <TextBox Grid.Column="0" Style="{StaticResource Input.TextBox}"
+                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     Tag="Search by asset name or path…" />
+
+            <ComboBox Grid.Column="2" Style="{StaticResource Input.ComboBox}"
+                      ItemsSource="{Binding ClassificationOptions}"
+                      SelectedItem="{Binding SelectedClassification}"
+                      DisplayMemberPath="Label" />
+
+            <ComboBox Grid.Column="4" Style="{StaticResource Input.ComboBox}"
+                      ItemsSource="{Binding StatusOptions}"
+                      SelectedItem="{Binding SelectedStatus}"
+                      DisplayMemberPath="Label" />
+        </Grid>
+
+        <!-- Table -->
+        <Border Grid.Row="2" Style="{StaticResource Surface.Card}" Padding="18,6,18,10">
+            <DataGrid ItemsSource="{Binding Assets}" Style="{StaticResource Grid.Data}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="ASSET NAME" Binding="{Binding AssetName}" Width="1.3*" />
+                    <DataGridTextColumn Header="TYPE" Binding="{Binding AssetType}" Width="0.8*" />
+                    <DataGridTextColumn Header="PATH" Binding="{Binding Path}" Width="2*" />
+
+                    <DataGridTemplateColumn Header="CLASSIFICATION" Width="1.1*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Badge.Base}"
+                                        Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
+                                    <TextBlock Text="{Binding Classification}"
+                                               Style="{StaticResource Badge.Text}"
+                                               Foreground="{Binding Classification, Converter={StaticResource ClassBrush}}" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTemplateColumn Header="STATUS" Width="*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                             Fill="{Binding Status, Converter={StaticResource StatusBrush}}" />
+                                    <TextBlock Text="{Binding Status}" Style="{StaticResource Text.Body}" Margin="7,0,0,0" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="PROTECTED AT" Binding="{Binding ProtectedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                    <DataGridTextColumn Header="PROTECTED BY" Binding="{Binding ProtectedBy}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+    </Grid>
+</UserControl>

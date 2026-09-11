@@ -142,11 +142,23 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="3">
-                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" />
+                        <Grid>
+                            <TextBlock Text="{TemplateBinding Tag}"
+                                       Foreground="{StaticResource Brush.TextTertiary}"
+                                       Margin="{TemplateBinding Padding}"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       x:Name="Placeholder"
+                                       Visibility="Collapsed" />
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" />
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsFocused" Value="True">
                             <Setter Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+                        </Trigger>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -249,6 +261,39 @@
          ============================================================ -->
     <Style x:Key="Layout.PageRoot" TargetType="Grid">
         <Setter Property="Margin" Value="28" />
+    </Style>
+
+    <!-- ============================================================
+         TOGGLE SWITCH — used by Settings. A flat pill, not a default
+         checkbox, so preference controls fit the rest of the UI.
+         ============================================================ -->
+    <Style x:Key="Toggle.Switch" TargetType="CheckBox">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid>
+                        <Border x:Name="Track" Width="36" Height="20" CornerRadius="10"
+                                Background="{StaticResource Brush.SurfaceElevated}"
+                                BorderBrush="{StaticResource Brush.Border}" BorderThickness="1"
+                                HorizontalAlignment="Left">
+                            <Border x:Name="Thumb" Width="14" Height="14" CornerRadius="7"
+                                    Background="{StaticResource Brush.TextSecondary}"
+                                    HorizontalAlignment="Left" Margin="2,0,0,0" />
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Track" Property="Background" Value="{StaticResource Brush.AccentMuted}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+                            <Setter TargetName="Thumb" Property="Background" Value="{StaticResource Brush.Accent}" />
+                            <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                            <Setter TargetName="Thumb" Property="Margin" Value="0,0,2,0" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

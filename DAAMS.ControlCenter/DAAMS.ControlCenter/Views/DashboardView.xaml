@@ -55,6 +55,8 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="12" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0" Style="{StaticResource Surface.Card}">
@@ -77,6 +79,16 @@
                         <TextBlock Text="{Binding ActiveSecurityAlerts}"
                                    Style="{StaticResource Text.Metric}"
                                    Foreground="{StaticResource Brush.RiskHigh}"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="6" Style="{StaticResource Surface.Card}">
+                    <StackPanel>
+                        <TextBlock Text="OPEN INCIDENTS" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding OpenIncidents}"
+                                   Style="{StaticResource Text.Metric}"
+                                   Foreground="{StaticResource Brush.StatusWarning}"
                                    Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>
