@@ -52,14 +52,18 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="170" />
+                <ColumnDefinition Width="150" />
                 <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="170" />
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <TextBox Grid.Column="0" Style="{StaticResource Input.TextBox}"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                     Tag="Search by user, device, or asset…" />
+                     Tag="Search by user, device, asset, path, action, classification, or risk…" />
 
             <ComboBox Grid.Column="2" Style="{StaticResource Input.ComboBox}"
                       ItemsSource="{Binding ActionOptions}"
@@ -67,9 +71,17 @@
                       DisplayMemberPath="Label" />
 
             <ComboBox Grid.Column="4" Style="{StaticResource Input.ComboBox}"
+                      ItemsSource="{Binding ClassificationOptions}"
+                      SelectedItem="{Binding SelectedClassification}"
+                      DisplayMemberPath="Label" />
+
+            <ComboBox Grid.Column="6" Style="{StaticResource Input.ComboBox}"
                       ItemsSource="{Binding RiskLevelOptions}"
                       SelectedItem="{Binding SelectedRiskLevel}"
                       DisplayMemberPath="Label" />
+
+            <Button Grid.Column="8" Content="Reset" Style="{StaticResource Button.Secondary}"
+                    Command="{Binding ResetFiltersCommand}" />
         </Grid>
 
         <!-- Content area: exactly one of these four is visible at a time -->
@@ -83,7 +95,13 @@
                         <DataGridTextColumn Header="TIMESTAMP" Binding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
                         <DataGridTextColumn Header="USER" Binding="{Binding User}" Width="*" />
                         <DataGridTextColumn Header="DEVICE" Binding="{Binding Device}" Width="*" />
-                        <DataGridTextColumn Header="ASSET" Binding="{Binding Asset}" Width="1.2*" />
+                        <DataGridTextColumn Header="ASSET" Binding="{Binding Asset}" Width="1.2*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="ToolTip" Value="{Binding Path}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
                         <DataGridTextColumn Header="ACTION" Binding="{Binding Action}" Width="0.8*" />
 
                         <DataGridTemplateColumn Header="CLASSIFICATION" Width="1.1*">
@@ -116,12 +134,18 @@
                         </DataGridTemplateColumn>
                     </DataGrid.Columns>
 
-                    <!-- Selecting a row reveals its risk factor breakdown — keeps the
-                         default table scannable while still surfacing the "why" on demand. -->
+                    <!-- Selecting a row reveals its full detail — the asset's full path
+                         (not shown as its own column, to keep the table scannable) plus
+                         the risk factor breakdown. -->
                     <DataGrid.RowDetailsTemplate>
                         <DataTemplate>
                             <Border Background="{StaticResource Brush.SurfaceAlt}" CornerRadius="3" Padding="14,10" Margin="0,4,0,8">
                                 <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <TextBlock Text="ASSET PATH" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Path}" Style="{StaticResource Text.Mono}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+
                                     <TextBlock Text="RISK FACTORS" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
                                     <ItemsControl ItemsSource="{Binding RiskFactors}">
                                         <ItemsControl.ItemTemplate>
