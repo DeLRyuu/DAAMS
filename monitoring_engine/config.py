@@ -107,3 +107,63 @@ DEFAULT_PIN = "1234"
 # Always contains exactly one document -- see pin_auth.py. Stores only a
 # salted hash, never the PIN itself.
 SECURITY_SETTINGS_COLLECTION = "security_settings"
+
+# ---------------------------------------------------------------------------
+# RISK ASSESSMENT (Phase 5) -- see risk_engine.py
+# ---------------------------------------------------------------------------
+# Base risk contribution from the protected asset's classification.
+CLASSIFICATION_WEIGHTS = {
+    "Public": 5,
+    "Sensitive": 15,
+    "Private": 25,
+    "Confidential": 35,
+}
+
+# Base risk contribution from the detected action.
+#
+# NOTE -- honest gap: the Phase 5 brief's action-weight table does not
+# include "Create", even though Create is one of the four actions this
+# Monitoring Engine actually detects (Phase 1). Rather than inventing an
+# unofficial number, risk_engine.py defaults any action missing from this
+# dict (including "Create") to 0 points and records that explicitly in
+# risk_factors, so the gap stays visible instead of silently guessed at.
+# If an official weight for Create is decided later, add it here --
+# nothing else needs to change.
+ACTION_WEIGHTS = {
+    "Open": 2,
+    "Modify": 8,
+    "Rename": 6,
+    "Copy": 18,
+    "Move": 14,
+    "Delete": 22,
+}
+
+# Normal working hours, 24-hour clock. WORK_HOURS_START is inclusive,
+# WORK_HOURS_END is exclusive (so 19 means "up to but not including 7:00 PM").
+WORK_HOURS_START = 7
+WORK_HOURS_END = 19
+AFTER_HOURS_RISK_POINTS = 25
+
+# Smaller risk contribution for activity that falls just inside working
+# hours but close to the boundary (e.g. 7:05 AM) -- optional and
+# configurable per the brief. Set ENABLE_NEAR_BOUNDARY_RISK = False to
+# disable this entirely.
+ENABLE_NEAR_BOUNDARY_RISK = True
+NEAR_BOUNDARY_MINUTES = 30
+NEAR_BOUNDARY_RISK_POINTS = 8
+
+# Burst/frequency risk: if this many (or more) relevant activities happen
+# on the SAME protected asset within this many seconds, add burst risk.
+# Tracked in-memory only -- see risk_engine.py module docstring.
+BURST_THRESHOLD = 3
+BURST_WINDOW_SECONDS = 60
+BURST_RISK_POINTS = 20
+
+# Risk level thresholds, checked highest-first. A score of exactly a
+# threshold value belongs to that level (e.g. 75 -> Critical, 74 -> High).
+RISK_LEVEL_THRESHOLDS = [
+    (75, "Critical"),
+    (50, "High"),
+    (25, "Medium"),
+    (0, "Low"),
+]

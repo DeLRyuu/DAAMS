@@ -2,8 +2,9 @@
 activity_logger.py
 
 Responsible for turning a raw filesystem event into a structured
-"activity record", displaying it to the administrator, persisting it
-locally, and (Phase 3) forwarding it to Firebase Firestore.
+"activity record", assessing its risk, displaying it to the
+administrator, persisting it locally, and forwarding it to Firebase
+Firestore.
 
 Phase 1 scope (unchanged):
 - Build a structured dict for each activity (User, Device, Asset, Action, Time).
@@ -15,7 +16,7 @@ Phase 2 scope (unchanged):
 - Handle logging failures (e.g. disk full, permissions) without crashing
   the monitoring engine -- a failed log write should never stop detection.
 
-Phase 3 scope (this update):
+Phase 3 scope (unchanged):
 - After the local log write, attempt to also upload the same record to
   Firebase Firestore via firestore_logger.py.
 - Firestore is entirely optional from this module's point of view: if it
@@ -23,8 +24,18 @@ Phase 3 scope (this update):
   addition to being caught inside firestore_logger itself) and reported
   as a warning. Local logging and terminal display are never affected.
 
-Risk scoring and alerting are still NOT part of this file. This module
-only records "what happened", not "how risky it was".
+Phase 5 scope (this update):
+- Between building the record and saving it anywhere, the record is
+  passed to risk_engine.assess_risk() (a separate module -- risk
+  CALCULATION logic does not live here, only the call to it). The
+  resulting risk_score/risk_level/risk_factors/advisory are merged into
+  the SAME record dict before it's logged locally or uploaded, so the
+  local log and Firestore both end up with risk data included, with no
+  second log and no schema change to how records are stored -- just more
+  keys in the same dict Phase 2/3 already knew how to persist.
+- Risk assessment failures are caught here as an extra safety net (on
+  top of risk_engine.py never raising on its own) so a risk-scoring bug
+  can never take down detection, local logging, or Firestore upload.
 """
 
 import getpass
@@ -34,6 +45,7 @@ import socket
 from datetime import datetime
 
 import firestore_logger
+import risk_engine
 
 # JSON Lines format: one JSON object per line. Chosen over a single JSON
 # array because it lets us APPEND new records cheaply and safely without
@@ -94,6 +106,19 @@ def display_activity(record: dict) -> None:
     print(f"Asset: {record['asset']}")
     print(f"Action: {record['action']}")
     print(f"Time: {record['timestamp']}")
+
+    # Phase 5: risk fields are optional in this function's eyes -- if
+    # something upstream failed to attach them, we still display the
+    # base activity rather than erroring out over missing keys.
+    if "risk_score" in record:
+        print(f"Risk: {record['risk_score']} ({record.get('risk_level', '?')})")
+        factors = record.get("risk_factors") or []
+        if factors:
+            print("Risk Factors:")
+            for factor in factors:
+                print(f"  - {factor}")
+        if record.get("advisory"):
+            print(f"Notice: {record['advisory']}")
 
 
 def append_to_local_log(record: dict) -> bool:
@@ -161,28 +186,67 @@ def read_all_activities() -> list:
     return records
 
 
-def record_activity(asset_path: str, action: str) -> dict:
+def _assess_risk_safely(record: dict, classification: str) -> dict:
     """
-    Build, locally log, upload to Firestore, and display an activity, in
-    that order:
+    Call risk_engine.assess_risk() with an extra safety net on top of the
+    one risk_engine.py already has internally -- belt and suspenders, so
+    a risk-scoring problem can NEVER prevent an activity from being
+    logged. Always returns a dict with risk_score/risk_level/
+    risk_factors/advisory, even in the worst case.
+    """
+    try:
+        return risk_engine.assess_risk(record, classification=classification)
+    except Exception as e:
+        print(f"[WARNING] Unexpected error during risk assessment: {e}")
+        return {
+            "risk_score": 0,
+            "risk_level": "Low",
+            "risk_factors": [f"Risk assessment failed unexpectedly: {e} (defaulted to Low/0)"],
+            "advisory": None,
+        }
+
+
+def record_activity(asset_path: str, action: str, classification: str = None) -> dict:
+    """
+    Build, assess risk for, locally log, upload to Firestore, and display
+    an activity, in that order:
         A. Build the structured activity record.
-        B. Save it to the local activity log (Phase 2).
-        C. Attempt to upload the same record to Firestore (Phase 3).
-        D. Display the activity in the terminal.
+        B. Assess its risk (Phase 5) -- risk_engine.py does the actual
+           calculation; this just calls it and merges the result in.
+        C. Save the (now risk-annotated) record to the local activity
+           log (Phase 2).
+        D. Attempt to upload the same record to Firestore (Phase 3).
+        E. Display the activity, including risk, in the terminal.
 
     Each step is isolated with its own error handling so that a problem
-    in any one of them (local disk, Firestore, terminal encoding) can
-    never crash the monitoring engine or prevent the others from running.
+    in any one of them (risk scoring, local disk, Firestore, terminal
+    encoding) can never crash the monitoring engine or prevent the
+    others from running.
 
-    Returns the record in case the caller needs it.
+    Args:
+        asset_path: the file/folder path the event happened to.
+        action: one of the actions the Monitoring Engine detects
+            (Create, Modify, Rename, Delete as of Phase 1-4).
+        classification: the protected asset's classification from the
+            Phase 4 registry, passed through to risk_engine.py. None is
+            handled safely (see risk_engine.py) if unavailable.
+
+    Returns the final record (including risk fields) in case the caller
+    needs it.
     """
     record = build_activity_record(asset_path, action)
 
-    # B. Local log (Phase 2) -- always attempted first, since it's the
+    # B. Risk assessment (Phase 5) -- merged into the SAME record dict,
+    # so everything downstream (local log, Firestore, display) just sees
+    # a slightly richer activity record with no format/schema change.
+    risk = _assess_risk_safely(record, classification)
+    record.update(risk)
+
+    # C. Local log (Phase 2) -- always attempted first, since it's the
     # most reliable storage and has no external dependency.
     append_to_local_log(record)
 
-    # C. Firestore upload (Phase 3) -- best-effort. firestore_logger
+    # D. Firestore upload (Phase 3) -- best-effort. firestore_logger
     # already catches everything internally; this try/except is an extra
     # safety net in case of an unexpected error outside that module.
     try:
@@ -190,7 +254,7 @@ def record_activity(asset_path: str, action: str) -> dict:
     except Exception as e:
         print(f"[WARNING] Unexpected error during Firestore upload attempt: {e}")
 
-    # D. Terminal display -- last, so the administrator sees the record
+    # E. Terminal display -- last, so the administrator sees the record
     # only after both storage attempts have already happened.
     try:
         display_activity(record)

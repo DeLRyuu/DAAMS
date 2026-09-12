@@ -25,6 +25,18 @@ menu takes effect on an already-running engine within a few seconds,
 with no restart needed. This is a simple periodic re-scan of a small
 local file, not a background sync queue or retry system.
 
+Phase 5 change: each event handler now carries the classification of
+the asset it's watching, and passes it through to
+activity_logger.record_activity() so risk_engine.py has what it needs
+to score classification-based risk. When a reconcile() detects a
+classification change on an already-watched asset, the handler's stored
+classification is updated in place -- this matters because a live
+reclassification does NOT create a new Watchdog watch (only
+protect/unprotect do), so without this fix risk scoring would keep
+using the asset's OLD classification until a restart. This module still
+only DETECTS activity; it does not calculate risk itself (see
+risk_engine.py).
+
 Design notes:
 - Watchdog's FileSystemEventHandler naturally distinguishes "moved" events
   (which covers same-volume Renames) from "created"/"deleted"/"modified".
@@ -50,22 +62,32 @@ class ProtectedAssetEventHandler(FileSystemEventHandler):
     """
     Translates raw Watchdog filesystem events into DAAMS activity records
     for the configured protected path.
+
+    Carries the asset's classification (Phase 5) so it can be passed to
+    activity_logger.record_activity() for risk scoring. `self.classification`
+    is mutable on purpose -- monitor.py's reconcile loop updates it in
+    place when an asset is reclassified live, without needing to tear
+    down and recreate the Watchdog watch itself.
     """
+
+    def __init__(self, classification: str = None):
+        super().__init__()
+        self.classification = classification
 
     def on_created(self, event):
         if event.is_directory:
             return  # Phase 1 focuses on file-level activity, not folder creation noise.
-        record_activity(asset_path=event.src_path, action="Create")
+        record_activity(asset_path=event.src_path, action="Create", classification=self.classification)
 
     def on_modified(self, event):
         if event.is_directory:
             return
-        record_activity(asset_path=event.src_path, action="Modify")
+        record_activity(asset_path=event.src_path, action="Modify", classification=self.classification)
 
     def on_deleted(self, event):
         if event.is_directory:
             return
-        record_activity(asset_path=event.src_path, action="Delete")
+        record_activity(asset_path=event.src_path, action="Delete", classification=self.classification)
 
     def on_moved(self, event):
         # A "moved" event where the file stays within the protected path
@@ -74,7 +96,7 @@ class ProtectedAssetEventHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         asset_description = f"{event.src_path} -> {event.dest_path}"
-        record_activity(asset_path=asset_description, action="Rename")
+        record_activity(asset_path=asset_description, action="Rename", classification=self.classification)
 
 
 def _validate_asset_for_watching(asset: dict) -> bool:
@@ -104,10 +126,12 @@ def _watch_asset(observer: Observer, asset: dict) -> dict:
     Schedule a Watchdog watch for a single ALREADY-VALIDATED protected
     asset. Returns a small info dict used to track this watch (so it can
     later be unscheduled if protection is removed, and so classification
-    changes can be detected on the next reconcile).
+    changes can be detected -- and applied to the live handler -- on the
+    next reconcile).
     """
     path = asset["path"]
     is_file = asset.get("asset_type") == "file" or os.path.isfile(path)
+    classification = asset.get("classification")
 
     # Watchdog observers watch directories. If the protected asset is a
     # single FILE, we watch its parent folder but filter events down to
@@ -115,18 +139,19 @@ def _watch_asset(observer: Observer, asset: dict) -> dict:
     # selected" rather than silently watching the whole containing folder.
     if is_file:
         watch_dir = os.path.dirname(os.path.abspath(path))
-        handler = _SingleFileFilterHandler(os.path.abspath(path))
+        handler = _SingleFileFilterHandler(os.path.abspath(path), classification=classification)
         recursive = False
     else:
         watch_dir = path
-        handler = ProtectedAssetEventHandler()
+        handler = ProtectedAssetEventHandler(classification=classification)
         recursive = True
 
     observed_watch = observer.schedule(handler, watch_dir, recursive=recursive)
     return {
         "observed_watch": observed_watch,
+        "handler": handler,
         "asset_type": "file" if is_file else "folder",
-        "classification": asset.get("classification", "?"),
+        "classification": classification,
     }
 
 
@@ -175,8 +200,12 @@ def start_monitoring():
                 print(f"\n[REGISTRY] Protection removed for '{path}' "
                       f"-- DAAMS stopped monitoring it.")
 
-        # Still protected, but reclassified -- no watch change needed,
-        # just let the administrator know the terminal reflects reality.
+        # Still protected, but reclassified -- no watch change needed
+        # (same handler instance keeps watching the same path), but the
+        # handler's OWN classification attribute must be updated in
+        # place (Phase 5) -- otherwise risk scoring would silently keep
+        # using the asset's old classification until a restart, since
+        # reclassifying doesn't create a new Watchdog watch.
         for path, asset in current_assets.items():
             if path in watched:
                 new_classification = asset.get("classification", "?")
@@ -184,6 +213,7 @@ def start_monitoring():
                     print(f"\n[REGISTRY] Classification changed for '{path}': "
                           f"{watched[path]['classification']} -> {new_classification}")
                     watched[path]["classification"] = new_classification
+                    watched[path]["handler"].classification = new_classification
 
     reconcile(initial=True)
 
@@ -217,8 +247,8 @@ class _SingleFileFilterHandler(ProtectedAssetEventHandler):
     reports activity on the specific protected file.
     """
 
-    def __init__(self, target_file: str):
-        super().__init__()
+    def __init__(self, target_file: str, classification: str = None):
+        super().__init__(classification=classification)
         self.target_file = os.path.normcase(os.path.abspath(target_file))
 
     def _matches(self, path: str) -> bool:
