@@ -2,3 +2,12 @@ bin/
 obj/
 *.user
 .vs/
+
+# Defense-in-depth: this project should never need a service-account key
+# file (Firestore auth goes through Application Default Credentials — see
+# README "Firestore setup"), but these patterns are ignored anyway in case
+# one is ever dropped in the folder during local testing.
+serviceAccountKey.json
+*firebase-adminsdk*.json
+appsettings.Local.json
+appsettings.*.local.json

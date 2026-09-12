@@ -208,8 +208,9 @@ public static class MockDataProvider
         return log.OrderByDescending(a => a.Timestamp).ToList();
     }
 
-    /// <summary>Most recent activity — used by the Dashboard. Same records, no duplicate data.</summary>
-    public static List<ActivityLog> GetRecentActivity(int count = 5) => GetActivityLog().Take(count).ToList();
+    // Note: no separate "recent activity" helper — DashboardViewModel takes
+    // .Take(n) of this same list itself (see Apply() there), so there's only
+    // ever one place activity records are defined.
 
     // ------------------------------------------------------------------
     // Security Alerts
@@ -259,10 +260,6 @@ public static class MockDataProvider
             Status = AlertStatus.Resolved, CreatedAt = DateTime.Now.AddDays(-3)
         },
     };
-
-    /// <summary>Most recent alerts — used by the Dashboard. Same records, no duplicate data.</summary>
-    public static List<SecurityAlert> GetRecentAlerts(int count = 3)
-        => GetSecurityAlerts().OrderByDescending(a => a.CreatedAt).Take(count).ToList();
 
     // ------------------------------------------------------------------
     // Incident Reports — investigation records, optionally tied to an alert above.
@@ -315,17 +312,10 @@ public static class MockDataProvider
         },
     };
 
-    // ------------------------------------------------------------------
-    // Dashboard summary figures
-    // ------------------------------------------------------------------
-
-    /// <summary>Counts of recent activity by risk band — feeds the Dashboard distribution bar.</summary>
-    public static (int Low, int Medium, int High, int Critical) GetRiskDistribution() => (128, 41, 15, 4);
-
-    public static int GetTotalProtectedAssets() => GetProtectedAssets().Count(a => a.Status == ProtectionStatus.Protected);
-
-    public static int GetTotalActivitiesThisWeek() => 1284;
-
-    public static int GetOpenIncidentsCount() => GetIncidentReports()
-        .Count(i => i.InvestigationStatus is InvestigationStatus.New or InvestigationStatus.UnderInvestigation);
+    // Note: no separate "dashboard summary" helpers (total protected count,
+    // risk distribution, open incidents, etc.) — DashboardViewModel.Apply()
+    // computes all of these itself from the same four lists above, exactly
+    // the way it computes them from real Firestore data. That keeps the
+    // sample-data path and the Firestore path go through identical logic,
+    // so switching between them never changes what a number means.
 }

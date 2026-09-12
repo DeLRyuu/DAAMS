@@ -13,6 +13,7 @@
 
     <Window.Resources>
         <conv:EnumToBooleanConverter x:Key="EnumToBool" />
+        <conv:FirestoreConnectionStateToBrushConverter x:Key="FirestoreStateBrush" />
 
         <!-- ViewModel -> View mapping. This is the whole navigation mechanism:
              MainViewModel swaps CurrentViewModel, the ContentControl below
@@ -63,10 +64,12 @@
                         BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.StatusInactive}" VerticalAlignment="Center" />
-                            <TextBlock Text="Firestore: Not Connected" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" />
+                            <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                     Fill="{Binding FirestoreState, Converter={StaticResource FirestoreStateBrush}}" />
+                            <TextBlock Text="{Binding FirestoreStatusText}" Style="{StaticResource Text.Secondary}"
+                                       Margin="8,0,0,0" TextWrapping="Wrap" />
                         </StackPanel>
-                        <TextBlock Text="Phase 2 — Functional Sections (Mock Data)" Style="{StaticResource Text.Secondary}"
+                        <TextBlock Text="Phase 3 — Firestore Integration" Style="{StaticResource Text.Secondary}"
                                    Foreground="{StaticResource Brush.TextTertiary}" Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>

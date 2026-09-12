@@ -3,26 +3,40 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Data;
 using ControlCenter.Data;
 using ControlCenter.Models;
+using ControlCenter.Services;
 
 namespace ControlCenter.ViewModels;
 
 /// <summary>
-/// Incident Reports: manager-authored investigation records, optionally tied
-/// back to a Security Alert. UI/data presentation layer only for Phase 2 —
-/// creating/editing incidents is a later phase.
+/// Incident Reports: manager-authored investigation records, read from
+/// Firestore's incident_reports collection, optionally tied back to a
+/// Security Alert. Read-only presentation — creating/editing incidents from
+/// the Control Center is a later phase.
 /// </summary>
-public class IncidentReportsViewModel : ViewModelBase
+public class IncidentReportsViewModel : DataSectionViewModelBase
 {
-    public bool IsSampleData { get; } = true;
+    private readonly FirestoreService _firestore;
+    private readonly ObservableCollection<IncidentReport> _allIncidents = new();
 
-    private readonly ObservableCollection<IncidentReport> _allIncidents;
     public ICollectionView Incidents { get; }
 
-    public int TotalCount => _allIncidents.Count;
-    public int OpenCount => _allIncidents.Count(i => i.InvestigationStatus is InvestigationStatus.New or InvestigationStatus.UnderInvestigation);
+    private int _totalCount;
+    public int TotalCount
+    {
+        get => _totalCount;
+        private set => SetProperty(ref _totalCount, value);
+    }
+
+    private int _openCount;
+    public int OpenCount
+    {
+        get => _openCount;
+        private set => SetProperty(ref _openCount, value);
+    }
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -52,14 +66,35 @@ public class IncidentReportsViewModel : ViewModelBase
         }
     }
 
-    public IncidentReportsViewModel()
+    public IncidentReportsViewModel(FirestoreService firestore)
     {
-        _allIncidents = new ObservableCollection<IncidentReport>(
-            MockDataProvider.GetIncidentReports().OrderByDescending(i => i.UpdatedAt));
+        _firestore = firestore;
+
         Incidents = CollectionViewSource.GetDefaultView(_allIncidents);
         Incidents.Filter = FilterPredicate;
 
         _selectedStatus = StatusOptions[0];
+    }
+
+    protected override async Task<int> LoadFromFirestoreAsync()
+    {
+        List<IncidentReport> incidents = await _firestore.GetIncidentReportsAsync();
+        Apply(incidents);
+        return incidents.Count;
+    }
+
+    protected override void LoadSampleFallbackCore() => Apply(MockDataProvider.GetIncidentReports());
+
+    private void Apply(List<IncidentReport> incidents)
+    {
+        _allIncidents.Clear();
+        foreach (IncidentReport incident in incidents.OrderByDescending(i => i.UpdatedAt))
+        {
+            _allIncidents.Add(incident);
+        }
+
+        TotalCount = _allIncidents.Count;
+        OpenCount = _allIncidents.Count(i => i.InvestigationStatus is InvestigationStatus.New or InvestigationStatus.UnderInvestigation);
     }
 
     private bool FilterPredicate(object obj)

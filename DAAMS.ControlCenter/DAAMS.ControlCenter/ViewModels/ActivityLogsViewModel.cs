@@ -3,25 +3,33 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Data;
 using ControlCenter.Data;
 using ControlCenter.Models;
+using ControlCenter.Services;
 
 namespace ControlCenter.ViewModels;
 
 /// <summary>
-/// Activity Logs: full detected-activity history for protected assets, as
-/// reported by the DAAMS Monitoring System. This view only displays events —
-/// it never invents or simulates them (see reference doc §9/§19).
+/// Activity Logs: detected-activity history for protected assets, read from
+/// Firestore's activity_logs collection, as reported by the DAAMS Monitoring
+/// System. This view only displays events — it never invents or simulates
+/// them (reference doc §9/§19).
 /// </summary>
-public class ActivityLogsViewModel : ViewModelBase
+public class ActivityLogsViewModel : DataSectionViewModelBase
 {
-    public bool IsSampleData { get; } = true;
+    private readonly FirestoreService _firestore;
+    private readonly ObservableCollection<ActivityLog> _allActivity = new();
 
-    private readonly ObservableCollection<ActivityLog> _allActivity;
     public ICollectionView Activity { get; }
 
-    public int TotalCount => _allActivity.Count;
+    private int _totalCount;
+    public int TotalCount
+    {
+        get => _totalCount;
+        private set => SetProperty(ref _totalCount, value);
+    }
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -66,14 +74,35 @@ public class ActivityLogsViewModel : ViewModelBase
         }
     }
 
-    public ActivityLogsViewModel()
+    public ActivityLogsViewModel(FirestoreService firestore)
     {
-        _allActivity = new ObservableCollection<ActivityLog>(MockDataProvider.GetActivityLog());
+        _firestore = firestore;
+
         Activity = CollectionViewSource.GetDefaultView(_allActivity);
         Activity.Filter = FilterPredicate;
 
         _selectedAction = ActionOptions[0];
         _selectedRiskLevel = RiskLevelOptions[0];
+    }
+
+    protected override async Task<int> LoadFromFirestoreAsync()
+    {
+        List<ActivityLog> activity = await _firestore.GetActivityLogsAsync();
+        Apply(activity);
+        return activity.Count;
+    }
+
+    protected override void LoadSampleFallbackCore() => Apply(MockDataProvider.GetActivityLog());
+
+    private void Apply(List<ActivityLog> activity)
+    {
+        _allActivity.Clear();
+        foreach (ActivityLog entry in activity.OrderByDescending(a => a.Timestamp))
+        {
+            _allActivity.Add(entry);
+        }
+
+        TotalCount = _allActivity.Count;
     }
 
     private bool FilterPredicate(object obj)

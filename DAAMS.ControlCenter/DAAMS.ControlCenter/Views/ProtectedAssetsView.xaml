@@ -11,6 +11,7 @@
     <UserControl.Resources>
         <conv:ClassificationToBrushConverter x:Key="ClassBrush" />
         <conv:StatusToBrushConverter x:Key="StatusBrush" />
+        <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
@@ -22,21 +23,31 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
-            <TextBlock Text="Protected Assets" Style="{StaticResource Text.PageTitle}" />
-            <Border Background="{StaticResource Brush.SurfaceElevated}"
-                    CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
-                    Visibility="{Binding IsSampleData, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="SAMPLE DATA" Style="{StaticResource Text.Label}" />
-            </Border>
-        </StackPanel>
-        <TextBlock Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
-                    Style="{StaticResource Text.Secondary}">
-            <Run Text="{Binding ProtectedCount, Mode=OneWay}" />
-            <Run Text=" of " />
-            <Run Text="{Binding TotalCount, Mode=OneWay}" />
-            <Run Text=" assets currently protected" />
-        </TextBlock>
+        <Grid Grid.Row="0" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <TextBlock Text="Protected Assets" Style="{StaticResource Text.PageTitle}" />
+                <Border Background="{StaticResource Brush.RiskMediumBg}"
+                        CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
+                        Visibility="{Binding IsShowingSampleFallback, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="SAMPLE DATA — FIRESTORE UNAVAILABLE" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.RiskMedium}" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                <Button Content="Refresh" Style="{StaticResource Button.Secondary}" Command="{Binding RefreshCommand}" HorizontalAlignment="Right" />
+                <TextBlock HorizontalAlignment="Right" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0">
+                    <Run Text="{Binding ProtectedCount, Mode=OneWay}" />
+                    <Run Text=" of " />
+                    <Run Text="{Binding TotalCount, Mode=OneWay}" />
+                    <Run Text=" protected" />
+                </TextBlock>
+            </StackPanel>
+        </Grid>
 
         <!-- Toolbar -->
         <Grid Grid.Row="1" Margin="0,16,0,14">
@@ -63,43 +74,72 @@
                       DisplayMemberPath="Label" />
         </Grid>
 
-        <!-- Table -->
-        <Border Grid.Row="2" Style="{StaticResource Surface.Card}" Padding="18,6,18,10">
-            <DataGrid ItemsSource="{Binding Assets}" Style="{StaticResource Grid.Data}">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="ASSET NAME" Binding="{Binding AssetName}" Width="1.3*" />
-                    <DataGridTextColumn Header="TYPE" Binding="{Binding AssetType}" Width="0.8*" />
-                    <DataGridTextColumn Header="PATH" Binding="{Binding Path}" Width="2*" />
+        <!-- Content area: exactly one of these four is visible at a time -->
+        <Grid Grid.Row="2">
 
-                    <DataGridTemplateColumn Header="CLASSIFICATION" Width="1.1*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource Badge.Base}"
-                                        Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
-                                    <TextBlock Text="{Binding Classification}"
-                                               Style="{StaticResource Badge.Text}"
-                                               Foreground="{Binding Classification, Converter={StaticResource ClassBrush}}" />
-                                </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+            <Border Style="{StaticResource Surface.Card}" Padding="18,6,18,10"
+                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
+                <DataGrid ItemsSource="{Binding Assets}" Style="{StaticResource Grid.Data}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="ASSET NAME" Binding="{Binding AssetName}" Width="1.3*" />
+                        <DataGridTextColumn Header="TYPE" Binding="{Binding AssetType}" Width="0.8*" />
+                        <DataGridTextColumn Header="PATH" Binding="{Binding Path}" Width="2*" />
 
-                    <DataGridTemplateColumn Header="STATUS" Width="*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <Ellipse Width="7" Height="7" VerticalAlignment="Center"
-                                             Fill="{Binding Status, Converter={StaticResource StatusBrush}}" />
-                                    <TextBlock Text="{Binding Status}" Style="{StaticResource Text.Body}" Margin="7,0,0,0" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="CLASSIFICATION" Width="1.1*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Badge.Base}"
+                                            Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
+                                        <TextBlock Text="{Binding Classification}"
+                                                   Style="{StaticResource Badge.Text}"
+                                                   Foreground="{Binding Classification, Converter={StaticResource ClassBrush}}" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Header="PROTECTED AT" Binding="{Binding ProtectedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
-                    <DataGridTextColumn Header="PROTECTED BY" Binding="{Binding ProtectedBy}" Width="*" />
-                </DataGrid.Columns>
-            </DataGrid>
-        </Border>
+                        <DataGridTemplateColumn Header="STATUS" Width="*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                                 Fill="{Binding Status, Converter={StaticResource StatusBrush}}" />
+                                        <TextBlock Text="{Binding Status}" Style="{StaticResource Text.Body}" Margin="7,0,0,0" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="PROTECTED AT" Binding="{Binding ProtectedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                        <DataGridTextColumn Header="PROTECTED BY" Binding="{Binding ProtectedBy}" Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <Border Style="{StaticResource Surface.Card}"
+                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loading}">
+                <TextBlock Text="Loading protected assets…" Style="{StaticResource Text.Secondary}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+
+            <Border Style="{StaticResource Surface.Card}"
+                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
+                <TextBlock Text="No protected assets found in Firestore." Style="{StaticResource Text.Secondary}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+
+            <Border Style="{StaticResource Surface.Card}"
+                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Error}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420">
+                    <TextBlock Text="Unable to load Protected Assets" Style="{StaticResource Text.SectionHeading}" HorizontalAlignment="Center" TextAlignment="Center" />
+                    <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource Text.Secondary}"
+                               TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,16" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" Margin="0,0,10,0" />
+                        <Button Content="View Sample Data" Style="{StaticResource Button.Secondary}" Command="{Binding ShowSampleDataCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

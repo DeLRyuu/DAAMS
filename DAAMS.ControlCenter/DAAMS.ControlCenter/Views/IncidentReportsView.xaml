@@ -12,6 +12,7 @@
         <conv:RiskLevelToBrushConverter x:Key="RiskBrush" />
         <conv:StatusToBrushConverter x:Key="StatusBrush" />
         <conv:StringToVisibilityConverter x:Key="StringToVis" />
+        <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
@@ -23,20 +24,31 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
-            <TextBlock Text="Incident Reports" Style="{StaticResource Text.PageTitle}" />
-            <Border Background="{StaticResource Brush.SurfaceElevated}"
-                    CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
-                    Visibility="{Binding IsSampleData, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="SAMPLE DATA" Style="{StaticResource Text.Label}" />
-            </Border>
-        </StackPanel>
-        <TextBlock Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top" Style="{StaticResource Text.Secondary}">
-            <Run Text="{Binding OpenCount, Mode=OneWay}" />
-            <Run Text=" of " />
-            <Run Text="{Binding TotalCount, Mode=OneWay}" />
-            <Run Text=" incidents open" />
-        </TextBlock>
+        <Grid Grid.Row="0" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <TextBlock Text="Incident Reports" Style="{StaticResource Text.PageTitle}" />
+                <Border Background="{StaticResource Brush.RiskMediumBg}"
+                        CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
+                        Visibility="{Binding IsShowingSampleFallback, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="SAMPLE DATA — FIRESTORE UNAVAILABLE" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.RiskMedium}" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                <Button Content="Refresh" Style="{StaticResource Button.Secondary}" Command="{Binding RefreshCommand}" HorizontalAlignment="Right" />
+                <TextBlock HorizontalAlignment="Right" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0">
+                    <Run Text="{Binding OpenCount, Mode=OneWay}" />
+                    <Run Text=" of " />
+                    <Run Text="{Binding TotalCount, Mode=OneWay}" />
+                    <Run Text=" open" />
+                </TextBlock>
+            </StackPanel>
+        </Grid>
 
         <!-- Toolbar -->
         <Grid Grid.Row="1" Margin="0,16,0,14">
@@ -56,69 +68,98 @@
                       DisplayMemberPath="Label" />
         </Grid>
 
-        <!-- Incident cards -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Incidents}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+        <!-- Content area: exactly one of these four is visible at a time -->
+        <Grid Grid.Row="2">
 
-                                <StackPanel Grid.Column="0">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding IncidentId}" Style="{StaticResource Text.Mono}" />
-                                        <TextBlock Style="{StaticResource Text.Secondary}" Margin="10,0,0,0"
-                                                   Visibility="{Binding RelatedAlertId, Converter={StaticResource StringToVis}}">
-                                            <Run Text="Related alert: " />
-                                            <Run Text="{Binding RelatedAlertId, Mode=OneWay}" />
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
+                <ItemsControl ItemsSource="{Binding Incidents}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding IncidentId}" Style="{StaticResource Text.Mono}" />
+                                            <TextBlock Style="{StaticResource Text.Secondary}" Margin="10,0,0,0"
+                                                       Visibility="{Binding RelatedAlertId, Converter={StaticResource StringToVis}}">
+                                                <Run Text="Related alert: " />
+                                                <Run Text="{Binding RelatedAlertId, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <Border Style="{StaticResource Badge.Base}" Margin="10,0,0,0"
+                                                    Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}">
+                                                <TextBlock Text="{Binding RiskLevel}"
+                                                           Style="{StaticResource Badge.Text}"
+                                                           Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
+                                            </Border>
+                                        </StackPanel>
+
+                                        <TextBlock Text="{Binding Asset}" Style="{StaticResource Text.SectionHeading}" Margin="0,8,0,2" />
+                                        <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" Margin="0,0,0,8" MaxWidth="640" />
+
+                                        <TextBlock Style="{StaticResource Text.Secondary}">
+                                            <Run Text="{Binding User, Mode=OneWay}" />
+                                            <Run Text=" · " />
+                                            <Run Text="{Binding Device, Mode=OneWay}" />
+                                            <Run Text=" · Action: " />
+                                            <Run Text="{Binding Action, Mode=OneWay}" />
+                                            <Run Text=" · " />
+                                            <Run Text="{Binding Timestamp, Mode=OneWay, StringFormat='yyyy-MM-dd HH:mm'}" />
                                         </TextBlock>
-                                        <Border Style="{StaticResource Badge.Base}" Margin="10,0,0,0"
-                                                Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}">
-                                            <TextBlock Text="{Binding RiskLevel}"
-                                                       Style="{StaticResource Badge.Text}"
-                                                       Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
-                                        </Border>
+
+                                        <TextBlock Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,8,0,0" MaxWidth="640"
+                                                   Visibility="{Binding Notes, Converter={StaticResource StringToVis}}">
+                                            <Run Text="Notes: " FontWeight="SemiBold" />
+                                            <Run Text="{Binding Notes, Mode=OneWay}" />
+                                        </TextBlock>
                                     </StackPanel>
 
-                                    <TextBlock Text="{Binding Asset}" Style="{StaticResource Text.SectionHeading}" Margin="0,8,0,2" />
-                                    <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" Margin="0,0,0,8" MaxWidth="640" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right">
+                                        <Border Style="{StaticResource Badge.Base}"
+                                                Background="{Binding InvestigationStatus, Converter={StaticResource StatusBrush}, ConverterParameter=Bg}">
+                                            <TextBlock Text="{Binding InvestigationStatus}"
+                                                       Style="{StaticResource Badge.Text}"
+                                                       Foreground="{Binding InvestigationStatus, Converter={StaticResource StatusBrush}}" />
+                                        </Border>
+                                        <TextBlock Text="{Binding UpdatedAt, StringFormat='Updated {0:yyyy-MM-dd HH:mm}'}"
+                                                   Style="{StaticResource Text.Secondary}" Margin="0,8,0,0" HorizontalAlignment="Right" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
 
-                                    <TextBlock Style="{StaticResource Text.Secondary}">
-                                        <Run Text="{Binding User, Mode=OneWay}" />
-                                        <Run Text=" · " />
-                                        <Run Text="{Binding Device, Mode=OneWay}" />
-                                        <Run Text=" · Action: " />
-                                        <Run Text="{Binding Action, Mode=OneWay}" />
-                                        <Run Text=" · " />
-                                        <Run Text="{Binding Timestamp, Mode=OneWay, StringFormat='yyyy-MM-dd HH:mm'}" />
-                                    </TextBlock>
+            <Border Style="{StaticResource Surface.Card}"
+                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loading}">
+                <TextBlock Text="Loading incident reports…" Style="{StaticResource Text.Secondary}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
 
-                                    <TextBlock Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,8,0,0" MaxWidth="640"
-                                               Visibility="{Binding Notes, Converter={StaticResource StringToVis}}">
-                                        <Run Text="Notes: " FontWeight="SemiBold" />
-                                        <Run Text="{Binding Notes, Mode=OneWay}" />
-                                    </TextBlock>
-                                </StackPanel>
+            <Border Style="{StaticResource Surface.Card}"
+                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
+                <TextBlock Text="No incident reports in Firestore yet." Style="{StaticResource Text.Secondary}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right">
-                                    <Border Style="{StaticResource Badge.Base}"
-                                            Background="{Binding InvestigationStatus, Converter={StaticResource StatusBrush}, ConverterParameter=Bg}">
-                                        <TextBlock Text="{Binding InvestigationStatus}"
-                                                   Style="{StaticResource Badge.Text}"
-                                                   Foreground="{Binding InvestigationStatus, Converter={StaticResource StatusBrush}}" />
-                                    </Border>
-                                    <TextBlock Text="{Binding UpdatedAt, StringFormat='Updated {0:yyyy-MM-dd HH:mm}'}"
-                                               Style="{StaticResource Text.Secondary}" Margin="0,8,0,0" HorizontalAlignment="Right" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+            <Border Style="{StaticResource Surface.Card}"
+                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Error}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420">
+                    <TextBlock Text="Unable to load Incident Reports" Style="{StaticResource Text.SectionHeading}" HorizontalAlignment="Center" TextAlignment="Center" />
+                    <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource Text.Secondary}"
+                               TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,16" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" Margin="0,0,10,0" />
+                        <Button Content="View Sample Data" Style="{StaticResource Button.Secondary}" Command="{Binding ShowSampleDataCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
