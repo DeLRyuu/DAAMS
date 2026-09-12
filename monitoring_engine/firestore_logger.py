@@ -27,6 +27,13 @@ records (see asset_registry.py) to a separate 'protected_assets'
 collection. Firestore is a best-effort MIRROR of the registry here, never
 the source of truth -- the Monitoring Engine always reads the local JSON
 registry so it keeps working even if Firestore is unreachable.
+
+Phase 6 addition: upload_security_alert() syncs Security Alerts (see
+alert_manager.py) to a separate 'security_alerts' collection, using the
+SAME Firestore project/credentials already configured -- no second
+Firebase project, no new collection setup required in the console (it's
+created automatically on first write, same as every other collection
+here).
 """
 
 import hashlib
@@ -37,6 +44,7 @@ from config import (
     FIRESTORE_COLLECTION,
     FIRESTORE_CREDENTIALS_PATH,
     PROTECTED_ASSETS_COLLECTION,
+    SECURITY_ALERTS_COLLECTION,
     SECURITY_SETTINGS_COLLECTION,
 )
 
@@ -155,6 +163,33 @@ def upload_security_settings(record: dict) -> bool:
     except Exception as e:
         print(f"[FIRESTORE WARNING] Failed to sync PIN settings to Firestore: {e}")
         print("The change was still saved to the local security settings file.")
+        return False
+
+
+def upload_security_alert(alert: dict) -> bool:
+    """
+    Upload a single Security Alert (Phase 6) to Firestore's
+    'security_alerts' collection, keyed by the alert's own alert_id so a
+    re-upload (if this were ever retried) stays idempotent rather than
+    creating a duplicate document.
+
+    Returns True on success, False otherwise. NEVER raises -- the local
+    alert record (alert_manager.py, security_alerts.jsonl) is always
+    written first and remains authoritative regardless of what happens
+    here.
+    """
+    _initialize_firestore()
+
+    if _firestore_disabled or _firestore_client is None:
+        return False
+
+    try:
+        alert_id = alert.get("alert_id", "unknown")
+        _firestore_client.collection(SECURITY_ALERTS_COLLECTION).document(alert_id).set(alert)
+        return True
+    except Exception as e:
+        print(f"[FIRESTORE WARNING] Failed to upload security alert to Firestore: {e}")
+        print("The alert was still saved to the local alert log.")
         return False
 
 

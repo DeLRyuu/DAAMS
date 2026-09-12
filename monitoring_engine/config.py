@@ -167,3 +167,15 @@ RISK_LEVEL_THRESHOLDS = [
     (25, "Medium"),
     (0, "Low"),
 ]
+
+# ---------------------------------------------------------------------------
+# SECURITY ALERTS (Phase 6) -- see alert_manager.py
+# ---------------------------------------------------------------------------
+# Risk levels that generate a Security Alert. Per the brief: Low and
+# Medium never alert; High and Critical always do. This does NOT
+# recalculate risk -- it only reads the risk_level Phase 5 already
+# produced.
+ALERT_RISK_LEVELS = {"High", "Critical"}
+
+# Name of the Firestore collection that stores security alerts.
+SECURITY_ALERTS_COLLECTION = "security_alerts"

@@ -13,6 +13,7 @@ serviceAccountKey.json
 firebase-adminsdk-*.json
 monitoring_engine/security_settings.json
 monitoring_engine/protected_assets.json
+monitoring_engine/security_alerts.jsonl
 
 # VS Code
 .vscode/

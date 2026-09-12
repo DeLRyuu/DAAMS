@@ -24,7 +24,7 @@ Phase 3 scope (unchanged):
   addition to being caught inside firestore_logger itself) and reported
   as a warning. Local logging and terminal display are never affected.
 
-Phase 5 scope (this update):
+Phase 5 scope (unchanged):
 - Between building the record and saving it anywhere, the record is
   passed to risk_engine.assess_risk() (a separate module -- risk
   CALCULATION logic does not live here, only the call to it). The
@@ -36,6 +36,18 @@ Phase 5 scope (this update):
 - Risk assessment failures are caught here as an extra safety net (on
   top of risk_engine.py never raising on its own) so a risk-scoring bug
   can never take down detection, local logging, or Firestore upload.
+
+Phase 6 scope (this update):
+- After the activity itself is fully logged and displayed, the SAME
+  risk-assessed record is handed to alert_manager.process_activity(),
+  which decides (using the risk_level Phase 5 already computed -- risk
+  is NOT recalculated) whether this warrants a Security Alert, and if
+  so builds/stores/displays it. This module doesn't know or care what
+  "warrants an alert" means; that decision, and all alert storage, is
+  alert_manager.py's job alone.
+- Alert-processing failures are caught here as an extra safety net (on
+  top of alert_manager.py never raising on its own) so an alerting bug
+  can never take down detection or activity logging.
 """
 
 import getpass
@@ -44,6 +56,7 @@ import os
 import socket
 from datetime import datetime
 
+import alert_manager
 import firestore_logger
 import risk_engine
 
@@ -208,8 +221,8 @@ def _assess_risk_safely(record: dict, classification: str) -> dict:
 
 def record_activity(asset_path: str, action: str, classification: str = None) -> dict:
     """
-    Build, assess risk for, locally log, upload to Firestore, and display
-    an activity, in that order:
+    Build, assess risk for, locally log, upload to Firestore, display,
+    and (if warranted) alert on an activity, in that order:
         A. Build the structured activity record.
         B. Assess its risk (Phase 5) -- risk_engine.py does the actual
            calculation; this just calls it and merges the result in.
@@ -217,19 +230,24 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
            log (Phase 2).
         D. Attempt to upload the same record to Firestore (Phase 3).
         E. Display the activity, including risk, in the terminal.
+        F. Hand the SAME record to alert_manager.py (Phase 6), which
+           decides -- using the risk_level already computed in step B,
+           never recalculating it -- whether to generate, store, and
+           display a Security Alert.
 
     Each step is isolated with its own error handling so that a problem
     in any one of them (risk scoring, local disk, Firestore, terminal
-    encoding) can never crash the monitoring engine or prevent the
-    others from running.
+    encoding, alert generation) can never crash the monitoring engine or
+    prevent the others from running.
 
     Args:
         asset_path: the file/folder path the event happened to.
         action: one of the actions the Monitoring Engine detects
             (Create, Modify, Rename, Delete as of Phase 1-4).
         classification: the protected asset's classification from the
-            Phase 4 registry, passed through to risk_engine.py. None is
-            handled safely (see risk_engine.py) if unavailable.
+            Phase 4 registry, passed through to risk_engine.py and (for
+            display purposes only) into any resulting Security Alert.
+            None is handled safely if unavailable.
 
     Returns the final record (including risk fields) in case the caller
     needs it.
@@ -237,8 +255,9 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
     record = build_activity_record(asset_path, action)
 
     # B. Risk assessment (Phase 5) -- merged into the SAME record dict,
-    # so everything downstream (local log, Firestore, display) just sees
-    # a slightly richer activity record with no format/schema change.
+    # so everything downstream (local log, Firestore, display, alerting)
+    # just sees a slightly richer activity record with no format/schema
+    # change.
     risk = _assess_risk_safely(record, classification)
     record.update(risk)
 
@@ -254,11 +273,20 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
     except Exception as e:
         print(f"[WARNING] Unexpected error during Firestore upload attempt: {e}")
 
-    # E. Terminal display -- last, so the administrator sees the record
-    # only after both storage attempts have already happened.
+    # E. Terminal display -- after both storage attempts, so the
+    # administrator sees the activity block before any alert block.
     try:
         display_activity(record)
     except Exception as e:
         print(f"[WARNING] Could not display activity in terminal: {e}")
+
+    # F. Security Alert (Phase 6) -- alert_manager.py decides based on
+    # risk_level (already computed above) whether this warrants an
+    # alert, and if so builds/stores/displays it. This is an extra
+    # safety net on top of alert_manager.py never raising on its own.
+    try:
+        alert_manager.process_activity(record, classification=classification)
+    except Exception as e:
+        print(f"[WARNING] Unexpected error during alert processing: {e}")
 
     return record
