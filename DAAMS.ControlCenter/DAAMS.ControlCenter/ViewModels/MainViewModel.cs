@@ -56,13 +56,21 @@ public class MainViewModel : ViewModelBase
 
         var firestoreService = new FirestoreService(_firestoreConnection);
 
+        // IncidentReportsViewModel is built first so SecurityAlertsViewModel can be
+        // handed a direct reference to AddLocalIncident — this is how "Create Incident
+        // Report" on an alert makes the new incident show up over in Incident Reports,
+        // without a shared backing store or any change to how either section loads
+        // its own data from Firestore.
+        var incidentReportsViewModel = new IncidentReportsViewModel(firestoreService);
+        var securityAlertsViewModel = new SecurityAlertsViewModel(firestoreService, incidentReportsViewModel.AddLocalIncident);
+
         _sections = new Dictionary<NavigationSection, ViewModelBase>
         {
             [NavigationSection.Dashboard] = new DashboardViewModel(firestoreService),
             [NavigationSection.ProtectedAssets] = new ProtectedAssetsViewModel(firestoreService),
             [NavigationSection.ActivityLogs] = new ActivityLogsViewModel(firestoreService),
-            [NavigationSection.SecurityAlerts] = new SecurityAlertsViewModel(firestoreService),
-            [NavigationSection.IncidentReports] = new IncidentReportsViewModel(firestoreService),
+            [NavigationSection.SecurityAlerts] = securityAlertsViewModel,
+            [NavigationSection.IncidentReports] = incidentReportsViewModel,
             [NavigationSection.Settings] = new SettingsViewModel(),
         };
 

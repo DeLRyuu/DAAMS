@@ -4,13 +4,15 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:conv="clr-namespace:ControlCenter.Converters"
+             xmlns:models="clr-namespace:ControlCenter.Models"
              mc:Ignorable="d"
-             d:DesignWidth="1150" d:DesignHeight="760"
+             d:DesignWidth="1150" d:DesignHeight="800"
              Background="{StaticResource Brush.Background}">
 
     <UserControl.Resources>
         <conv:RiskLevelToBrushConverter x:Key="RiskBrush" />
         <conv:StatusToBrushConverter x:Key="StatusBrush" />
+        <conv:ClassificationToBrushConverter x:Key="ClassBrush" />
         <conv:StringToVisibilityConverter x:Key="StringToVis" />
         <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -55,7 +57,9 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="190" />
+                <ColumnDefinition Width="170" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="170" />
             </Grid.ColumnDefinitions>
 
             <TextBox Grid.Column="0" Style="{StaticResource Input.TextBox}"
@@ -66,75 +70,144 @@
                       ItemsSource="{Binding StatusOptions}"
                       SelectedItem="{Binding SelectedStatus}"
                       DisplayMemberPath="Label" />
+
+            <ComboBox Grid.Column="4" Style="{StaticResource Input.ComboBox}"
+                      ItemsSource="{Binding RiskLevelOptions}"
+                      SelectedItem="{Binding SelectedRiskLevel}"
+                      DisplayMemberPath="Label" />
         </Grid>
 
         <!-- Content area: exactly one of these four is visible at a time -->
         <Grid Grid.Row="2">
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
-                <ItemsControl ItemsSource="{Binding Incidents}">
-                    <ItemsControl.ItemTemplate>
+            <Border Style="{StaticResource Surface.Card}" Padding="18,6,18,10"
+                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
+                <DataGrid ItemsSource="{Binding Incidents}" Style="{StaticResource Grid.Data}"
+                          SelectedItem="{Binding SelectedIncident}"
+                          RowDetailsVisibilityMode="VisibleWhenSelected">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="INCIDENT ID" Binding="{Binding IncidentId}" Width="1.1*" />
+                        <DataGridTextColumn Header="ALERT ID" Binding="{Binding RelatedAlertId}" Width="*" />
+                        <DataGridTextColumn Header="USER" Binding="{Binding User}" Width="*" />
+                        <DataGridTextColumn Header="ASSET" Binding="{Binding Asset}" Width="1.2*" />
+
+                        <DataGridTemplateColumn Header="RISK LEVEL" Width="0.9*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Badge.Base}"
+                                            Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}">
+                                        <TextBlock Text="{Binding RiskLevel}"
+                                                   Style="{StaticResource Badge.Text}"
+                                                   Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="DATE / TIME" Binding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+
+                        <DataGridTemplateColumn Header="STATUS" Width="*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Badge.Base}"
+                                            Background="{Binding InvestigationStatus, Converter={StaticResource StatusBrush}, ConverterParameter=Bg}">
+                                        <TextBlock Text="{Binding InvestigationStatus}"
+                                                   Style="{StaticResource Badge.Text}"
+                                                   Foreground="{Binding InvestigationStatus, Converter={StaticResource StatusBrush}}" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="DATE RESOLVED" Binding="{Binding DateResolved, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                    </DataGrid.Columns>
+
+                    <!-- Selecting a row reveals full details + the resolution workflow. -->
+                    <DataGrid.RowDetailsTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,10">
+                            <Border Background="{StaticResource Brush.SurfaceAlt}" CornerRadius="3" Padding="16,14" Margin="0,4,0,8">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.1*" />
+                                        <ColumnDefinition Width="20" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
+                                    <!-- LEFT: full details -->
                                     <StackPanel Grid.Column="0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding IncidentId}" Style="{StaticResource Text.Mono}" />
-                                            <TextBlock Style="{StaticResource Text.Secondary}" Margin="10,0,0,0"
-                                                       Visibility="{Binding RelatedAlertId, Converter={StaticResource StringToVis}}">
-                                                <Run Text="Related alert: " />
-                                                <Run Text="{Binding RelatedAlertId, Mode=OneWay}" />
-                                            </TextBlock>
-                                            <Border Style="{StaticResource Badge.Base}" Margin="10,0,0,0"
-                                                    Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}">
-                                                <TextBlock Text="{Binding RiskLevel}"
+                                        <TextBlock Text="INCIDENT DETAILS" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="DEVICE" Style="{StaticResource Text.Label}" />
+                                                <TextBlock Text="{Binding Device}" Style="{StaticResource Text.Body}" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="ACTION" Style="{StaticResource Text.Label}" />
+                                                <TextBlock Text="{Binding Action}" Style="{StaticResource Text.Body}" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <StackPanel Margin="0,0,0,10">
+                                            <TextBlock Text="CLASSIFICATION" Style="{StaticResource Text.Label}" />
+                                            <Border Style="{StaticResource Badge.Base}" Margin="0,4,0,0"
+                                                    Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
+                                                <TextBlock Text="{Binding Classification}"
                                                            Style="{StaticResource Badge.Text}"
-                                                           Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
+                                                           Foreground="{Binding Classification, Converter={StaticResource ClassBrush}}" />
                                             </Border>
                                         </StackPanel>
 
-                                        <TextBlock Text="{Binding Asset}" Style="{StaticResource Text.SectionHeading}" Margin="0,8,0,2" />
-                                        <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" Margin="0,0,0,8" MaxWidth="640" />
+                                        <TextBlock Text="DESCRIPTION" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                                        <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" Margin="0,0,0,10" />
 
-                                        <TextBlock Style="{StaticResource Text.Secondary}">
-                                            <Run Text="{Binding User, Mode=OneWay}" />
-                                            <Run Text=" · " />
-                                            <Run Text="{Binding Device, Mode=OneWay}" />
-                                            <Run Text=" · Action: " />
-                                            <Run Text="{Binding Action, Mode=OneWay}" />
-                                            <Run Text=" · " />
-                                            <Run Text="{Binding Timestamp, Mode=OneWay, StringFormat='yyyy-MM-dd HH:mm'}" />
-                                        </TextBlock>
-
-                                        <TextBlock Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,8,0,0" MaxWidth="640"
-                                                   Visibility="{Binding Notes, Converter={StaticResource StringToVis}}">
-                                            <Run Text="Notes: " FontWeight="SemiBold" />
-                                            <Run Text="{Binding Notes, Mode=OneWay}" />
-                                        </TextBlock>
+                                        <StackPanel Visibility="{Binding Notes, Converter={StaticResource StringToVis}}">
+                                            <TextBlock Text="INVESTIGATION NOTES" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                                            <TextBlock Text="{Binding Notes}" Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
                                     </StackPanel>
 
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right">
-                                        <Border Style="{StaticResource Badge.Base}"
-                                                Background="{Binding InvestigationStatus, Converter={StaticResource StatusBrush}, ConverterParameter=Bg}">
-                                            <TextBlock Text="{Binding InvestigationStatus}"
-                                                       Style="{StaticResource Badge.Text}"
-                                                       Foreground="{Binding InvestigationStatus, Converter={StaticResource StatusBrush}}" />
-                                        </Border>
-                                        <TextBlock Text="{Binding UpdatedAt, StringFormat='Updated {0:yyyy-MM-dd HH:mm}'}"
-                                                   Style="{StaticResource Text.Secondary}" Margin="0,8,0,0" HorizontalAlignment="Right" />
+                                    <!-- RIGHT: resolution workflow -->
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="RESOLUTION WORKFLOW" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+
+                                        <TextBlock Text="Update status" Style="{StaticResource Text.Secondary}" Margin="0,0,0,6" />
+                                        <WrapPanel>
+                                            <Button Content="New" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
+                                                    Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{x:Static models:InvestigationStatus.New}" />
+                                            <Button Content="Under Investigation" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
+                                                    Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{x:Static models:InvestigationStatus.UnderInvestigation}" />
+                                            <Button Content="Resolved" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
+                                                    Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{x:Static models:InvestigationStatus.Resolved}" />
+                                            <Button Content="Dismissed" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
+                                                    Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{x:Static models:InvestigationStatus.Dismissed}" />
+                                        </WrapPanel>
+                                        <TextBlock Text="Marking Resolved or Dismissed records today's date as Date Resolved."
+                                                   Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+                                        <TextBlock Text="Resolution" Style="{StaticResource Text.Secondary}" Margin="0,14,0,6" />
+                                        <TextBox Style="{StaticResource Input.TextBox}"
+                                                 Text="{Binding DataContext.ResolutionDraft, RelativeSource={RelativeSource AncestorType=UserControl}, UpdateSourceTrigger=PropertyChanged}"
+                                                 Tag="What was found / concluded?"
+                                                 AcceptsReturn="True" TextWrapping="Wrap" Height="60" />
+
+                                        <Button Content="Save Resolution" Style="{StaticResource Button.Primary}" Margin="0,10,0,0" HorizontalAlignment="Left"
+                                                Command="{Binding DataContext.SaveResolutionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                    </DataGrid.RowDetailsTemplate>
+                </DataGrid>
+            </Border>
 
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loading}">

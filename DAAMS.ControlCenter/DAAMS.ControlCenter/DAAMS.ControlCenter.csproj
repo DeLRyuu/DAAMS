@@ -105,7 +105,6 @@
     <None Include=".git\objects\fe\200f76987e628e752f24c0b06434de4ce96978" />
     <None Include=".git\objects\ff\c0b4d8348e04c1f5058def3cea93aad4da61f1" />
     <None Include=".git\refs\heads\master" />
-    <None Include="ControlCenter.csproj" />
   </ItemGroup>
 
   <ItemGroup>

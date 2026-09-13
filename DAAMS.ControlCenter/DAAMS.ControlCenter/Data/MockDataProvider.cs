@@ -220,42 +220,48 @@ public static class MockDataProvider
         new SecurityAlert
         {
             AlertId = "ALT-1042", User = "Juan.DC", Device = "PC-FINANCE-01", Asset = "Payroll.xlsx",
-            Action = ActionType.Copy, RiskScore = 83, RiskLevel = RiskLevel.Critical,
+            Path = @"C:\Company\Payroll.xlsx",
+            Action = ActionType.Copy, Classification = Classification.Confidential, RiskScore = 83, RiskLevel = RiskLevel.Critical,
             Reason = "Confidential asset copied during off-hours.",
             Status = AlertStatus.New, CreatedAt = DateTime.Now.AddMinutes(-12)
         },
         new SecurityAlert
         {
             AlertId = "ALT-1039", User = "Juan.DC", Device = "PC-FINANCE-01", Asset = "ClientDB.sqlite",
-            Action = ActionType.Delete, RiskScore = 61, RiskLevel = RiskLevel.High,
+            Path = @"C:\Company\ClientDB.sqlite",
+            Action = ActionType.Delete, Classification = Classification.Confidential, RiskScore = 61, RiskLevel = RiskLevel.High,
             Reason = "Confidential asset deleted.",
             Status = AlertStatus.Investigating, CreatedAt = DateTime.Now.AddHours(-5)
         },
         new SecurityAlert
         {
             AlertId = "ALT-1037", User = "Juan.DC", Device = "PC-FINANCE-01", Asset = "ClientDB.sqlite",
-            Action = ActionType.Copy, RiskScore = 53, RiskLevel = RiskLevel.High,
+            Path = @"C:\Company\ClientDB.sqlite",
+            Action = ActionType.Copy, Classification = Classification.Confidential, RiskScore = 53, RiskLevel = RiskLevel.High,
             Reason = "Confidential asset copied twice within a short window (burst activity).",
             Status = AlertStatus.Investigating, CreatedAt = DateTime.Now.AddDays(-2)
         },
         new SecurityAlert
         {
             AlertId = "ALT-1031", User = "Carlo.R", Device = "PC-PM-03", Asset = "ProjectPlans",
-            Action = ActionType.Rename, RiskScore = 33, RiskLevel = RiskLevel.Medium,
+            Path = @"C:\Company\ProjectPlans",
+            Action = ActionType.Rename, Classification = Classification.Sensitive, RiskScore = 33, RiskLevel = RiskLevel.Medium,
             Reason = "Sensitive asset renamed near edge of working hours.",
             Status = AlertStatus.Reviewed, CreatedAt = DateTime.Now.AddHours(-2)
         },
         new SecurityAlert
         {
             AlertId = "ALT-1024", User = "Priya.N", Device = "PC-LEGAL-01", Asset = "NDAs",
-            Action = ActionType.Rename, RiskScore = 41, RiskLevel = RiskLevel.Medium,
+            Path = @"C:\Company\Legal\NDAs",
+            Action = ActionType.Rename, Classification = Classification.Confidential, RiskScore = 41, RiskLevel = RiskLevel.Medium,
             Reason = "Confidential folder contents renamed.",
             Status = AlertStatus.Resolved, CreatedAt = DateTime.Now.AddDays(-1).AddHours(-3)
         },
         new SecurityAlert
         {
             AlertId = "ALT-1018", User = "Devon.K", Device = "PC-MKT-04", Asset = "Old_Campaign_2024",
-            Action = ActionType.Delete, RiskScore = 28, RiskLevel = RiskLevel.Medium,
+            Path = @"C:\Company\Marketing\Old_Campaign_2024",
+            Action = ActionType.Delete, Classification = Classification.Sensitive, RiskScore = 28, RiskLevel = RiskLevel.Medium,
             Reason = "Sensitive folder deleted; protection was later removed by admin.",
             Status = AlertStatus.Resolved, CreatedAt = DateTime.Now.AddDays(-3)
         },
@@ -270,44 +276,50 @@ public static class MockDataProvider
         {
             IncidentId = "INC-204", RelatedAlertId = "ALT-1039",
             User = "Juan.DC", Device = "PC-FINANCE-01", Asset = "ClientDB.sqlite",
-            Action = ActionType.Delete, Timestamp = DateTime.Now.AddHours(-5),
+            Action = ActionType.Delete, Classification = Classification.Confidential, Timestamp = DateTime.Now.AddHours(-5),
             RiskLevel = RiskLevel.High,
             Description = "Confidential client database deleted outside a scheduled maintenance window.",
             InvestigationStatus = InvestigationStatus.UnderInvestigation,
             Notes = "Awaiting confirmation from Juan.DC on the reason for deletion.",
+            Resolution = null, DateResolved = null,
             CreatedAt = DateTime.Now.AddHours(-5), UpdatedAt = DateTime.Now.AddHours(-1)
         },
         new IncidentReport
         {
             IncidentId = "INC-201", RelatedAlertId = "ALT-1042",
             User = "Juan.DC", Device = "PC-FINANCE-01", Asset = "Payroll.xlsx",
-            Action = ActionType.Copy, Timestamp = DateTime.Now.AddMinutes(-12),
+            Action = ActionType.Copy, Classification = Classification.Confidential, Timestamp = DateTime.Now.AddMinutes(-12),
             RiskLevel = RiskLevel.Critical,
             Description = "Payroll spreadsheet copied during off-hours; reason not yet established.",
             InvestigationStatus = InvestigationStatus.New,
             Notes = null,
+            Resolution = null, DateResolved = null,
             CreatedAt = DateTime.Now.AddMinutes(-10), UpdatedAt = DateTime.Now.AddMinutes(-10)
         },
         new IncidentReport
         {
             IncidentId = "INC-196", RelatedAlertId = "ALT-1024",
             User = "Priya.N", Device = "PC-LEGAL-01", Asset = "NDAs",
-            Action = ActionType.Rename, Timestamp = DateTime.Now.AddDays(-1).AddHours(-3),
+            Action = ActionType.Rename, Classification = Classification.Confidential, Timestamp = DateTime.Now.AddDays(-1).AddHours(-3),
             RiskLevel = RiskLevel.Medium,
             Description = "NDA files renamed as part of a routine legal document cleanup.",
             InvestigationStatus = InvestigationStatus.Resolved,
             Notes = "Confirmed with Priya.N — scheduled housekeeping, no concern.",
+            Resolution = "No wrongdoing found — routine legal document cleanup, confirmed with the user.",
+            DateResolved = DateTime.Now.AddDays(-1),
             CreatedAt = DateTime.Now.AddDays(-1).AddHours(-2), UpdatedAt = DateTime.Now.AddDays(-1)
         },
         new IncidentReport
         {
             IncidentId = "INC-188", RelatedAlertId = "ALT-1018",
             User = "Devon.K", Device = "PC-MKT-04", Asset = "Old_Campaign_2024",
-            Action = ActionType.Delete, Timestamp = DateTime.Now.AddDays(-3),
+            Action = ActionType.Delete, Classification = Classification.Sensitive, Timestamp = DateTime.Now.AddDays(-3),
             RiskLevel = RiskLevel.Medium,
             Description = "Outdated marketing folder deleted after campaign archival was completed.",
             InvestigationStatus = InvestigationStatus.Dismissed,
             Notes = "Approved cleanup — no further action required.",
+            Resolution = "Dismissed — pre-approved archival cleanup, no security concern.",
+            DateResolved = DateTime.Now.AddDays(-2),
             CreatedAt = DateTime.Now.AddDays(-3), UpdatedAt = DateTime.Now.AddDays(-2)
         },
     };

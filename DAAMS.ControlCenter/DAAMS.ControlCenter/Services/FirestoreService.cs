@@ -85,7 +85,10 @@ public class FirestoreService
     //                       assessment, alerts, and incidents were not yet
     //                       implemented in the Monitoring System as of the
     //                       last check. Field names below are a reasonable
-    //                       best guess, not a verified contract.
+    //                       best guess, not a verified contract. Phase 5
+    //                       added path/classification (alerts) and
+    //                       classification/resolution/date_resolved
+    //                       (incidents) on the same best-guess basis.
     //
     // Every Get*/Map* helper below tolerates a missing or mismatched field
     // (falls back to a safe default) rather than throwing, per the reference
@@ -128,7 +131,9 @@ public class FirestoreService
         User = GetString(doc, "user", "unknown"),
         Device = GetString(doc, "device", "unknown"),
         Asset = GetString(doc, "asset", "unknown"),
+        Path = doc.TryGetValue("path", out string? path) ? path : null,
         Action = GetEnum(doc, "action", ActionType.Open),
+        Classification = GetEnum(doc, "classification", Classification.Public),
         RiskScore = GetNullableInt(doc, "risk_score") ?? 0,
         RiskLevel = GetEnum(doc, "risk_level", RiskLevel.Low),
         Reason = GetString(doc, "reason", "No reason provided."),
@@ -144,11 +149,14 @@ public class FirestoreService
         Device = GetString(doc, "device", "unknown"),
         Asset = GetString(doc, "asset", "unknown"),
         Action = GetEnum(doc, "action", ActionType.Open),
+        Classification = GetEnum(doc, "classification", Classification.Public),
         Timestamp = GetTimestamp(doc, "timestamp"),
         RiskLevel = GetEnum(doc, "risk_level", RiskLevel.Low),
         Description = GetString(doc, "description", string.Empty),
         InvestigationStatus = GetEnum(doc, "investigation_status", InvestigationStatus.New),
         Notes = doc.TryGetValue("notes", out string? notes) ? notes : null,
+        Resolution = doc.TryGetValue("resolution", out string? resolution) ? resolution : null,
+        DateResolved = GetNullableTimestamp(doc, "date_resolved"),
         CreatedAt = GetTimestamp(doc, "created_at"),
         UpdatedAt = GetTimestamp(doc, "updated_at"),
     };
@@ -206,6 +214,23 @@ public class FirestoreService
         }
 
         return DateTime.MinValue;
+    }
+
+    /// <summary>Same as GetTimestamp, but returns null instead of DateTime.MinValue when the field is absent — for genuinely optional dates like "date_resolved" where "not yet resolved" is a real, meaningful state.</summary>
+    private static DateTime? GetNullableTimestamp(DocumentSnapshot doc, string field)
+    {
+        if (doc.TryGetValue(field, out Timestamp ts))
+        {
+            return ts.ToDateTime().ToLocalTime();
+        }
+
+        if (doc.TryGetValue(field, out string? raw) &&
+            DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
+        {
+            return parsed;
+        }
+
+        return null;
     }
 
     /// <summary>
