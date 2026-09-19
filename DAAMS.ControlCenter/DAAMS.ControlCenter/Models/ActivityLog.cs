@@ -8,6 +8,12 @@ namespace ControlCenter.Models;
 /// DAAMS Monitoring System. RiskScore/RiskLevel/RiskFactors are optional/nullable
 /// because not every build of the Monitoring System has risk assessment wired up yet
 /// (see reference doc section 21, "Current Development Boundary").
+///
+/// PHASE 7: added Advisory. Confirmed against the actual Monitoring Engine
+/// source (risk_engine.py) — every risk-assessed activity_logs document has
+/// a real "advisory" field (a plain-language investigation note for
+/// High/Critical results, null otherwise) that was previously not mapped
+/// to anything and silently dropped.
 /// </summary>
 public class ActivityLog
 {
@@ -26,4 +32,12 @@ public class ActivityLog
     public RiskLevel? RiskLevel { get; init; }
 
     public List<RiskFactor> RiskFactors { get; init; } = new();
+
+    /// <summary>
+    /// Plain-language investigation note the Monitoring Engine attaches to
+    /// High/Critical activity (e.g. "Suspicious activity requiring
+    /// investigation..."). Null for Low/Medium activity, or when risk
+    /// assessment hasn't been performed.
+    /// </summary>
+    public string? Advisory { get; init; }
 }

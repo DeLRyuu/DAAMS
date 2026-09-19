@@ -35,9 +35,11 @@ public enum ProtectionStatus
 
 /// <summary>
 /// DAAMS action model. This is the INTENDED full set from the reference doc.
-/// The Monitoring System currently only reliably detects Create/Modify/Rename/Delete;
-/// the Control Center must not invent or simulate Open/Copy/Move events that were
-/// not actually reported by the Monitoring System.
+/// The Monitoring System currently reliably detects Create/Modify/Rename/Delete
+/// (confirmed against the actual Monitoring Engine — see Phase 7 notes in
+/// FirestoreService.cs); Open/Copy/Move are defined for risk-scoring purposes
+/// but not yet actually detected. The Control Center must not invent or
+/// simulate events for actions that were not actually reported.
 /// </summary>
 public enum ActionType
 {
@@ -46,7 +48,8 @@ public enum ActionType
     Copy,
     Move,
     Rename,
-    Delete
+    Delete,
+    Create
 }
 
 /// <summary>

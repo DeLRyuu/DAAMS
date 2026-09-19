@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ControlCenter.Models;
 
@@ -12,6 +13,15 @@ namespace ControlCenter.Models;
 /// move an alert through New → Investigating → Resolved/Dismissed locally,
 /// in-memory, pending real write-back once Firestore integration supports
 /// it — see SecurityAlertsViewModel).
+///
+/// Phase 7 addition: RiskFactors. Confirmed against the actual Monitoring
+/// Engine source (alert_manager.py) — security_alerts documents carry the
+/// same real, structured risk_factors array activity_logs does. Reason
+/// remains a simple one-line summary (built from these same factors, since
+/// there is no separate "reason" field in the real data — see
+/// FirestoreService mapping notes); RiskFactors exposes the full list for
+/// anywhere that wants the detailed breakdown, matching the "explainable
+/// risk" principle the whole DAAMS system is built around.
 /// </summary>
 public class SecurityAlert
 {
@@ -28,6 +38,9 @@ public class SecurityAlert
     public int RiskScore { get; init; }
     public RiskLevel RiskLevel { get; init; }
     public required string Reason { get; init; }
+
+    /// <summary>The full, structured list of risk contributors behind this alert's score (e.g. "Confidential asset (+35)"). See Reason for a one-line summary of the same data.</summary>
+    public List<RiskFactor> RiskFactors { get; init; } = new();
 
     /// <summary>Mutable so the investigation workflow can change it locally (see SecurityAlertsViewModel.ChangeStatusCommand).</summary>
     public AlertStatus Status { get; set; }
