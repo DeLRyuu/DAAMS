@@ -42,12 +42,11 @@ import hashlib
 import json
 import os
 import secrets
-import tkinter as tk
 from datetime import datetime
-from tkinter import messagebox, simpledialog
 
 from config import DEFAULT_PIN
 import firestore_logger
+import glass_ui
 
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "security_settings.json")
 
@@ -153,17 +152,13 @@ def set_pin(new_pin: str, changed_by: str = None) -> tuple:
     return True, "PIN changed successfully."
 
 
-def prompt_pin(title: str = "DAAMS - PIN Required", message: str = "Enter your DAAMS PIN:") -> str:
+def prompt_pin(title: str = "PIN required", message: str = "Enter your DAAMS PIN:") -> str:
     """
-    Show a small modal, masked PIN-entry dialog and return what was
-    typed, or None if cancelled. Creates and cleans up its own hidden Tk
-    root, so callers don't need a Tk window already open.
+    Show the glass, masked PIN-entry dialog (see glass_ui.py) and return
+    what was typed, or None if cancelled. Creates and cleans up its own
+    window, so callers don't need one already open.
     """
-    root = tk.Tk()
-    root.withdraw()
-    pin = simpledialog.askstring(title, message, show="*", parent=root)
-    root.destroy()
-    return pin
+    return glass_ui.ask_pin(message, title=title)
 
 
 def confirm_with_pin(action_description: str) -> bool:
@@ -178,17 +173,18 @@ def confirm_with_pin(action_description: str) -> bool:
     Returns True only if the correct PIN was entered. Also warns (but
     does not block) if the default PIN is still in use.
     """
-    pin = prompt_pin(message=f"Enter your DAAMS PIN to {action_description}:")
+    pin = prompt_pin(message=f"Enter your DAAMS PIN to {action_description}.")
     if pin is None:
         return False  # Cancelled -- treated the same as a failed check.
 
     if not verify_pin(pin):
-        messagebox.showerror("DAAMS", "Incorrect PIN. Action cancelled.")
+        glass_ui.show_message("error", "Incorrect PIN", "The PIN you entered is incorrect. The action was cancelled.")
         return False
 
     if is_using_default_pin():
-        messagebox.showwarning(
-            "DAAMS - Security Notice",
+        glass_ui.show_message(
+            "warning",
+            "Default PIN in use",
             "You are still using the DEFAULT PIN (1234).\n\n"
             "Please change it soon by running change_pin_cli.py.",
         )

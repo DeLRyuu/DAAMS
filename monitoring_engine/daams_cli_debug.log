@@ -1,0 +1,50 @@
+2026-09-19 22:12:31  START argv=['C:\\Users\\whind\\Desktop\\Third_Year\\Information-Assurance-and-Security\\Capstone\\DAAMS\\monitoring_engine\\protect_asset_cli.py', 'C:\\DAAMS_Test\\ConfidentialFolder'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\pythonw.exe cwd=C:\DAAMS_Test
+2026-09-19 22:13:34  END ok
+2026-09-19 22:15:30  START argv=['C:\\Users\\whind\\Desktop\\Third_Year\\Information-Assurance-and-Security\\Capstone\\DAAMS\\monitoring_engine\\protect_asset_cli.py', 'C:\\DAAMS_Test\\SensitiveDoc.txt'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\pythonw.exe cwd=C:\DAAMS_Test
+2026-09-19 22:43:35  START (remove) argv=['C:\\Users\\whind\\Desktop\\Third_Year\\Information-Assurance-and-Security\\Capstone\\DAAMS\\monitoring_engine\\remove_protection_cli.py', 'C:\\DAAMS_Test\\SensitiveDoc.txt'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\pythonw.exe cwd=C:\DAAMS_Test
+2026-09-19 22:43:37  IMPORT FAILED
+Traceback (most recent call last):
+  File "C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\remove_protection_cli.py", line 64, in <module>
+    import glass_ui
+  File "C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\glass_ui.py", line 40, in <module>
+    from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageTk
+ModuleNotFoundError: No module named 'PIL'
+
+2026-09-19 22:46:35  START argv=['C:\\Users\\whind\\Desktop\\Third_Year\\Information-Assurance-and-Security\\Capstone\\DAAMS\\monitoring_engine\\protect_asset_cli.py', 'C:\\DAAMS_Test\\SensitiveDoc.txt'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\pythonw.exe cwd=C:\DAAMS_Test
+2026-09-19 22:46:35  IMPORT FAILED
+Traceback (most recent call last):
+  File "C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\protect_asset_cli.py", line 93, in <module>
+    import glass_ui
+  File "C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\glass_ui.py", line 40, in <module>
+    from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageTk
+ModuleNotFoundError: No module named 'PIL'
+
+2026-09-19 22:47:15  START (remove) argv=['C:\\Users\\whind\\Desktop\\Third_Year\\Information-Assurance-and-Security\\Capstone\\DAAMS\\monitoring_engine\\remove_protection_cli.py', 'C:\\DAAMS_Test\\SensitiveDoc.txt'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\pythonw.exe cwd=C:\DAAMS_Test
+2026-09-19 22:47:15  IMPORT FAILED
+Traceback (most recent call last):
+  File "C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\remove_protection_cli.py", line 64, in <module>
+    import glass_ui
+  File "C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\glass_ui.py", line 40, in <module>
+    from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageTk
+ModuleNotFoundError: No module named 'PIL'
+
+2026-09-19 22:47:35  START (remove) argv=['C:\\Users\\whind\\Desktop\\Third_Year\\Information-Assurance-and-Security\\Capstone\\DAAMS\\monitoring_engine\\remove_protection_cli.py', 'C:\\DAAMS_Test\\SensitiveDoc.txt'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\pythonw.exe cwd=C:\DAAMS_Test
+2026-09-19 22:47:35  IMPORT FAILED
+Traceback (most recent call last):
+  File "C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\remove_protection_cli.py", line 65, in <module>
+    import glass_ui
+  File "C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\glass_ui.py", line 40, in <module>
+    from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageTk
+ModuleNotFoundError: No module named 'PIL'
+
+2026-09-19 22:58:01  START argv=['-c'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\python.exe cwd=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine
+2026-09-19 22:58:02  imports finished
+2026-09-19 22:58:02  START (remove) argv=['-c'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\python.exe cwd=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine
+2026-09-19 22:58:02  imports finished
+2026-09-19 22:59:13  START argv=['protect_asset_cli.py', 'C:\\DAAMS_Test\\skibidi'] exe=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine\venv\Scripts\python.exe cwd=C:\Users\whind\Desktop\Third_Year\Information-Assurance-and-Security\Capstone\DAAMS\monitoring_engine
+2026-09-19 22:59:14  imports finished
+2026-09-19 22:59:14  asking for PIN
+2026-09-19 22:59:42  PIN confirmed
+2026-09-19 22:59:46  classification chosen: Public
+2026-09-19 22:59:56  protect_asset finished: ok=True
+2026-09-19 23:00:00  END ok
