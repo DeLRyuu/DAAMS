@@ -29,13 +29,29 @@ codebase, alerts here use:
     asset_path       -> the full path (or "old -> new" for a rename),
                         i.e. exactly what activity_log.jsonl calls "asset"
     asset_classification -> the protected asset's classification
+
+Phase 7 additions:
+- Every alert now also carries "investigation_status": "Not Started",
+  alongside the existing "status": "New" -- these are two independent
+  fields per the Phase 7 brief (Alert Status vs. Investigation Status).
+  Neither is a redesign of the Phase 6 schema; both are additive.
+- After a NEW alert (not a suppressed duplicate) is stored and
+  displayed, this module hands it to incident_manager.py (builds an
+  Incident Report referencing this alert) and then to
+  email_notifier.py (sends a notification, if enabled). Both calls are
+  individually wrapped so a failure in either can never undo the alert
+  that was already saved, and can never crash the Monitoring Engine.
+  Neither module is called for a suppressed duplicate, since no new
+  security event actually occurred in that case.
 """
 
 import json
 import os
 from datetime import datetime
 
+import email_notifier
 import firestore_logger
+import incident_manager
 from config import ALERT_RISK_LEVELS, SECURITY_ALERTS_COLLECTION
 
 ALERT_LOG_FILE = os.path.join(os.path.dirname(__file__), "security_alerts.jsonl")
@@ -158,6 +174,7 @@ def process_activity(record: dict, classification: str = None):
             "risk_factors": record.get("risk_factors", []),
             "timestamp": record.get("timestamp"),
             "status": "New",
+            "investigation_status": "Not Started",
         }
 
         _recent_alert_keys[dedupe_key] = alert["alert_id"]
@@ -171,6 +188,25 @@ def process_activity(record: dict, classification: str = None):
             print("The alert was still saved to the local alert log.")
 
         _display_alert(alert)
+
+        # Phase 7: an incident report is created for every NEW alert
+        # (never for a suppressed duplicate, since no new security event
+        # occurred in that case). Wrapped defensively even though
+        # incident_manager.py already never raises on its own -- belt
+        # and suspenders, matching the pattern used everywhere else in
+        # this project.
+        incident = None
+        try:
+            incident = incident_manager.create_incident_from_alert(alert)
+        except Exception as e:
+            print(f"[INCIDENT ERROR] Unexpected error during incident processing: {e}")
+
+        # Phase 7: notify, if enabled. A failure here can never undo the
+        # alert or incident that were already saved above.
+        try:
+            email_notifier.send_alert_email(alert, incident)
+        except Exception as e:
+            print(f"[EMAIL WARNING] Unexpected error during email notification: {e}")
 
         return alert
 

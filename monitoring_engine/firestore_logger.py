@@ -43,6 +43,7 @@ from config import (
     ENABLE_FIRESTORE,
     FIRESTORE_COLLECTION,
     FIRESTORE_CREDENTIALS_PATH,
+    INCIDENT_REPORTS_COLLECTION,
     PROTECTED_ASSETS_COLLECTION,
     SECURITY_ALERTS_COLLECTION,
     SECURITY_SETTINGS_COLLECTION,
@@ -190,6 +191,33 @@ def upload_security_alert(alert: dict) -> bool:
     except Exception as e:
         print(f"[FIRESTORE WARNING] Failed to upload security alert to Firestore: {e}")
         print("The alert was still saved to the local alert log.")
+        return False
+
+
+def upload_incident_report(incident: dict) -> bool:
+    """
+    Upload a single Incident Report (Phase 7) to Firestore's
+    'incident_reports' collection, keyed by the incident's own
+    incident_id -- same idempotent-upsert pattern as
+    upload_security_alert().
+
+    Returns True on success, False otherwise. NEVER raises -- the local
+    incident record (incident_manager.py, incident_reports.jsonl) is
+    always written first and remains authoritative regardless of what
+    happens here.
+    """
+    _initialize_firestore()
+
+    if _firestore_disabled or _firestore_client is None:
+        return False
+
+    try:
+        incident_id = incident.get("incident_id", "unknown")
+        _firestore_client.collection(INCIDENT_REPORTS_COLLECTION).document(incident_id).set(incident)
+        return True
+    except Exception as e:
+        print(f"[FIRESTORE WARNING] Failed to upload incident report to Firestore: {e}")
+        print("The incident was still saved to the local incident log.")
         return False
 
 

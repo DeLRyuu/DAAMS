@@ -179,3 +179,44 @@ ALERT_RISK_LEVELS = {"High", "Critical"}
 
 # Name of the Firestore collection that stores security alerts.
 SECURITY_ALERTS_COLLECTION = "security_alerts"
+
+# ---------------------------------------------------------------------------
+# INCIDENT REPORTS (Phase 7) -- see incident_manager.py
+# ---------------------------------------------------------------------------
+# Name of the Firestore collection that stores incident reports. Every
+# incident is created for (and references) a Security Alert that has
+# already been generated -- see alert_manager.py's ALERT_RISK_LEVELS.
+# There is no separate threshold here: an incident is created whenever an
+# alert is.
+INCIDENT_REPORTS_COLLECTION = "incident_reports"
+
+# ---------------------------------------------------------------------------
+# EMAIL NOTIFICATIONS (Phase 7) -- see email_notifier.py
+# ---------------------------------------------------------------------------
+# All values come from environment variables ONLY -- never hardcoded,
+# never read from a file this project owns. This mirrors the same
+# "credentials never live in source" approach already used for Firestore
+# (FIRESTORE_CREDENTIALS_PATH) and the DAAMS PIN. See README.md "Email
+# Setup" for how to set these on Windows (PowerShell $env:... or a
+# permanent System Environment Variable).
+#
+# EMAIL_ENABLED defaults to OFF: a fresh checkout of this project must
+# never silently start sending email just because SMTP values happen to
+# be present in someone's environment.
+EMAIL_ENABLED = os.environ.get("DAAMS_EMAIL_ENABLED", "false").strip().lower() == "true"
+
+SMTP_HOST = os.environ.get("DAAMS_SMTP_HOST", "")
+
+try:
+    SMTP_PORT = int(os.environ.get("DAAMS_SMTP_PORT", "587"))
+except ValueError:
+    # A garbled env var must not crash startup -- fall back to the
+    # standard STARTTLS submission port and let the actual send attempt
+    # fail (and be reported) later if the value was wrong for another reason.
+    SMTP_PORT = 587
+
+SMTP_USERNAME = os.environ.get("DAAMS_SMTP_USERNAME", "")
+SMTP_PASSWORD = os.environ.get("DAAMS_SMTP_PASSWORD", "")
+
+# Where security alert / incident notifications are sent.
+NOTIFICATION_EMAIL = os.environ.get("DAAMS_NOTIFICATION_EMAIL", "")
