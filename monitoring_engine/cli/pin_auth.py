@@ -42,13 +42,22 @@ import hashlib
 import json
 import os
 import secrets
+import sys
 from datetime import datetime
 
-from config import DEFAULT_PIN
-import firestore_logger
-import glass_ui
+_ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ENGINE_DIR not in sys.path:
+    sys.path.insert(0, _ENGINE_DIR)
 
-SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "security_settings.json")
+from config import settings
+from config.settings import DATA_DIR, DEFAULT_PIN
+from core import database
+from services import firestore_logger, sync_service
+from ui import glass_ui
+
+REQUIRE_PIN_CHANGE_ON_DEFAULT = getattr(settings, "REQUIRE_PIN_CHANGE_ON_DEFAULT", True)
+
+SETTINGS_FILE = os.path.join(DATA_DIR, "security_settings.json")
 
 MIN_PIN_LENGTH = 4
 MAX_PIN_LENGTH = 8
@@ -59,6 +68,13 @@ def _hash_pin(pin: str, salt: str) -> str:
 
 
 def _load_settings() -> dict:
+    try:
+        db_settings = database.get_security_settings()
+        if db_settings and db_settings.get("pin_hash"):
+            return db_settings
+    except Exception:
+        pass
+
     if not os.path.exists(SETTINGS_FILE):
         return {}
     try:
@@ -71,6 +87,7 @@ def _load_settings() -> dict:
 
 def _save_settings(data: dict) -> bool:
     try:
+        os.makedirs(DATA_DIR, exist_ok=True)
         tmp_path = SETTINGS_FILE + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -102,9 +119,14 @@ def _ensure_initialized() -> dict:
     }
     _save_settings(settings)
     try:
-        firestore_logger.upload_security_settings(settings)
+        database.upsert_security_settings(settings)
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Could not sync default PIN to Firestore: {e}")
+        print(f"[SECURITY WARNING] Could not save PIN settings to SQLite: {e}")
+
+    try:
+        sync_service.trigger_sync()
+    except Exception as e:
+        print(f"[SECURITY WARNING] Could not trigger sync service: {e}")
     return settings
 
 
@@ -145,9 +167,14 @@ def set_pin(new_pin: str, changed_by: str = None) -> tuple:
         return False, "Failed to save the new PIN locally. PIN was NOT changed."
 
     try:
-        firestore_logger.upload_security_settings(settings)
+        database.upsert_security_settings(settings)
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Could not sync new PIN to Firestore: {e}")
+        print(f"[SECURITY WARNING] Could not save new PIN to SQLite: {e}")
+
+    try:
+        sync_service.trigger_sync()
+    except Exception as e:
+        print(f"[SECURITY WARNING] Could not trigger sync service: {e}")
 
     return True, "PIN changed successfully."
 
@@ -159,6 +186,26 @@ def prompt_pin(title: str = "PIN required", message: str = "Enter your DAAMS PIN
     window, so callers don't need one already open.
     """
     return glass_ui.ask_pin(message, title=title)
+
+
+def first_use_pin_setup(action_description: str) -> bool:
+    new_pin = glass_ui.ask_pin(
+        f"Before you {action_description}, choose your own DAAMS PIN ({MIN_PIN_LENGTH}-{MAX_PIN_LENGTH} digits). The default PIN can no longer be used.",
+        title="Set a PIN",
+    )
+    if new_pin is None:
+        return False
+    again = glass_ui.ask_pin("Re-enter your new PIN to confirm.", title="Confirm PIN")
+    if again is None:
+        return False
+    if new_pin != again:
+        glass_ui.show_message("error", "PINs don't match", "The two PINs did not match. Nothing was changed.")
+        return False
+    ok, msg = set_pin(new_pin)
+    if not ok:
+        glass_ui.show_message("error", "Could not set PIN", msg)
+        return False
+    return True
 
 
 def confirm_with_pin(action_description: str) -> bool:
@@ -173,6 +220,9 @@ def confirm_with_pin(action_description: str) -> bool:
     Returns True only if the correct PIN was entered. Also warns (but
     does not block) if the default PIN is still in use.
     """
+    if REQUIRE_PIN_CHANGE_ON_DEFAULT and is_using_default_pin():
+        return first_use_pin_setup(action_description)
+
     pin = prompt_pin(message=f"Enter your DAAMS PIN to {action_description}.")
     if pin is None:
         return False  # Cancelled -- treated the same as a failed check.

@@ -42,11 +42,11 @@ from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageTk
 # ---------------------------------------------------------------------------
 # DESIGN TOKENS
 # ---------------------------------------------------------------------------
-BG = "#0D1015"
-TEXT = "#E4E7EC"
-TEXT_DIM = "#9198AA"
-ACCENT = "#4C8DFF"
-ACCENT_DIM = "#25406E"
+BG = "#0B0F14"
+TEXT = "#E6EAF0"
+TEXT_DIM = "#8D98A8"
+ACCENT = "#3FA9F5"
+ACCENT_DIM = "#245A82"
 
 # (rgb, alpha) -- glass surfaces
 SURFACE = ((23, 29, 38), 0.52)
@@ -66,10 +66,10 @@ BLOBS = [
 
 # (foreground, background)
 RISK_COLORS = {
-    "Low": ("#3FB68B", "#15271f"),
-    "Medium": ("#D9A544", "#2c2410"),
-    "High": ("#E2793F", "#2c1c0f"),
-    "Critical": ("#E15361", "#2c1216"),
+    "Low": ("#3DBE72", "#12241b"),
+    "Medium": ("#D9A93B", "#2a2312"),
+    "High": ("#E0762F", "#2c1c10"),
+    "Critical": ("#E0453F", "#2c1414"),
 }
 CLASSIFICATION_COLORS = {
     "Public": ("#6B7A99", "#171d29"),
@@ -89,8 +89,8 @@ KIND_COLORS = {
 }
 
 # First installed family wins; the last entry of each list is the fallback.
-SANS_CANDIDATES = ["IBM Plex Sans", "Segoe UI Variable Text", "Segoe UI", "Helvetica"]
-MONO_CANDIDATES = ["IBM Plex Mono", "Cascadia Mono", "Consolas", "Courier New", "Courier"]
+SANS_CANDIDATES = ["Segoe UI Variable Text", "Segoe UI", "Helvetica"]
+MONO_CANDIDATES = ["Cascadia Mono", "Consolas", "Courier New", "Courier"]
 
 _families = {}
 

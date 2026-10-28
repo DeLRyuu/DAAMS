@@ -56,15 +56,15 @@ import os
 import socket
 from datetime import datetime
 
-import alert_manager
-import firestore_logger
-import risk_engine
+from config.settings import LOGS_DIR
+from core import database, risk_engine
+from services import alert_manager, firestore_logger, sync_service
 
 # JSON Lines format: one JSON object per line. Chosen over a single JSON
 # array because it lets us APPEND new records cheaply and safely without
 # re-reading/re-writing the whole file, and a corrupted/incomplete final
 # line can't break the records before it.
-LOG_FILE = os.path.join(os.path.dirname(__file__), "activity_log.jsonl")
+LOG_FILE = os.path.join(LOGS_DIR, "activity_log.jsonl")
 
 
 def get_windows_username() -> str:
@@ -160,6 +160,7 @@ def append_to_local_log(record: dict) -> bool:
         return False
 
     try:
+        os.makedirs(LOGS_DIR, exist_ok=True)
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
         return True
@@ -253,6 +254,8 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
     needs it.
     """
     record = build_activity_record(asset_path, action)
+    if classification:
+        record["classification"] = classification
 
     # B. Risk assessment (Phase 5) -- merged into the SAME record dict,
     # so everything downstream (local log, Firestore, display, alerting)
@@ -261,17 +264,20 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
     risk = _assess_risk_safely(record, classification)
     record.update(risk)
 
-    # C. Local log (Phase 2) -- always attempted first, since it's the
-    # most reliable storage and has no external dependency.
+    # C. Local SQLite Database -- saved locally first for offline-first architecture.
+    try:
+        database.save_activity(record)
+    except Exception as e:
+        print(f"[WARNING] Could not save activity to SQLite database: {e}")
+
+    # Legacy JSONL log (preserved for compatibility)
     append_to_local_log(record)
 
-    # D. Firestore upload (Phase 3) -- best-effort. firestore_logger
-    # already catches everything internally; this try/except is an extra
-    # safety net in case of an unexpected error outside that module.
+    # D. Trigger cloud synchronization via single-owner sync service
     try:
-        firestore_logger.upload_activity(record)
+        sync_service.trigger_sync()
     except Exception as e:
-        print(f"[WARNING] Unexpected error during Firestore upload attempt: {e}")
+        print(f"[WARNING] Unexpected error triggering sync service: {e}")
 
     # E. Terminal display -- after both storage attempts, so the
     # administrator sees the activity block before any alert block.

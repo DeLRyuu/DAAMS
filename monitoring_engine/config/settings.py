@@ -18,6 +18,10 @@ DAAMS -> Protect This File/Folder.
 
 import os
 
+ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ENGINE_DIR, "data")
+LOGS_DIR = os.path.join(ENGINE_DIR, "logs")
+
 # ---------------------------------------------------------------------------
 # PROTECTED ASSET SAFETY RULES (used by asset_registry.py and monitor.py)
 # ---------------------------------------------------------------------------
@@ -76,14 +80,14 @@ PROTECTED_ASSETS_COLLECTION = "protected_assets"
 # Resolution order:
 #   1. If the environment variable DAAMS_FIREBASE_CREDENTIALS is set,
 #      that path is used (recommended for shared/deployed setups).
-#   2. Otherwise, defaults to "serviceAccountKey.json" in this same
-#      folder -- a filename already covered by .gitignore.
+#   2. Otherwise, defaults to "serviceAccountKey.json" in the engine
+#      root -- a filename already covered by .gitignore.
 #
 # See README.md "Secure Credential Setup" for how to obtain and place
 # this file.
 FIRESTORE_CREDENTIALS_PATH = os.environ.get(
     "DAAMS_FIREBASE_CREDENTIALS",
-    os.path.join(os.path.dirname(__file__), "serviceAccountKey.json"),
+    os.path.join(ENGINE_DIR, "serviceAccountKey.json"),
 )
 
 # ---------------------------------------------------------------------------
@@ -102,6 +106,8 @@ FIRESTORE_CREDENTIALS_PATH = os.environ.get(
 # it exists only so the system is usable out of the box, never treat it
 # as a real secret.
 DEFAULT_PIN = "1234"
+# Set False for demos that rely on the default PIN.
+REQUIRE_PIN_CHANGE_ON_DEFAULT = True
 
 # Name of the Firestore collection that mirrors the PIN configuration.
 # Always contains exactly one document -- see pin_auth.py. Stores only a

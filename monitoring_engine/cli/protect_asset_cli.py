@@ -49,11 +49,15 @@ from datetime import datetime
 # Debug logging -- this MUST come before the project imports below, so that
 # "START" is recorded even if one of those imports fails.
 # ---------------------------------------------------------------------------
-_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daams_cli_debug.log")
+_ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_LOG = os.path.join(_ENGINE_DIR, "logs", "daams_cli_debug.log")
+if _ENGINE_DIR not in sys.path:
+    sys.path.insert(0, _ENGINE_DIR)
 
 
 def _log(msg):
     try:
+        os.makedirs(os.path.dirname(_LOG), exist_ok=True)
         with open(_LOG, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S}  {msg}\n")
     except OSError:
@@ -68,7 +72,7 @@ def _show_fatal(err: str) -> None:
     """
     summary = err.strip().splitlines()[-1] if err.strip() else "Unknown error"
     try:
-        import glass_ui
+        from ui import glass_ui
         glass_ui.show_message(
             "error", "Unexpected error",
             "Something went wrong. Full details were saved to daams_cli_debug.log.",
@@ -89,10 +93,10 @@ def _show_fatal(err: str) -> None:
 _log(f"START argv={sys.argv} exe={sys.executable} cwd={os.getcwd()}")
 
 try:
-    import asset_registry as ar
-    import glass_ui
-    import pin_auth
-    from config import CLASSIFICATION_WEIGHTS
+    from config.settings import CLASSIFICATION_WEIGHTS
+    from core import asset_registry as ar
+    from ui import glass_ui
+    from cli import pin_auth
 except BaseException:
     _err = traceback.format_exc()
     _log("IMPORT FAILED\n" + _err)
@@ -121,7 +125,7 @@ def main():
             "Already protected",
             f"This {asset_type} is already protected as "
             f"'{existing.get('classification')}'.\n\n"
-            f"To change its classification, use the DAAMS Admin Control Center.",
+            f"To change its classification or remove protection, use the DAAMS Control Center.",
         )
         return
 

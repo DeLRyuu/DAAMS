@@ -35,7 +35,7 @@ Design goals, matching the rest of this project's established patterns:
 import smtplib
 from email.message import EmailMessage
 
-from config import (
+from config.settings import (
     EMAIL_ENABLED,
     NOTIFICATION_EMAIL,
     SMTP_HOST,

@@ -15,9 +15,14 @@ Configuration (Phase 4):
     registry.
 """
 
+import os
 import sys
 
-from monitor import start_monitoring
+_ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
+if _ENGINE_DIR not in sys.path:
+    sys.path.insert(0, _ENGINE_DIR)
+
+from core.monitor import start_monitoring
 
 
 def main():

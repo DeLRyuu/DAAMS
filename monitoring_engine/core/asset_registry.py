@@ -43,10 +43,11 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from config import is_disallowed_root
-import firestore_logger
+from config.settings import DATA_DIR, is_disallowed_root
+from core import database
+from services import firestore_logger, sync_service
 
-REGISTRY_FILE = os.path.join(os.path.dirname(__file__), "protected_assets.json")
+REGISTRY_FILE = os.path.join(DATA_DIR, "protected_assets.json")
 
 VALID_CLASSIFICATIONS = ("Public", "Sensitive", "Private", "Confidential")
 
@@ -86,6 +87,7 @@ def _save_registry(data: dict) -> bool:
     file stays intact until the new one is fully written.
     """
     try:
+        os.makedirs(DATA_DIR, exist_ok=True)
         tmp_path = REGISTRY_FILE + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -98,12 +100,19 @@ def _save_registry(data: dict) -> bool:
 
 def is_protected(path: str) -> bool:
     """Return True if `path` is currently a protected asset."""
+    asset = database.get_protected_asset(path)
+    if asset:
+        return asset.get("status") == "protected"
+    # Fallback to local JSON if database had no hit
     record = _load_registry().get(_normalize(path))
     return bool(record and record.get("status") == "protected")
 
 
 def get_asset(path: str) -> Optional[dict]:
     """Return the registry record for `path` (protected or not), or None."""
+    asset = database.get_protected_asset(path)
+    if asset:
+        return asset
     return _load_registry().get(_normalize(path))
 
 
@@ -113,6 +122,10 @@ def get_all_assets(only_protected: bool = True) -> list:
     By default, only currently-protected assets are returned -- this is
     what the Monitoring Engine calls to build its watch list.
     """
+    db_assets = database.get_all_protected_assets(only_protected=only_protected)
+    if db_assets:
+        return db_assets
+
     assets = list(_load_registry().values())
     if only_protected:
         assets = [a for a in assets if a.get("status") == "protected"]
@@ -170,10 +183,17 @@ def protect_asset(path: str, classification: str, protected_by: str = None) -> t
     if not _save_registry(registry):
         return False, "Failed to save the protected asset registry locally. Protection was NOT applied."
 
+    # Save to SQLite database first (offline-first)
     try:
-        firestore_logger.upload_protected_asset(record)
+        database.upsert_protected_asset(record)
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Could not sync protected asset to Firestore: {e}")
+        print(f"[REGISTRY WARNING] Could not save asset to SQLite database: {e}")
+
+    # Trigger cloud sync
+    try:
+        sync_service.trigger_sync()
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not trigger sync service: {e}")
 
     return True, f"'{path}' is now protected as {classification}."
 
@@ -194,7 +214,7 @@ def change_classification(path: str, new_classification: str) -> tuple:
 
     key = _normalize(path)
     registry = _load_registry()
-    record = registry.get(key)
+    record = registry.get(key) or database.get_protected_asset(path)
 
     if not record or record.get("status") != "protected":
         return False, f"'{path}' is not currently protected. Nothing to change."
@@ -205,9 +225,14 @@ def change_classification(path: str, new_classification: str) -> tuple:
         return False, "Failed to save the classification change locally."
 
     try:
-        firestore_logger.upload_protected_asset(record)
+        database.upsert_protected_asset(record)
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Could not sync classification change to Firestore: {e}")
+        print(f"[REGISTRY WARNING] Could not update asset in SQLite: {e}")
+
+    try:
+        sync_service.trigger_sync()
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not trigger sync service: {e}")
 
     return True, f"'{path}' classification changed to {new_classification}."
 
@@ -223,7 +248,7 @@ def remove_protection(path: str) -> tuple:
     """
     key = _normalize(path)
     registry = _load_registry()
-    record = registry.get(key)
+    record = registry.get(key) or database.get_protected_asset(path)
 
     if not record or record.get("status") != "protected":
         return False, f"'{path}' is not currently protected."
@@ -234,8 +259,13 @@ def remove_protection(path: str) -> tuple:
         return False, "Failed to save the protection removal locally."
 
     try:
-        firestore_logger.upload_protected_asset(record)
+        database.upsert_protected_asset(record)
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Could not sync protection removal to Firestore: {e}")
+        print(f"[REGISTRY WARNING] Could not update asset in SQLite: {e}")
+
+    try:
+        sync_service.trigger_sync()
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not trigger sync service: {e}")
 
     return True, f"Protection removed from '{path}'. The file/folder itself was not touched."

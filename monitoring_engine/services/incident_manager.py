@@ -28,10 +28,11 @@ import json
 import os
 from datetime import datetime
 
-import firestore_logger
-from config import INCIDENT_REPORTS_COLLECTION
+from config.settings import INCIDENT_REPORTS_COLLECTION, LOGS_DIR
+from core import database
+from services import firestore_logger, sync_service
 
-INCIDENT_LOG_FILE = os.path.join(os.path.dirname(__file__), "incident_reports.jsonl")
+INCIDENT_LOG_FILE = os.path.join(LOGS_DIR, "incident_reports.jsonl")
 
 # Plain-language phrasing for each action the Monitoring Engine actually
 # detects (Create/Modify/Rename/Delete). An action outside this map (e.g.
@@ -111,6 +112,7 @@ def _append_incident_locally(incident: dict) -> bool:
     reported and swallowed so it can't stop the Monitoring Engine.
     """
     try:
+        os.makedirs(LOGS_DIR, exist_ok=True)
         with open(INCIDENT_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(incident, ensure_ascii=False) + "\n")
         return True
@@ -146,18 +148,26 @@ def create_incident_from_alert(alert: dict):
             "risk_factors": alert.get("risk_factors", []),
             "description": _build_description(alert),
             "investigation_notes": "Pending investigation.",
-            "status": "Open",
+            "investigation_status": "New",
+            "status": "New",
             "resolution": None,
             "date_resolved": None,
         }
 
+        # Save to SQLite database first (offline-first)
+        try:
+            database.save_incident_report(incident)
+        except Exception as e:
+            print(f"[INCIDENT ERROR] Could not save incident report to SQLite: {e}")
+
+        # Legacy JSONL log (preserved for compatibility)
         _append_incident_locally(incident)
 
+        # Trigger cloud synchronization
         try:
-            firestore_logger.upload_incident_report(incident)
+            sync_service.trigger_sync()
         except Exception as e:
-            print(f"[FIRESTORE WARNING] Could not upload incident report: {e}")
-            print("The incident was still saved to the local incident log.")
+            print(f"[INCIDENT WARNING] Unexpected error triggering sync service: {e}")
 
         print("\n[INCIDENT REPORT]")
         print(f"Incident ID: {incident['incident_id']}")

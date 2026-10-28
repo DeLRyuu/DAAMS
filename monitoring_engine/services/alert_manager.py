@@ -49,12 +49,11 @@ import json
 import os
 from datetime import datetime
 
-import email_notifier
-import firestore_logger
-import incident_manager
-from config import ALERT_RISK_LEVELS, SECURITY_ALERTS_COLLECTION
+from config.settings import ALERT_RISK_LEVELS, LOGS_DIR
+from core import database
+from services import email_notifier, firestore_logger, incident_manager, sync_service
 
-ALERT_LOG_FILE = os.path.join(os.path.dirname(__file__), "security_alerts.jsonl")
+ALERT_LOG_FILE = os.path.join(LOGS_DIR, "security_alerts.jsonl")
 
 # In-memory duplicate-alert guard: (asset_path, action, timestamp) -> the
 # alert_id already issued for that EXACT activity. This protects against
@@ -112,6 +111,7 @@ def _append_alert_locally(alert: dict) -> bool:
     Monitoring Engine.
     """
     try:
+        os.makedirs(LOGS_DIR, exist_ok=True)
         with open(ALERT_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(alert, ensure_ascii=False) + "\n")
         return True
@@ -163,6 +163,7 @@ def process_activity(record: dict, classification: str = None):
 
         alert = {
             "alert_id": _generate_alert_id(),
+            "activity_id": record.get("activity_id"),
             "user": record.get("user"),
             "device": record.get("device"),
             "asset": _derive_asset_name(record.get("asset")),
@@ -179,13 +180,20 @@ def process_activity(record: dict, classification: str = None):
 
         _recent_alert_keys[dedupe_key] = alert["alert_id"]
 
+        # Save to SQLite database first (offline-first)
+        try:
+            database.save_security_alert(alert)
+        except Exception as e:
+            print(f"[ALERT ERROR] Could not save security alert to SQLite: {e}")
+
+        # Legacy JSONL log (preserved for compatibility)
         _append_alert_locally(alert)
 
+        # Trigger cloud synchronization
         try:
-            firestore_logger.upload_security_alert(alert)
+            sync_service.trigger_sync()
         except Exception as e:
-            print(f"[FIRESTORE WARNING] Could not upload security alert: {e}")
-            print("The alert was still saved to the local alert log.")
+            print(f"[ALERT WARNING] Unexpected error triggering sync service: {e}")
 
         _display_alert(alert)
 

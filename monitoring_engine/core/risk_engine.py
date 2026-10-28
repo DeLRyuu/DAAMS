@@ -53,7 +53,7 @@ Honesty notes (also covered in README):
 from collections import defaultdict
 from datetime import datetime
 
-from config import (
+from config.settings import (
     CLASSIFICATION_WEIGHTS,
     ACTION_WEIGHTS,
     WORK_HOURS_START,

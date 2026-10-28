@@ -23,8 +23,13 @@ Usage:
     (or pythonw.exe change_pin_cli.py to avoid a console window)
 """
 
+import os
 import sys
 import traceback
+
+_ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ENGINE_DIR not in sys.path:
+    sys.path.insert(0, _ENGINE_DIR)
 
 
 def _show_fatal(err: str) -> None:
@@ -40,8 +45,8 @@ def _show_fatal(err: str) -> None:
 
 
 try:
-    import glass_ui
-    import pin_auth
+    from ui import glass_ui
+    from cli import pin_auth
 except BaseException:
     _show_fatal(traceback.format_exc())
     raise
@@ -49,10 +54,9 @@ except BaseException:
 
 def main():
     if pin_auth.is_using_default_pin():
-        glass_ui.show_message(
-            "info",
-            "Default PIN in use",
-            "DAAMS is currently using the default PIN.\nLet's set a new one.",
+        new_pin = glass_ui.ask_pin(
+            "DAAMS is still using its default PIN. Choose a new PIN (4-8 digits).",
+            title="Set a PIN",
         )
     else:
         current_pin = glass_ui.ask_pin("Enter your CURRENT PIN.", title="Change PIN")
@@ -62,10 +66,11 @@ def main():
             glass_ui.show_message("error", "Incorrect PIN", "Incorrect current PIN. No changes made.")
             return
 
-    new_pin = glass_ui.ask_pin(
-        f"Enter your NEW PIN ({pin_auth.MIN_PIN_LENGTH}-{pin_auth.MAX_PIN_LENGTH} digits).",
-        title="Change PIN",
-    )
+        new_pin = glass_ui.ask_pin(
+            f"Enter your NEW PIN ({pin_auth.MIN_PIN_LENGTH}-{pin_auth.MAX_PIN_LENGTH} digits).",
+            title="Change PIN",
+        )
+
     if new_pin is None:
         return
 

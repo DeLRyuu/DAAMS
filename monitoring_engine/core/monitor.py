@@ -48,14 +48,21 @@ Design notes:
 """
 
 import os
+import sys
 import time
+
+_ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ENGINE_DIR not in sys.path:
+    sys.path.insert(0, _ENGINE_DIR)
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from activity_logger import record_activity
-from config import is_disallowed_root, REGISTRY_RELOAD_INTERVAL_SECONDS
-from asset_registry import get_all_assets
+from config.settings import is_disallowed_root, REGISTRY_RELOAD_INTERVAL_SECONDS
+from core import database
+from core.asset_registry import get_all_assets
+from services import sync_service
+from services.activity_logger import record_activity
 
 
 class ProtectedAssetEventHandler(FileSystemEventHandler):
@@ -167,8 +174,12 @@ def start_monitoring():
     the context menu is picked up automatically, without restarting.
     """
     print("=" * 60)
-    print("DAAMS Python Monitoring Engine - Phase 4")
+    print("DAAMS Python Monitoring Engine - Offline-First")
     print("=" * 60)
+
+    # Initialize shared SQLite database and start single-owner sync service
+    database.initialize_database()
+    sync_service.start_sync_service()
 
     observer = Observer()
     observer.start()
@@ -235,6 +246,7 @@ def start_monitoring():
     except KeyboardInterrupt:
         print("\nStopping DAAMS monitoring engine...")
         observer.stop()
+        sync_service.stop_sync_service()
     observer.join()
     print("Monitoring stopped cleanly.")
 

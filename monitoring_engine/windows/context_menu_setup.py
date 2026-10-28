@@ -6,19 +6,16 @@ Explorer, for both individual files and folders:
 
     Right-click a file:
         DAAMS
-         |- Protect This File
-         `- Remove Protection
+         `- Protect This File
 
     Right-click a folder:
         DAAMS
-         |- Protect This Folder
-         `- Remove Protection
+         `- Protect This Folder
 
-Note: "Change Classification" is intentionally NOT in this menu. Per
-project decision, reclassifying an already-protected asset is reserved
-for the C# WPF Admin Control Center, which gives an administrator more
-context (e.g. seeing the whole registry at once) than a quick right-click
-action would. The underlying logic still exists -- see
+Note: "Remove Protection" and "Change Classification" are intentionally NOT
+in this menu. Protection removal and reclassification are reserved for the
+DAAMS Control Center, which gives an administrator full context and centralized
+control. The underlying logic still exists -- see
 asset_registry.change_classification() -- the WPF console calls straight
 into it, the same shared-implementation approach used everywhere else in
 this project. Right-clicking an already-protected file/folder and
@@ -38,16 +35,14 @@ Scope: entries are written under HKEY_CURRENT_USER, so:
     (which is appropriate -- DAAMS is administrator-controlled per user,
     not machine-wide spyware).
 
-Each menu command runs one of the small companion GUI scripts in this
-same folder (protect_asset_cli.py, remove_protection_cli.py) via
-`pythonw.exe`, passing the selected path as %1. Those scripts then call
-directly into asset_registry.py -- the SAME Protected Asset Registry
-logic the Monitoring Engine reads, and that the future WPF console will
-also use.
+The menu command runs the companion GUI script (protect_asset_cli.py)
+via `pythonw.exe`, passing the selected path as %1. It calls directly
+into asset_registry.py -- the SAME Protected Asset Registry logic the
+Monitoring Engine reads, and that the WPF Control Center also uses.
 
 Usage:
-    python context_menu_setup.py install
-    python context_menu_setup.py uninstall
+    python windows/context_menu_setup.py install
+    python windows/context_menu_setup.py uninstall
 """
 
 import os
@@ -61,12 +56,12 @@ except ImportError:
     # install()/uninstall() will refuse to run with a clear message instead.
 
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = os.path.join(ENGINE_DIR, "cli")
 
 # (registry key name, menu label, script filename)
-MENU_ENTRIES = [
-    ("02RemoveProtection", "Remove Protection", "remove_protection_cli.py"),
-]
+# "Remove Protection" is now managed from the DAAMS Control Center only.
+MENU_ENTRIES = []
 
 # Roots where the DAAMS submenu is installed, and the label for the
 # "protect" entry specific to that root (files vs. folders get different
@@ -153,10 +148,27 @@ def _install_for_root(root_key: str, protect_key_name: str, protect_label: str, 
             winreg.SetValueEx(command_key, "", 0, winreg.REG_SZ, _command_line(script))
 
 
+def _delete_legacy_remove_protection(root_key: str) -> None:
+    """
+    Deletes any leftover 02RemoveProtection entry from earlier DAAMS versions:
+    deletes its 'command' subkey first, then the key itself, ignoring FileNotFoundError.
+    """
+    legacy_base = f"{root_key}\\shell\\DAAMS\\shell\\02RemoveProtection"
+    try:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, f"{legacy_base}\\command")
+    except FileNotFoundError:
+        pass
+    try:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, legacy_base)
+    except FileNotFoundError:
+        pass
+
+
 def install() -> None:
     _require_windows()
     for root_key, protect_key_name, protect_label, protect_script in ROOTS:
         _install_for_root(root_key, protect_key_name, protect_label, protect_script)
+        _delete_legacy_remove_protection(root_key)
         friendly = "files (*)" if root_key.endswith("*") else "folders (Directory)"
         print(f"Installed DAAMS context menu for: {friendly}")
     print("\nDAAMS context menu installed successfully.")
@@ -167,6 +179,7 @@ def install() -> None:
 def uninstall() -> None:
     _require_windows()
     for root_key, _, _, _ in ROOTS:
+        _delete_legacy_remove_protection(root_key)
         _delete_key_recursive(winreg.HKEY_CURRENT_USER, f"{root_key}\\shell\\DAAMS")
         friendly = "files (*)" if root_key.endswith("*") else "folders (Directory)"
         print(f"Removed DAAMS context menu for: {friendly}")
@@ -180,5 +193,5 @@ if __name__ == "__main__":
     elif action == "uninstall":
         uninstall()
     else:
-        print(f"Unknown action '{action}'. Use: python context_menu_setup.py [install|uninstall]")
+        print(f"Unknown action '{action}'. Use: python windows/context_menu_setup.py [install|uninstall]")
         sys.exit(1)
