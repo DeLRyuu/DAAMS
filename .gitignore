@@ -4,25 +4,39 @@ __pycache__/
 .venv/
 venv/
 
-# Environment / Secrets
+# Secrets
 .env
 .env.*
 *.key
 *.pem
+*.log
 serviceAccountKey.json
 firebase-adminsdk-*.json
-monitoring_engine/security_settings.json
-monitoring_engine/protected_assets.json
-monitoring_engine/security_alerts.jsonl
+**/appsettings.Local.json
 
-# VS Code
+# Monitoring engine local data
+monitoring_engine/data/security_settings.json
+monitoring_engine/data/protected_assets.json
+monitoring_engine/logs/*.jsonl
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Editors / IDE
 .vscode/
-
-# Visual Studio / C#
 .vs/
+*.user
+*.suo
+
+# .NET build output
 bin/
 obj/
-monitoring_engine/activity_log.jsonl
+*_wpftmp.csproj
+
+# Exported reports (may contain real activity data)
+daams-activity-*.csv
 
 # OS
 .DS_Store
