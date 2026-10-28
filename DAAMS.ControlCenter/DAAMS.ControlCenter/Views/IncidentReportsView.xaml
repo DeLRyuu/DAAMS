@@ -15,6 +15,7 @@
         <conv:ClassificationToBrushConverter x:Key="ClassBrush" />
         <conv:StringToVisibilityConverter x:Key="StringToVis" />
         <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
+        <conv:StatusMatchToBrushConverter x:Key="StatusMatch" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
@@ -86,12 +87,12 @@
                           SelectedItem="{Binding SelectedIncident}"
                           RowDetailsVisibilityMode="VisibleWhenSelected">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="INCIDENT ID" Binding="{Binding IncidentId}" Width="1.1*" />
-                        <DataGridTextColumn Header="ALERT ID" Binding="{Binding RelatedAlertId}" Width="*" />
-                        <DataGridTextColumn Header="USER" Binding="{Binding User}" Width="*" />
-                        <DataGridTextColumn Header="ASSET" Binding="{Binding Asset}" Width="1.2*" />
+                        <DataGridTextColumn Header="Incident ID" Binding="{Binding IncidentId}" Width="1.1*" />
+                        <DataGridTextColumn Header="Alert ID" Binding="{Binding RelatedAlertId}" Width="*" />
+                        <DataGridTextColumn Header="User" Binding="{Binding User}" Width="*" />
+                        <DataGridTextColumn Header="Asset" Binding="{Binding Asset}" Width="1.2*" />
 
-                        <DataGridTemplateColumn Header="RISK LEVEL" Width="0.9*">
+                        <DataGridTemplateColumn Header="Risk level" Width="0.9*">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border Style="{StaticResource Badge.Base}"
@@ -104,9 +105,9 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="DATE / TIME" Binding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                        <DataGridTextColumn Header="Date / time" Binding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
 
-                        <DataGridTemplateColumn Header="STATUS" Width="*">
+                        <DataGridTemplateColumn Header="Status" Width="*">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border Style="{StaticResource Badge.Base}"
@@ -119,7 +120,7 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="DATE RESOLVED" Binding="{Binding DateResolved, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                        <DataGridTextColumn Header="Date resolved" Binding="{Binding DateResolved, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
                     </DataGrid.Columns>
 
                     <!-- Selecting a row reveals full details + the resolution workflow. -->
@@ -135,7 +136,17 @@
 
                                     <!-- LEFT: full details -->
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="INCIDENT DETAILS" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+                                        <TextBlock Text="Incident details" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+
+                                        <StackPanel Visibility="{Binding RelatedAlertId, Converter={StaticResource StringToVis}}" Margin="0,0,0,10">
+                                            <TextBlock Style="{StaticResource Text.Mono}">
+                                                <Run Text="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm', Mode=OneWay}" />
+                                                <Run Text=" — Alert " />
+                                                <Run Text="{Binding RelatedAlertId, Mode=OneWay}" />
+                                                <Run Text=" — Incident " />
+                                                <Run Text="{Binding IncidentId, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </StackPanel>
 
                                         <Grid Margin="0,0,0,10">
                                             <Grid.ColumnDefinitions>
@@ -143,17 +154,17 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0">
-                                                <TextBlock Text="DEVICE" Style="{StaticResource Text.Label}" />
+                                                <TextBlock Text="Device" Style="{StaticResource Text.Label}" />
                                                 <TextBlock Text="{Binding Device}" Style="{StaticResource Text.Body}" Margin="0,3,0,0" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1">
-                                                <TextBlock Text="ACTION" Style="{StaticResource Text.Label}" />
+                                                <TextBlock Text="Action" Style="{StaticResource Text.Label}" />
                                                 <TextBlock Text="{Binding Action}" Style="{StaticResource Text.Body}" Margin="0,3,0,0" />
                                             </StackPanel>
                                         </Grid>
 
                                         <StackPanel Margin="0,0,0,10">
-                                            <TextBlock Text="CLASSIFICATION" Style="{StaticResource Text.Label}" />
+                                            <TextBlock Text="Classification" Style="{StaticResource Text.Label}" />
                                             <Border Style="{StaticResource Badge.Base}" Margin="0,4,0,0"
                                                     Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
                                                 <TextBlock Text="{Binding Classification}"
@@ -162,33 +173,61 @@
                                             </Border>
                                         </StackPanel>
 
-                                        <TextBlock Text="DESCRIPTION" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                                        <TextBlock Text="Description" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
                                         <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" Margin="0,0,0,10" />
 
                                         <StackPanel Visibility="{Binding Notes, Converter={StaticResource StringToVis}}">
-                                            <TextBlock Text="INVESTIGATION NOTES" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                                            <TextBlock Text="Investigation notes" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
                                             <TextBlock Text="{Binding Notes}" Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </StackPanel>
 
                                     <!-- RIGHT: resolution workflow -->
                                     <StackPanel Grid.Column="2">
-                                        <TextBlock Text="RESOLUTION WORKFLOW" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+                                        <TextBlock Text="Resolution workflow" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
 
                                         <TextBlock Text="Update status" Style="{StaticResource Text.Secondary}" Margin="0,0,0,6" />
                                         <WrapPanel>
                                             <Button Content="New" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
                                                     Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{x:Static models:InvestigationStatus.New}" />
+                                                    CommandParameter="{x:Static models:InvestigationStatus.New}">
+                                                <Button.Foreground>
+                                                    <MultiBinding Converter="{StaticResource StatusMatch}">
+                                                        <Binding Path="DataContext.SelectedIncident.InvestigationStatus" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        <Binding RelativeSource="{RelativeSource Self}" Path="CommandParameter" />
+                                                    </MultiBinding>
+                                                </Button.Foreground>
+                                            </Button>
                                             <Button Content="Under Investigation" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
                                                     Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{x:Static models:InvestigationStatus.UnderInvestigation}" />
+                                                    CommandParameter="{x:Static models:InvestigationStatus.UnderInvestigation}">
+                                                <Button.Foreground>
+                                                    <MultiBinding Converter="{StaticResource StatusMatch}">
+                                                        <Binding Path="DataContext.SelectedIncident.InvestigationStatus" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        <Binding RelativeSource="{RelativeSource Self}" Path="CommandParameter" />
+                                                    </MultiBinding>
+                                                </Button.Foreground>
+                                            </Button>
                                             <Button Content="Resolved" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
                                                     Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{x:Static models:InvestigationStatus.Resolved}" />
+                                                    CommandParameter="{x:Static models:InvestigationStatus.Resolved}">
+                                                <Button.Foreground>
+                                                    <MultiBinding Converter="{StaticResource StatusMatch}">
+                                                        <Binding Path="DataContext.SelectedIncident.InvestigationStatus" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        <Binding RelativeSource="{RelativeSource Self}" Path="CommandParameter" />
+                                                    </MultiBinding>
+                                                </Button.Foreground>
+                                            </Button>
                                             <Button Content="Dismissed" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
                                                     Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{x:Static models:InvestigationStatus.Dismissed}" />
+                                                    CommandParameter="{x:Static models:InvestigationStatus.Dismissed}">
+                                                <Button.Foreground>
+                                                    <MultiBinding Converter="{StaticResource StatusMatch}">
+                                                        <Binding Path="DataContext.SelectedIncident.InvestigationStatus" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        <Binding RelativeSource="{RelativeSource Self}" Path="CommandParameter" />
+                                                    </MultiBinding>
+                                                </Button.Foreground>
+                                            </Button>
                                         </WrapPanel>
                                         <TextBlock Text="Marking Resolved or Dismissed records today's date as Date Resolved."
                                                    Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0" />

@@ -7,11 +7,8 @@ using ControlCenter.Models;
 namespace ControlCenter.Converters;
 
 /// <summary>
-/// Maps a Classification to a brush, reusing the same four-step color scale as
-/// RiskLevelToBrushConverter (Public≈Low ... Confidential≈Critical). This is a
-/// deliberate design decision: classification weights already sit on the same
-/// ordinal scale the risk engine uses (5/15/25/35 — see reference doc §13), so
-/// reusing the palette teaches the manager one color language instead of two.
+/// Maps any Classification to the violet classification brush so classification
+/// badges are visually distinct from risk-level badges (green/amber/orange/red).
 /// ConverterParameter "Bg" returns the muted background tint.
 /// </summary>
 public class ClassificationToBrushConverter : IValueConverter
@@ -20,14 +17,10 @@ public class ClassificationToBrushConverter : IValueConverter
     {
         bool background = string.Equals(parameter as string, "Bg", StringComparison.OrdinalIgnoreCase);
 
-        string key = value switch
-        {
-            Classification.Public => background ? "Brush.RiskLowBg" : "Brush.RiskLow",
-            Classification.Sensitive => background ? "Brush.RiskMediumBg" : "Brush.RiskMedium",
-            Classification.Private => background ? "Brush.RiskHighBg" : "Brush.RiskHigh",
-            Classification.Confidential => background ? "Brush.RiskCriticalBg" : "Brush.RiskCritical",
-            _ => background ? "Brush.SurfaceElevated" : "Brush.TextSecondary"
-        };
+        // Classification uses a single violet family so it is never confused
+        // with the risk-level palette (green/amber/orange/red). The level itself
+        // is still shown as text; color no longer doubles as a risk signal.
+        string key = background ? "Brush.ClassificationBg" : "Brush.Classification";
 
         return Application.Current.Resources[key];
     }

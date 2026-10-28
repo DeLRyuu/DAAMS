@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:conv="clr-namespace:ControlCenter.Converters"
+             xmlns:vm="clr-namespace:ControlCenter.ViewModels"
              mc:Ignorable="d"
              d:DesignWidth="1150" d:DesignHeight="760"
              Background="{StaticResource Brush.Background}">
@@ -13,6 +14,7 @@
         <conv:ClassificationToBrushConverter x:Key="ClassBrush" />
         <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <vm:DateToDayGroupConverter x:Key="DateToDayGroupConverter" />
     </UserControl.Resources>
 
     <Grid Style="{StaticResource Layout.PageRoot}">
@@ -50,38 +52,55 @@
         <!-- Toolbar -->
         <Grid Grid.Row="1" Margin="0,16,0,14">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="140" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="140" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="140" />
                 <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBox Grid.Column="0" Style="{StaticResource Input.TextBox}"
+            <!-- Quick chips: segmented toggle style, left of toolbar -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <ToggleButton Content="Last 24 hours" Style="{StaticResource Segment.ToggleItem}"
+                              IsChecked="{Binding FilterLast24Hours, Mode=TwoWay}" Margin="0,0,4,0" />
+                <ToggleButton Content="Off-hours" Style="{StaticResource Segment.ToggleItem}"
+                              IsChecked="{Binding FilterOffHours, Mode=TwoWay}" Margin="0,0,4,0" />
+                <ToggleButton Content="High and above" Style="{StaticResource Segment.ToggleItem}"
+                              IsChecked="{Binding FilterHighAndAbove, Mode=TwoWay}" />
+            </StackPanel>
+
+            <TextBox Grid.Column="2" Style="{StaticResource Input.TextBox}"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                      Tag="Search by user, device, asset, path, action, classification, or risk…" />
 
-            <ComboBox Grid.Column="2" Style="{StaticResource Input.ComboBox}"
+            <ComboBox Grid.Column="4" Style="{StaticResource Input.ComboBox}"
                       ItemsSource="{Binding ActionOptions}"
                       SelectedItem="{Binding SelectedAction}"
                       DisplayMemberPath="Label" />
 
-            <ComboBox Grid.Column="4" Style="{StaticResource Input.ComboBox}"
+            <ComboBox Grid.Column="6" Style="{StaticResource Input.ComboBox}"
                       ItemsSource="{Binding ClassificationOptions}"
                       SelectedItem="{Binding SelectedClassification}"
                       DisplayMemberPath="Label" />
 
-            <ComboBox Grid.Column="6" Style="{StaticResource Input.ComboBox}"
+            <ComboBox Grid.Column="8" Style="{StaticResource Input.ComboBox}"
                       ItemsSource="{Binding RiskLevelOptions}"
                       SelectedItem="{Binding SelectedRiskLevel}"
                       DisplayMemberPath="Label" />
 
-            <Button Grid.Column="8" Content="Reset" Style="{StaticResource Button.Secondary}"
+            <Button Grid.Column="10" Content="Reset" Style="{StaticResource Button.Secondary}"
                     Command="{Binding ResetFiltersCommand}" />
+
+            <Button Grid.Column="12" Content="Export CSV" Style="{StaticResource Button.Secondary}"
+                    Command="{Binding ExportCsvCommand}" />
         </Grid>
 
         <!-- Content area: exactly one of these four is visible at a time -->
@@ -91,20 +110,63 @@
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
                 <DataGrid ItemsSource="{Binding Activity}" Style="{StaticResource Grid.Data}"
                           RowDetailsVisibilityMode="VisibleWhenSelected">
+                    <DataGrid.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource Brush.SurfaceAlt}" BorderThickness="0,0,0,1" Margin="0,10,0,4" Padding="0,0,0,4">
+                                        <TextBlock Text="{Binding Name, Converter={StaticResource DateToDayGroupConverter}}"
+                                                   Style="{StaticResource Text.Label}" />
+                                    </Border>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </DataGrid.GroupStyle>
+
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="TIMESTAMP" Binding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
-                        <DataGridTextColumn Header="USER" Binding="{Binding User}" Width="*" />
-                        <DataGridTextColumn Header="DEVICE" Binding="{Binding Device}" Width="*" />
-                        <DataGridTextColumn Header="ASSET" Binding="{Binding Asset}" Width="1.2*">
+                        <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*"
+                                            SortMemberPath="Timestamp" SortDirection="Descending" />
+
+                        <DataGridTextColumn Binding="{Binding User}" Width="*" SortMemberPath="User">
+                            <DataGridTextColumn.Header>
+                                <TextBlock Text="USER" ToolTip="Windows account, not necessarily one individual." />
+                            </DataGridTextColumn.Header>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="Device" Binding="{Binding Device}" Width="*" SortMemberPath="Device" />
+
+                        <DataGridTextColumn Header="Asset" Binding="{Binding Asset}" Width="1.2*" SortMemberPath="Asset">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="ToolTip" Value="{Binding Path}" />
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="ACTION" Binding="{Binding Action}" Width="0.8*" />
 
-                        <DataGridTemplateColumn Header="CLASSIFICATION" Width="1.1*">
+                        <DataGridTemplateColumn Header="Action" Width="0.8*" SortMemberPath="Action">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Action}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding RepeatCountDisplay}"
+                                                   Margin="4,0,0,0"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Secondary}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasRepeats}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="Classification" Width="1.1*" SortMemberPath="Classification">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border Style="{StaticResource Badge.Base}"
@@ -117,7 +179,7 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTemplateColumn Header="RISK" Width="0.9*">
+                        <DataGridTemplateColumn Header="Risk" Width="0.9*" SortMemberPath="RiskScore">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
@@ -136,7 +198,7 @@
 
                     <!-- Selecting a row reveals its full detail — the asset's full path
                          (not shown as its own column, to keep the table scannable) plus
-                         the risk factor breakdown. -->
+                         the risk factor breakdown, navigation actions, and merged repeat timestamps. -->
                     <DataGrid.RowDetailsTemplate>
                         <DataTemplate>
                             <Border Background="{StaticResource Brush.SurfaceAlt}" CornerRadius="3" Padding="14,10" Margin="0,4,0,8">
@@ -144,6 +206,18 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                         <TextBlock Text="ASSET PATH" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
                                         <TextBlock Text="{Binding Path}" Style="{StaticResource Text.Mono}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <!-- Navigation Actions -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <Button Content="Open case" Style="{StaticResource Button.Secondary}"
+                                                Command="{Binding DataContext.OpenCaseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Visibility="{Binding HasMatchingCase, Converter={StaticResource BoolToVis}}"
+                                                Margin="0,0,8,0" />
+                                        <Button Content="View device" Style="{StaticResource Button.Secondary}"
+                                                Command="{Binding DataContext.ViewDeviceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding Device}" />
                                     </StackPanel>
 
                                     <TextBlock Text="RISK FACTORS" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
@@ -158,6 +232,18 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+
+                                    <!-- Collapsed Repeats: list all merged timestamps -->
+                                    <StackPanel Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVis}}" Margin="0,10,0,0">
+                                        <TextBlock Text="MERGED TIMESTAMPS" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                                        <ItemsControl ItemsSource="{Binding MergedTimestamps}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding StringFormat='yyyy-MM-dd HH:mm:ss'}" Style="{StaticResource Text.Mono}" Margin="0,2" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

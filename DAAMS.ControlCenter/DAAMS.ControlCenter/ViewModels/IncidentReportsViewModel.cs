@@ -24,11 +24,25 @@ namespace ControlCenter.ViewModels;
 /// incidents created from the Security Alerts investigation panel. As with
 /// Security Alerts, all edits here are local/in-memory for this phase;
 /// Firestore stays read-only until real write-back is built later.
+///
+/// Phase 8 fix: Phase 7's schema inspection confirmed the incident_reports
+/// collection doesn't actually exist in the real Monitoring Engine yet —
+/// which meant every Refresh here silently wiped out any incident the
+/// manager had just created locally, since Firestore always returns empty
+/// for it. _locallyCreatedIncidents now tracks those separately and Apply()
+/// merges them back in on every load, so they survive Refresh for the rest
+/// of the session. They still don't survive an app restart — there's
+/// nowhere in Firestore for them to actually live until the Monitoring
+/// Engine adds a write path for incidents.
 /// </summary>
 public class IncidentReportsViewModel : DataSectionViewModelBase
 {
-    private readonly FirestoreService _firestore;
+    private readonly LocalDatabaseService _db;
+    private readonly FirestoreService? _firestore;
     private readonly ObservableCollection<IncidentReport> _allIncidents = new();
+
+    /// <summary>Incidents created via AddLocalIncident this session — re-merged into every load since Firestore has nowhere to persist them yet (see class remarks).</summary>
+    private readonly List<IncidentReport> _locallyCreatedIncidents = new();
 
     public ICollectionView Incidents { get; }
 
@@ -120,8 +134,9 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
     /// <summary>Commits ResolutionDraft into the selected incident's Resolution field.</summary>
     public ICommand SaveResolutionCommand { get; }
 
-    public IncidentReportsViewModel(FirestoreService firestore)
+    public IncidentReportsViewModel(LocalDatabaseService db, FirestoreService? firestore = null)
     {
+        _db = db;
         _firestore = firestore;
 
         Incidents = CollectionViewSource.GetDefaultView(_allIncidents);
@@ -147,9 +162,13 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
         });
     }
 
+    public IncidentReportsViewModel(FirestoreService firestore) : this(new LocalDatabaseService(), firestore)
+    {
+    }
+
     protected override async Task<int> LoadFromFirestoreAsync()
     {
-        List<IncidentReport> incidents = await _firestore.GetIncidentReportsAsync();
+        List<IncidentReport> incidents = await _db.GetIncidentReportsAsync();
         Apply(incidents);
         return incidents.Count;
     }
@@ -158,11 +177,13 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
 
     /// <summary>
     /// Adds an incident created from the Security Alerts investigation panel
-    /// straight into the visible list, without a full reload. Session-only —
-    /// like every other edit in this phase, it isn't written to Firestore.
+    /// into the local database and visible list, persisting it across refreshes and restarts.
     /// </summary>
     public void AddLocalIncident(IncidentReport incident)
     {
+        _ = _db.SaveIncidentReportAsync(incident);
+
+        _locallyCreatedIncidents.Insert(0, incident);
         _allIncidents.Insert(0, incident);
         TotalCount = _allIncidents.Count;
         RecomputeOpenCount();
@@ -173,8 +194,20 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
     {
         SelectedIncident = null;
 
+        // Merge in anything created locally this session that Firestore
+        // didn't return (it never will, until the Monitoring Engine writes
+        // to this collection) — otherwise Refresh would erase it.
+        var merged = new List<IncidentReport>(incidents);
+        foreach (IncidentReport local in _locallyCreatedIncidents)
+        {
+            if (!merged.Any(i => i.IncidentId == local.IncidentId))
+            {
+                merged.Add(local);
+            }
+        }
+
         _allIncidents.Clear();
-        foreach (IncidentReport incident in incidents.OrderByDescending(i => i.UpdatedAt))
+        foreach (IncidentReport incident in merged.OrderByDescending(i => i.UpdatedAt))
         {
             _allIncidents.Add(incident);
         }
@@ -217,6 +250,9 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
         SelectedIncident = incident;
 
         RecomputeOpenCount();
+
+        // Persist status change to local SQLite database
+        _ = _db.UpdateIncidentReportStatusAsync(incident.IncidentId, newStatus, incident.DateResolved);
     }
 
     private void SaveResolution(IncidentReport incident)
@@ -233,6 +269,9 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
         _allIncidents.RemoveAt(index);
         _allIncidents.Insert(index, incident);
         SelectedIncident = incident;
+
+        // Persist resolution to local SQLite database
+        _ = _db.UpdateIncidentResolutionAsync(incident.IncidentId, incident.Resolution);
     }
 
     private bool FilterPredicate(object obj)
@@ -255,10 +294,10 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
             string term = SearchText.Trim();
-            bool matches = incident.IncidentId.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || incident.User.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || incident.Asset.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || incident.Description.Contains(term, StringComparison.OrdinalIgnoreCase);
+            bool matches = StringMatch.Has(incident.IncidentId, term)
+                           || StringMatch.Has(incident.User, term)
+                           || StringMatch.Has(incident.Asset, term)
+                           || StringMatch.Has(incident.Description, term);
             if (!matches)
             {
                 return false;

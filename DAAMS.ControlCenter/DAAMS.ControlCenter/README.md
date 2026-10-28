@@ -53,3 +53,4 @@ control_center/
 ├── Services/          (reserved for future Firestore/navigation services)
 └── Resources/         Colors.xaml, Typography.xaml, Styles.xaml
 ```
+Design change: Security Alerts and Incident Reports are merged into a single Cases workflow. A case is created from a High/Critical alert, tracks investigation status (New → Investigating → Resolved/Dismissed), and holds notes and a resolution.

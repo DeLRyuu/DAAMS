@@ -27,7 +27,8 @@ namespace ControlCenter.ViewModels;
 /// </summary>
 public class SecurityAlertsViewModel : DataSectionViewModelBase
 {
-    private readonly FirestoreService _firestore;
+    private readonly LocalDatabaseService _db;
+    private readonly FirestoreService? _firestore;
     private readonly Action<IncidentReport> _createIncidentReport;
     private readonly ObservableCollection<SecurityAlert> _allAlerts = new();
 
@@ -122,8 +123,9 @@ public class SecurityAlertsViewModel : DataSectionViewModelBase
     /// <summary>Creates a new Incident Report pre-filled from the selected alert and hands it to IncidentReportsViewModel via the constructor-injected callback.</summary>
     public ICommand CreateIncidentReportCommand { get; }
 
-    public SecurityAlertsViewModel(FirestoreService firestore, Action<IncidentReport> createIncidentReport)
+    public SecurityAlertsViewModel(LocalDatabaseService db, Action<IncidentReport> createIncidentReport, FirestoreService? firestore = null)
     {
+        _db = db;
         _firestore = firestore;
         _createIncidentReport = createIncidentReport;
 
@@ -148,11 +150,27 @@ public class SecurityAlertsViewModel : DataSectionViewModelBase
                 CreateIncidentFrom(SelectedAlert);
             }
         });
+
+        ViewContext.Current.RangeChanged += () =>
+        {
+            Alerts.Refresh();
+            RecomputeCounts();
+        };
+    }
+
+    public SecurityAlertsViewModel(FirestoreService firestore, Action<IncidentReport> createIncidentReport)
+        : this(new LocalDatabaseService(), createIncidentReport, firestore)
+    {
+    }
+
+    protected override void ApplyPendingSearch(string s)
+    {
+        SearchText = s;
     }
 
     protected override async Task<int> LoadFromFirestoreAsync()
     {
-        List<SecurityAlert> alerts = await _firestore.GetSecurityAlertsAsync();
+        List<SecurityAlert> alerts = await _db.GetSecurityAlertsAsync();
         Apply(alerts);
         return alerts.Count;
     }
@@ -169,12 +187,17 @@ public class SecurityAlertsViewModel : DataSectionViewModelBase
             _allAlerts.Add(alert);
         }
 
-        TotalCount = _allAlerts.Count;
-        RecomputeNeedsAttention();
+        RecomputeCounts();
     }
 
     private void RecomputeNeedsAttention()
-        => NeedsAttentionCount = _allAlerts.Count(a => a.Status is AlertStatus.New or AlertStatus.Investigating);
+        => RecomputeCounts();
+
+    private void RecomputeCounts()
+    {
+        TotalCount = _allAlerts.Count(a => ViewContext.Current.IsInRange(a.CreatedAt));
+        NeedsAttentionCount = _allAlerts.Count(a => a.Status is AlertStatus.New or AlertStatus.Investigating && ViewContext.Current.IsInRange(a.CreatedAt));
+    }
 
     /// <summary>
     /// Mutates the alert's Status, then removes+re-inserts it in the backing
@@ -197,6 +220,9 @@ public class SecurityAlertsViewModel : DataSectionViewModelBase
         SelectedAlert = alert;
 
         RecomputeNeedsAttention();
+
+        // Persist to local SQLite database
+        _ = _db.UpdateAlertStatusAsync(alert.AlertId, newStatus);
     }
 
     private void CreateIncidentFrom(SecurityAlert alert)
@@ -221,6 +247,9 @@ public class SecurityAlertsViewModel : DataSectionViewModelBase
             UpdatedAt = DateTime.Now,
         };
 
+        // Persist to local SQLite database
+        _ = _db.SaveIncidentReportAsync(incident);
+
         _createIncidentReport(incident);
         NewIncidentNotes = string.Empty;
     }
@@ -228,6 +257,11 @@ public class SecurityAlertsViewModel : DataSectionViewModelBase
     private bool FilterPredicate(object obj)
     {
         if (obj is not SecurityAlert alert)
+        {
+            return false;
+        }
+
+        if (!ViewContext.Current.IsInRange(alert.CreatedAt))
         {
             return false;
         }
@@ -245,10 +279,10 @@ public class SecurityAlertsViewModel : DataSectionViewModelBase
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
             string term = SearchText.Trim();
-            bool matches = alert.User.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || alert.Device.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || alert.Asset.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || alert.AlertId.Contains(term, StringComparison.OrdinalIgnoreCase);
+            bool matches = StringMatch.Has(alert.User, term)
+                           || StringMatch.Has(alert.Device, term)
+                           || StringMatch.Has(alert.Asset, term)
+                           || StringMatch.Has(alert.AlertId, term);
             if (!matches)
             {
                 return false;

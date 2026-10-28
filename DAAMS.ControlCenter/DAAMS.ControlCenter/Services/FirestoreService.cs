@@ -199,7 +199,8 @@ public class FirestoreService
         // adds one.
         List<RiskFactor> riskFactors = GetRiskFactors(doc);
 
-        string reason = doc.TryGetValue("reason", out string? explicitReason) && !string.IsNullOrWhiteSpace(explicitReason)
+        string? explicitReason = GetOptionalString(doc, "reason");
+        string reason = !string.IsNullOrWhiteSpace(explicitReason)
             ? explicitReason
             : SynthesizeReason(riskFactors);
 
@@ -209,7 +210,7 @@ public class FirestoreService
             User = GetString(doc, "user", "unknown"),
             Device = GetString(doc, "device", "unknown"),
             Asset = GetString(doc, "asset", "unknown"),
-            Path = doc.TryGetValue("asset_path", out string? assetPath) ? assetPath : null,
+            Path = GetOptionalString(doc, "asset_path"),
             Action = GetEnum(doc, "action", ActionType.Open),
             Classification = GetEnum(doc, "asset_classification", Classification.Public),
             RiskScore = GetNullableInt(doc, "risk_score") ?? 0,
@@ -229,7 +230,7 @@ public class FirestoreService
     private static IncidentReport MapIncidentReport(DocumentSnapshot doc) => new()
     {
         IncidentId = GetString(doc, "incident_id", doc.Id),
-        RelatedAlertId = doc.TryGetValue("related_alert_id", out string? relatedAlert) ? relatedAlert : null,
+        RelatedAlertId = GetOptionalString(doc, "related_alert_id"),
         User = GetString(doc, "user", "unknown"),
         Device = GetString(doc, "device", "unknown"),
         Asset = GetString(doc, "asset", "unknown"),
@@ -239,61 +240,82 @@ public class FirestoreService
         RiskLevel = GetEnum(doc, "risk_level", RiskLevel.Low),
         Description = GetString(doc, "description", string.Empty),
         InvestigationStatus = GetEnum(doc, "investigation_status", InvestigationStatus.New),
-        Notes = doc.TryGetValue("notes", out string? notes) ? notes : null,
-        Resolution = doc.TryGetValue("resolution", out string? resolution) ? resolution : null,
+        Notes = GetOptionalString(doc, "notes"),
+        Resolution = GetOptionalString(doc, "resolution"),
         DateResolved = GetNullableTimestamp(doc, "date_resolved"),
         CreatedAt = GetTimestamp(doc, "created_at"),
         UpdatedAt = GetTimestamp(doc, "updated_at"),
     };
 
     // --- field-read helpers: every one tolerates a missing/mismatched field ---
+    //
+    // Bug found in real usage (not caught by earlier testing, which only
+    // ever used mock/sample data): calling doc.TryGetValue<T>(field, out T)
+    // with a specific type — e.g. TryGetValue<Timestamp>(...) — can THROW
+    // instead of returning false when the field exists but holds a
+    // different type. The real Monitoring Engine writes protected_at,
+    // timestamp, etc. as plain STRINGS (confirmed against a live document:
+    // "protected_at": "2026-09-19 22:59:46"), not native Firestore
+    // Timestamps — so asking for Timestamp directly blew up before the
+    // string-parsing fallback below it ever ran, taking down every section
+    // that loaded real data. Every helper below now reads the field once as
+    // plain `object` (which always succeeds for any existing field) and
+    // pattern-matches the actual runtime type in C#, instead of asking
+    // Firestore's client to convert to a specific type up front.
 
     private static string GetString(DocumentSnapshot doc, string field, string fallback)
-        => doc.TryGetValue(field, out string? value) && !string.IsNullOrEmpty(value) ? value : fallback;
+        => doc.TryGetValue(field, out object? raw) && raw is string s && !string.IsNullOrEmpty(s) ? s : fallback;
+
+    private static string? GetOptionalString(DocumentSnapshot doc, string field)
+        => doc.TryGetValue(field, out object? raw) && raw is string s ? s : null;
 
     private static TEnum GetEnum<TEnum>(DocumentSnapshot doc, string field, TEnum fallback) where TEnum : struct, Enum
-        => doc.TryGetValue(field, out string? raw) && Enum.TryParse(raw, ignoreCase: true, out TEnum parsed)
+        => doc.TryGetValue(field, out object? raw) && raw is string s && Enum.TryParse(s, ignoreCase: true, out TEnum parsed)
             ? parsed
             : fallback;
 
     private static TEnum? GetNullableEnum<TEnum>(DocumentSnapshot doc, string field) where TEnum : struct, Enum
-        => doc.TryGetValue(field, out string? raw) && Enum.TryParse(raw, ignoreCase: true, out TEnum parsed)
+        => doc.TryGetValue(field, out object? raw) && raw is string s && Enum.TryParse(s, ignoreCase: true, out TEnum parsed)
             ? parsed
             : null;
 
     private static int? GetNullableInt(DocumentSnapshot doc, string field)
     {
-        if (doc.TryGetValue(field, out long longValue))
+        if (!doc.TryGetValue(field, out object? raw) || raw is null)
         {
-            return (int)longValue;
+            return null;
         }
 
-        if (doc.TryGetValue(field, out double doubleValue))
+        return raw switch
         {
-            return (int)doubleValue;
-        }
-
-        return null;
+            long l => (int)l,
+            int i => i,
+            double d => (int)d,
+            string s when int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) => parsed,
+            _ => null
+        };
     }
 
     /// <summary>
     /// Reads a timestamp field that may be either a native Firestore Timestamp
-    /// (if the Monitoring System writes datetime objects) or a plain string in
-    /// "yyyy-MM-dd HH:mm:ss" form (matching the format shown throughout the
-    /// reference doc's JSON examples — Python's json.dumps of a formatted
-    /// string, not a Firestore Timestamp). Tries both; falls back to
-    /// DateTime.MinValue — treated by the UI as "timestamp unavailable" — if
-    /// neither works, rather than throwing.
+    /// or a plain string in "yyyy-MM-dd HH:mm:ss" form — confirmed (see note
+    /// above) that the real Monitoring Engine actually uses the string form.
+    /// Tries both; falls back to DateTime.MinValue — treated by the UI as
+    /// "timestamp unavailable" — if neither works, rather than throwing.
     /// </summary>
     private static DateTime GetTimestamp(DocumentSnapshot doc, string field)
     {
-        if (doc.TryGetValue(field, out Timestamp ts))
+        if (!doc.TryGetValue(field, out object? raw) || raw is null)
+        {
+            return DateTime.MinValue;
+        }
+
+        if (raw is Timestamp ts)
         {
             return ts.ToDateTime().ToLocalTime();
         }
 
-        if (doc.TryGetValue(field, out string? raw) &&
-            DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
+        if (raw is string s && DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
         {
             return parsed;
         }
@@ -304,13 +326,17 @@ public class FirestoreService
     /// <summary>Same as GetTimestamp, but returns null instead of DateTime.MinValue when the field is absent — for genuinely optional dates like "date_resolved" where "not yet resolved" is a real, meaningful state.</summary>
     private static DateTime? GetNullableTimestamp(DocumentSnapshot doc, string field)
     {
-        if (doc.TryGetValue(field, out Timestamp ts))
+        if (!doc.TryGetValue(field, out object? raw) || raw is null)
+        {
+            return null;
+        }
+
+        if (raw is Timestamp ts)
         {
             return ts.ToDateTime().ToLocalTime();
         }
 
-        if (doc.TryGetValue(field, out string? raw) &&
-            DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
+        if (raw is string s && DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
         {
             return parsed;
         }

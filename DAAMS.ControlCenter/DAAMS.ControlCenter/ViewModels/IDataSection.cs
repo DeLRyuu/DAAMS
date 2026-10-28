@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace ControlCenter.ViewModels;
 
 /// <summary>
@@ -10,4 +12,6 @@ public interface IDataSection
 {
     /// <summary>Starts the first load if one hasn't happened yet. Safe to call repeatedly.</summary>
     void EnsureLoaded();
+
+    Task RefreshAsync();
 }

@@ -40,6 +40,10 @@
         <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
     </Style>
 
+    <Style x:Key="Text.Primary" TargetType="TextBlock" BasedOn="{StaticResource Text.Body}">
+        <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+    </Style>
+
     <Style x:Key="Text.Secondary" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Primary}" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Small}" />

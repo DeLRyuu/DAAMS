@@ -11,9 +11,14 @@
     <UserControl.Resources>
         <conv:ClassificationToBrushConverter x:Key="ClassBrush" />
         <conv:StatusToBrushConverter x:Key="StatusBrush" />
+        <conv:RiskLevelToBrushConverter x:Key="RiskBrush" />
         <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
+
+    <UserControl.InputBindings>
+        <KeyBinding Key="Escape" Command="{Binding CloseDrawerCommand}" />
+    </UserControl.InputBindings>
 
     <Grid Style="{StaticResource Layout.PageRoot}">
         <Grid.RowDefinitions>
@@ -74,60 +79,268 @@
                       DisplayMemberPath="Label" />
         </Grid>
 
-        <!-- Content area: exactly one of these four is visible at a time -->
+        <!-- Content area -->
         <Grid Grid.Row="2">
 
-            <Border Style="{StaticResource Surface.Card}" Padding="18,6,18,10"
-                    Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
-                <DataGrid ItemsSource="{Binding Assets}" Style="{StaticResource Grid.Data}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="ASSET NAME" Binding="{Binding AssetName}" Width="1.3*" />
-                        <DataGridTextColumn Header="TYPE" Binding="{Binding AssetType}" Width="0.8*" />
-                        <DataGridTextColumn Header="PATH" Binding="{Binding Path}" Width="2*" />
+            <!-- Loaded State with DataGrid + Detail Drawer -->
+            <Grid Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                        <DataGridTemplateColumn Header="CLASSIFICATION" Width="1.1*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource Badge.Base}"
-                                            Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
-                                        <TextBlock Text="{Binding Classification}"
-                                                   Style="{StaticResource Badge.Text}"
-                                                   Foreground="{Binding Classification, Converter={StaticResource ClassBrush}}" />
-                                    </Border>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
+                <!-- DataGrid Table -->
+                <Border Grid.Column="0" Style="{StaticResource Surface.Card}" Padding="18,6,18,10">
+                    <DataGrid ItemsSource="{Binding Assets}"
+                              SelectedItem="{Binding SelectedAsset}"
+                              SelectionMode="Single"
+                              Style="{StaticResource Grid.Data}">
+                        <DataGrid.InputBindings>
+                            <KeyBinding Key="Escape" Command="{Binding CloseDrawerCommand}" />
+                        </DataGrid.InputBindings>
+                        <DataGrid.Columns>
+                            <!-- ASSET (name, ellipsis + ToolTip full path, and inactive note) -->
+                            <DataGridTemplateColumn Header="Asset" Width="2*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding AssetName}"
+                                                       Style="{StaticResource Text.Body}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding Path}" />
+                                            <TextBlock Text="No activity in 30 days"
+                                                       Style="{StaticResource Text.Secondary}"
+                                                       FontSize="{StaticResource FontSize.Micro}"
+                                                       Foreground="{StaticResource Brush.TextTertiary}"
+                                                       Visibility="{Binding HasNoRecentActivity, Converter={StaticResource BoolToVis}}"
+                                                       Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
 
-                        <DataGridTemplateColumn Header="STATUS" Width="*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center"
-                                                 Fill="{Binding Status, Converter={StaticResource StatusBrush}}" />
-                                        <TextBlock Text="{Binding Status}" Style="{StaticResource Text.Body}" Margin="7,0,0,0" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Type" Binding="{Binding AssetType}" Width="0.8*" />
 
-                        <DataGridTextColumn Header="PROTECTED AT" Binding="{Binding ProtectedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
-                        <DataGridTextColumn Header="PROTECTED BY" Binding="{Binding ProtectedBy}" Width="*" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Border>
+                            <DataGridTemplateColumn Header="Classification" Width="1.1*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource Badge.Base}"
+                                                Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
+                                            <TextBlock Text="{Binding Classification}"
+                                                       Style="{StaticResource Badge.Text}"
+                                                       Foreground="{Binding Classification, Converter={StaticResource ClassBrush}}" />
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
 
+                            <DataGridTextColumn Header="Last activity" Binding="{Binding LastActivityText}" Width="1.1*" />
+                            <DataGridTextColumn Header="EVENTS (RANGE)" Binding="{Binding EventsInRange}" Width="1*" />
+                            <DataGridTextColumn Header="Open cases" Binding="{Binding OpenCases}" Width="0.9*" />
+
+                            <DataGridTemplateColumn Header="Highest risk" Width="1.1*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border x:Name="RiskBadge" Style="{StaticResource Badge.Base}"
+                                                    Background="{Binding HighestRisk, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}">
+                                                <TextBlock Text="{Binding HighestRisk}"
+                                                           Style="{StaticResource Badge.Text}"
+                                                           Foreground="{Binding HighestRisk, Converter={StaticResource RiskBrush}}" />
+                                            </Border>
+                                            <TextBlock x:Name="NoneText" Text="None" Style="{StaticResource Text.Secondary}" Visibility="Collapsed" />
+                                        </StackPanel>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding HighestRisk}" Value="{x:Null}">
+                                                <Setter TargetName="RiskBadge" Property="Visibility" Value="Collapsed" />
+                                                <Setter TargetName="NoneText" Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Protected at" Binding="{Binding ProtectedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+
+                <!-- Detail Drawer (about 340px) -->
+                <Border Grid.Column="1" Width="340" Margin="14,0,0,0"
+                        Style="{StaticResource Surface.Card}" Padding="18"
+                        Visibility="{Binding IsDrawerOpen, Converter={StaticResource BoolToVis}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Header: Title and Close -->
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding SelectedAsset.AssetName}"
+                                           Style="{StaticResource Text.SectionHeading}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding SelectedAsset.AssetName}"
+                                           VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Content="✕"
+                                        Style="{StaticResource Button.Secondary}"
+                                        Command="{Binding CloseDrawerCommand}"
+                                        Padding="0" Height="26" Width="26"
+                                        ToolTip="Close (Esc)" />
+                            </Grid>
+
+                            <!-- Full Path (Text.Mono, wrapped) -->
+                            <TextBlock Text="ASSET PATH" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding SelectedAsset.Path}"
+                                       Style="{StaticResource Text.Mono}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,14" />
+
+                            <!-- Classification & Base risk -->
+                            <TextBlock Text="Classification &amp; base risk" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                <Border Style="{StaticResource Badge.Base}"
+                                        Background="{Binding SelectedAsset.Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
+                                    <TextBlock Text="{Binding SelectedAsset.Classification}"
+                                               Style="{StaticResource Badge.Text}"
+                                               Foreground="{Binding SelectedAsset.Classification, Converter={StaticResource ClassBrush}}" />
+                                </Border>
+                                <TextBlock Text="{Binding SelectedAsset.BaseRiskText}"
+                                           Style="{StaticResource Text.Secondary}"
+                                           Margin="10,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- Protected by and Protected at -->
+                            <TextBlock Text="PROTECTION DETAILS" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Protected by:" Style="{StaticResource Text.Secondary}" Margin="0,0,10,4" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedAsset.ProtectedBy}" Style="{StaticResource Text.Body}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Protected at:" Style="{StaticResource Text.Secondary}" Margin="0,0,10,4" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedAsset.ProtectedAt, StringFormat='yyyy-MM-dd HH:mm'}" Style="{StaticResource Text.Body}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Type:" Style="{StaticResource Text.Secondary}" Margin="0,0,10,0" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedAsset.AssetType}" Style="{StaticResource Text.Body}" />
+                            </Grid>
+
+                            <!-- Open cases count -->
+                            <TextBlock Text="OPEN CASES" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                            <TextBlock Style="{StaticResource Text.Body}" Margin="0,0,0,14">
+                                <Run Text="{Binding SelectedAsset.OpenCases, Mode=OneWay}" FontWeight="SemiBold" />
+                                <Run Text=" active open cases" />
+                            </TextBlock>
+
+                            <!-- Last 5 events (time, action, risk badge) -->
+                            <TextBlock Text="LAST 5 EVENTS" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+                            <ItemsControl ItemsSource="{Binding RecentEvents}" Margin="0,0,0,8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,0,0,1" Padding="0,6,0,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Timestamp, StringFormat='MM-dd HH:mm'}"
+                                                           Style="{StaticResource Text.Secondary}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Action}"
+                                                           Style="{StaticResource Text.Body}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                <Border Grid.Column="2" Style="{StaticResource Badge.Base}"
+                                                        Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}">
+                                                    <TextBlock Text="{Binding RiskLevel}"
+                                                               Style="{StaticResource Badge.Text}"
+                                                               Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="No events recorded" Margin="0,0,0,14">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Secondary}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding RecentEvents.Count}" Value="0">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <!-- Action Buttons -->
+                            <WrapPanel Margin="0,6,0,0">
+                                <Button Content="View activity" Style="{StaticResource Button.Secondary}"
+                                        Command="{Binding ViewActivityCommand}" Margin="0,0,8,8" />
+                                <Button Content="View alerts" Style="{StaticResource Button.Secondary}"
+                                        Command="{Binding ViewAlertsCommand}" Margin="0,0,8,8" />
+                            </WrapPanel>
+
+                            <!-- Protection Actions (PIN-gated) -->
+                            <Border BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,14,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Change classification" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                                    <TextBlock Text="Applies to future events only" Style="{StaticResource Text.Secondary}" Margin="0,0,0,8" />
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox Grid.Column="0"
+                                                  Style="{StaticResource Input.ComboBox}"
+                                                  ItemsSource="{Binding AvailableClassifications}"
+                                                  SelectedItem="{Binding DrawerSelectedClassification}" />
+                                        <Button Grid.Column="2"
+                                                Content="Change"
+                                                Style="{StaticResource Button.Secondary}"
+                                                Command="{Binding ChangeClassificationCommand}" />
+                                    </Grid>
+
+                                    <TextBlock Text="REMOVE PROTECTION" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                                    <TextBlock Text="The file is not touched. Activity history is kept."
+                                               Style="{StaticResource Text.Secondary}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,8" />
+                                    <Button Content="Remove protection"
+                                            Style="{StaticResource Button.Secondary}"
+                                            Command="{Binding RemoveProtectionCommand}"
+                                            HorizontalAlignment="Left"
+                                            IsEnabled="{Binding IsSelectedAssetProtected}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+            <!-- Loading State -->
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loading}">
                 <TextBlock Text="Loading protected assets…" Style="{StaticResource Text.Secondary}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
 
+            <!-- Empty State -->
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
                 <TextBlock Text="No protected assets found in Firestore." Style="{StaticResource Text.Secondary}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
 
+            <!-- Error State -->
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Error}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420">

@@ -15,6 +15,7 @@
         <conv:ClassificationToBrushConverter x:Key="ClassBrush" />
         <conv:StringToVisibilityConverter x:Key="StringToVis" />
         <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
+        <conv:StatusMatchToBrushConverter x:Key="StatusMatch" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
@@ -54,11 +55,21 @@
         </Grid>
 
         <!-- Interpretation note — keeps alerts from reading as accusations -->
-        <TextBlock Grid.Row="1" Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,10,0,0" MaxWidth="760">
-            An alert flags activity that scored High or Critical risk and warrants a closer look — it is not proof of
-            malicious behavior. Select an alert below to review why it was flagged, update its status, and
-            optionally open an Incident Report to document what you find.
-        </TextBlock>
+        <Border Grid.Row="1" Style="{StaticResource Surface.Card}" Margin="0,10,0,0" Padding="14,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Width="3" CornerRadius="2" Background="{StaticResource Brush.Border}" />
+                <TextBlock Grid.Column="2" Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" MaxWidth="760">
+                    An alert flags activity that scored High or Critical risk and warrants a closer look — it is not proof of
+                    malicious behavior. Select an alert below to review why it was flagged, update its status, and
+                    optionally open an Incident Report to document what you find.
+                </TextBlock>
+            </Grid>
+        </Border>
 
         <!-- Toolbar -->
         <Grid Grid.Row="2" Margin="0,16,0,14">
@@ -94,13 +105,13 @@
                           SelectedItem="{Binding SelectedAlert}"
                           RowDetailsVisibilityMode="VisibleWhenSelected">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="ALERT ID" Binding="{Binding AlertId}" Width="1.1*" />
-                        <DataGridTextColumn Header="USER" Binding="{Binding User}" Width="*" />
-                        <DataGridTextColumn Header="DEVICE" Binding="{Binding Device}" Width="*" />
-                        <DataGridTextColumn Header="ASSET" Binding="{Binding Asset}" Width="1.2*" />
-                        <DataGridTextColumn Header="ACTION" Binding="{Binding Action}" Width="0.8*" />
+                        <DataGridTextColumn Header="Alert ID" Binding="{Binding AlertId}" Width="1.1*" />
+                        <DataGridTextColumn Header="User" Binding="{Binding User}" Width="*" />
+                        <DataGridTextColumn Header="Device" Binding="{Binding Device}" Width="*" />
+                        <DataGridTextColumn Header="Asset" Binding="{Binding Asset}" Width="1.2*" />
+                        <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="0.8*" />
 
-                        <DataGridTemplateColumn Header="RISK" Width="0.9*">
+                        <DataGridTemplateColumn Header="Risk" Width="0.9*">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
@@ -116,9 +127,9 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="DATE / TIME" Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                        <DataGridTextColumn Header="Date / time" Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
 
-                        <DataGridTemplateColumn Header="STATUS" Width="*">
+                        <DataGridTemplateColumn Header="Status" Width="*">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border Style="{StaticResource Badge.Base}"
@@ -145,7 +156,7 @@
 
                                     <!-- LEFT: full details + why -->
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="ALERT DETAILS" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+                                        <TextBlock Text="Alert details" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
 
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -158,11 +169,11 @@
                                             </Grid.RowDefinitions>
 
                                             <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,10">
-                                                <TextBlock Text="ASSET PATH" Style="{StaticResource Text.Label}" />
+                                                <TextBlock Text="Asset path" Style="{StaticResource Text.Label}" />
                                                 <TextBlock Text="{Binding Path}" Style="{StaticResource Text.Mono}" Margin="0,3,0,0" TextWrapping="Wrap" />
                                             </StackPanel>
                                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
-                                                <TextBlock Text="CLASSIFICATION" Style="{StaticResource Text.Label}" />
+                                                <TextBlock Text="Classification" Style="{StaticResource Text.Label}" />
                                                 <Border Style="{StaticResource Badge.Base}" Margin="0,4,0,0"
                                                         Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
                                                     <TextBlock Text="{Binding Classification}"
@@ -172,28 +183,56 @@
                                             </StackPanel>
                                         </Grid>
 
-                                        <TextBlock Text="WHY THIS WAS FLAGGED" Style="{StaticResource Text.Label}" Margin="0,4,0,6" />
+                                        <TextBlock Text="Why this was flagged" Style="{StaticResource Text.Label}" Margin="0,4,0,6" />
                                         <TextBlock Text="{Binding Reason}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" />
                                     </StackPanel>
 
                                     <!-- RIGHT: investigation panel -->
                                     <StackPanel Grid.Column="2">
-                                        <TextBlock Text="INVESTIGATION" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+                                        <TextBlock Text="Investigation" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
 
                                         <TextBlock Text="Update status" Style="{StaticResource Text.Secondary}" Margin="0,0,0,6" />
                                         <WrapPanel>
                                             <Button Content="New" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
                                                     Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{x:Static models:AlertStatus.New}" />
+                                                    CommandParameter="{x:Static models:AlertStatus.New}">
+                                                <Button.Foreground>
+                                                    <MultiBinding Converter="{StaticResource StatusMatch}">
+                                                        <Binding Path="DataContext.SelectedAlert.Status" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        <Binding RelativeSource="{RelativeSource Self}" Path="CommandParameter" />
+                                                    </MultiBinding>
+                                                </Button.Foreground>
+                                            </Button>
                                             <Button Content="Investigating" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
                                                     Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{x:Static models:AlertStatus.Investigating}" />
+                                                    CommandParameter="{x:Static models:AlertStatus.Investigating}">
+                                                <Button.Foreground>
+                                                    <MultiBinding Converter="{StaticResource StatusMatch}">
+                                                        <Binding Path="DataContext.SelectedAlert.Status" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        <Binding RelativeSource="{RelativeSource Self}" Path="CommandParameter" />
+                                                    </MultiBinding>
+                                                </Button.Foreground>
+                                            </Button>
                                             <Button Content="Reviewed" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
                                                     Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{x:Static models:AlertStatus.Reviewed}" />
+                                                    CommandParameter="{x:Static models:AlertStatus.Reviewed}">
+                                                <Button.Foreground>
+                                                    <MultiBinding Converter="{StaticResource StatusMatch}">
+                                                        <Binding Path="DataContext.SelectedAlert.Status" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        <Binding RelativeSource="{RelativeSource Self}" Path="CommandParameter" />
+                                                    </MultiBinding>
+                                                </Button.Foreground>
+                                            </Button>
                                             <Button Content="Resolved" Style="{StaticResource Button.Secondary}" Margin="0,0,6,6"
                                                     Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{x:Static models:AlertStatus.Resolved}" />
+                                                    CommandParameter="{x:Static models:AlertStatus.Resolved}">
+                                                <Button.Foreground>
+                                                    <MultiBinding Converter="{StaticResource StatusMatch}">
+                                                        <Binding Path="DataContext.SelectedAlert.Status" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        <Binding RelativeSource="{RelativeSource Self}" Path="CommandParameter" />
+                                                    </MultiBinding>
+                                                </Button.Foreground>
+                                            </Button>
                                         </WrapPanel>
 
                                         <TextBlock Text="Investigation notes (used when creating an incident report)"

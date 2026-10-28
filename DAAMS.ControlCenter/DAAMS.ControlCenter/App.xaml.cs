@@ -1,12 +1,19 @@
+using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace ControlCenter;
 
-/// <summary>
-/// DAAMS Control Center application entry point.
-/// No Firestore, no monitoring engine, no risk engine lives here.
-/// This process only ever displays/manages information — see project reference doc.
-/// </summary>
 public partial class App : Application
 {
+    public App()
+    {
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            File.WriteAllText("C:\\temp\\crash.txt", e.ExceptionObject?.ToString() ?? "null");
+        DispatcherUnhandledException += (_, e) =>
+        {
+            File.WriteAllText("C:\\temp\\crash.txt", e.Exception.ToString());
+            e.Handled = true;
+        };
+    }
 }

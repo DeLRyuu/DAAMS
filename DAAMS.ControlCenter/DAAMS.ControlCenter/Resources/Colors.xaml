@@ -40,6 +40,12 @@
     <Color x:Key="Color.RiskHighBg">#2C1C10</Color>
     <Color x:Key="Color.RiskCriticalBg">#2C1414</Color>
 
+    <!-- Classification semantics — distinct from risk colors (violet) -->
+    <Color x:Key="Color.Classification">#9B6BFF</Color>
+    <Color x:Key="Color.ClassificationBg">#2A1F3D</Color>
+    <SolidColorBrush x:Key="Brush.Classification" Color="{StaticResource Color.Classification}" />
+    <SolidColorBrush x:Key="Brush.ClassificationBg" Color="{StaticResource Color.ClassificationBg}" />
+
     <!-- Status semantics -->
     <Color x:Key="Color.StatusPositive">#3DBE72</Color>
     <Color x:Key="Color.StatusNeutral">#8D98A8</Color>

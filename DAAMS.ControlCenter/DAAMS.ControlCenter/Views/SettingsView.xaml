@@ -5,7 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:conv="clr-namespace:ControlCenter.Converters"
              mc:Ignorable="d"
-             d:DesignWidth="960" d:DesignHeight="1200"
+             d:DesignWidth="960" d:DesignHeight="1400"
              Background="{StaticResource Brush.Background}">
 
     <UserControl.Resources>
@@ -21,247 +21,75 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Style="{StaticResource Layout.PageRoot}">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <StackPanel Style="{StaticResource Layout.PageRoot}">
+            <TextBlock Text="Settings" Style="{StaticResource Text.PageTitle}" Margin="0,0,0,16" />
 
-            <TextBlock Grid.Row="0" Text="Settings" Style="{StaticResource Text.PageTitle}" Margin="0,0,0,16" />
-
-            <!-- ==================== CONFIGURATION ACTIONS ==================== -->
-            <Border Grid.Row="1" Style="{StaticResource Surface.PrimaryCard}" Margin="0,0,0,16">
+            <!-- ==================== 1. SYSTEM INFORMATION ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
                 <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <TextBlock Text="System information" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,14" />
 
-                        <StackPanel Grid.Column="0" Orientation="Horizontal">
-                            <TextBlock Text="Configuration" Style="{StaticResource Text.SectionHeading}" VerticalAlignment="Center" />
-                            <Border Background="{StaticResource Brush.RiskMediumBg}" CornerRadius="3" Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center"
-                                    Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="UNSAVED CHANGES" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.RiskMedium}" />
-                            </Border>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                    Visibility="{Binding IsNotConfirmingReset, Converter={StaticResource BoolToVis}}">
-                            <Button Content="Cancel" Style="{StaticResource Button.Secondary}" Margin="0,0,8,0"
-                                    Command="{Binding CancelChangesCommand}"
-                                    IsEnabled="{Binding HasUnsavedChanges}" />
-                            <Button Content="Reset to Defaults" Style="{StaticResource Button.Secondary}" Margin="0,0,8,0"
-                                    Command="{Binding ResetToDefaultsCommand}" />
-                            <Button Content="Save Changes" Style="{StaticResource Button.Primary}"
-                                    Command="{Binding SaveChangesCommand}" />
-                        </StackPanel>
-
-                        <!-- Reset confirmation replaces the normal action buttons in place -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                    Visibility="{Binding IsConfirmingReset, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="Reset all settings to their default values?" Style="{StaticResource Text.Secondary}"
-                                       VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <Button Content="Cancel" Style="{StaticResource Button.Secondary}" Margin="0,0,8,0"
-                                    Command="{Binding CancelResetCommand}" />
-                            <Button Content="Yes, Reset" Style="{StaticResource Button.Primary}"
-                                    Command="{Binding ConfirmResetCommand}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock Text="{Binding ValidationMessage}" Style="{StaticResource Text.Body}"
-                               Foreground="{StaticResource Brush.RiskHigh}" TextWrapping="Wrap" Margin="0,10,0,0"
-                               Visibility="{Binding ValidationMessage, Converter={StaticResource StringToVis}}" />
-
-                    <TextBlock Text="{Binding SuccessMessage}" Style="{StaticResource Text.Body}"
-                               Foreground="{StaticResource Brush.StatusPositive}" TextWrapping="Wrap" Margin="0,10,0,0"
-                               Visibility="{Binding SuccessMessage, Converter={StaticResource StringToVis}}" />
-                </StackPanel>
-            </Border>
-
-            <!-- ==================== 1. MONITORING CONFIGURATION ==================== -->
-            <Border Grid.Row="2" Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
-                <StackPanel>
-                    <TextBlock Text="Monitoring Configuration" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
-                    <TextBlock Text="Configuration only — does not directly start, stop, or reconfigure the Python Monitoring System."
-                               Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,0,0,14" MaxWidth="620" />
-
-                    <Grid Style="{StaticResource SettingRow}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Monitoring" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="{Binding MonitoringStatusText}" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding MonitoringEnabled}" VerticalAlignment="Center" />
-                    </Grid>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Monitoring interval" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="How often the registry reload check runs, in seconds. Matches the Monitoring System's own default (3s)."
-                                       Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,2,0,0" MaxWidth="440" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBox Style="{StaticResource NumericField}" Text="{Binding MonitoringIntervalInput, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="seconds" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- ==================== 2. RISK ASSESSMENT CONFIGURATION ==================== -->
-            <Border Grid.Row="3" Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
-                <StackPanel>
-                    <TextBlock Text="Risk Assessment Configuration" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
-                    <TextBlock Text="Stored locally for future integration with the Risk Assessment Engine. Changing these values does not currently change how risk is calculated — the engine still uses its own configured thresholds until that integration exists."
-                               Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,0,0,14" MaxWidth="640" />
-
-                    <Grid Style="{StaticResource SettingRow}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="MEDIUM (Low ends below this)" Style="{StaticResource Text.Label}" />
-                            <TextBox Style="{StaticResource NumericField}" Margin="0,6,0,0"
-                                     Text="{Binding MediumThresholdInput, UpdateSourceTrigger=PropertyChanged}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="HIGH" Style="{StaticResource Text.Label}" />
-                            <TextBox Style="{StaticResource NumericField}" Margin="0,6,0,0"
-                                     Text="{Binding HighThresholdInput, UpdateSourceTrigger=PropertyChanged}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="CRITICAL" Style="{StaticResource Text.Label}" />
-                            <TextBox Style="{StaticResource NumericField}" Margin="0,6,0,0"
-                                     Text="{Binding CriticalThresholdInput, UpdateSourceTrigger=PropertyChanged}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock Style="{StaticResource Text.Secondary}" Margin="0,0,0,16">
-                        <Run Text="Low: below " /><Run Text="{Binding MediumThresholdInput, Mode=OneWay}" FontWeight="SemiBold" />
-                        <Run Text="  ·  Medium: " /><Run Text="{Binding MediumThresholdInput, Mode=OneWay}" FontWeight="SemiBold" />
-                        <Run Text="–" /><Run Text="{Binding HighThresholdInput, Mode=OneWay}" FontWeight="SemiBold" />
-                        <Run Text="  ·  High: " /><Run Text="{Binding HighThresholdInput, Mode=OneWay}" FontWeight="SemiBold" />
-                        <Run Text="–" /><Run Text="{Binding CriticalThresholdInput, Mode=OneWay}" FontWeight="SemiBold" />
-                        <Run Text="  ·  Critical: " /><Run Text="{Binding CriticalThresholdInput, Mode=OneWay}" FontWeight="SemiBold" />
-                        <Run Text=" and above" />
-                    </TextBlock>
-
-                    <Grid Style="{StaticResource SettingRow}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Activity burst threshold" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Number of rapid, related actions on the same asset treated as burst activity."
-                                       Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,2,0,0" MaxWidth="440" />
-                        </StackPanel>
-                        <TextBox Style="{StaticResource NumericField}" VerticalAlignment="Center"
-                                 Text="{Binding BurstThresholdInput, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Off-hours risk weighting" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Treat activity outside working hours as higher risk." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding OffHoursMonitoringEnabled}" VerticalAlignment="Center" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- ==================== 3. NOTIFICATION SETTINGS ==================== -->
-            <Border Grid.Row="4" Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
-                <StackPanel>
-                    <TextBlock Text="Notification Settings" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
-                    <TextBlock Text="Controls how alerts are surfaced to you — not whether the Monitoring System generates them."
-                               Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,0,0,14" MaxWidth="600" />
-
-                    <Grid Style="{StaticResource SettingRow}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Enable security notifications" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Show a notification when a new Security Alert is created." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding NotifyOnNewAlert}" VerticalAlignment="Center" />
-                    </Grid>
-
-                    <StackPanel Style="{StaticResource SettingRow}" Margin="0,0,0,16">
-                        <TextBlock Text="Notify when risk level is" Style="{StaticResource Text.Body}" Margin="0,0,0,8" />
-                        <StackPanel Orientation="Horizontal">
-                            <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding NotifyOnHighRisk}" VerticalAlignment="Center" />
-                            <TextBlock Text="High" Style="{StaticResource Text.Body}" Margin="8,0,24,0" VerticalAlignment="Center" />
-                            <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding NotifyOnCriticalRisk}" VerticalAlignment="Center" />
-                            <TextBlock Text="Critical" Style="{StaticResource Text.Body}" Margin="8,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="Version" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding ApplicationVersion}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                     </StackPanel>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Email notifications" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Requires email delivery integration — not yet connected." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding EmailNotificationsEnabled}" VerticalAlignment="Center" />
-                    </Grid>
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="Database path" Style="{StaticResource Text.Label}" />
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding DatabasePath}"
+                                       Style="{StaticResource Text.Mono}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding DatabasePath}"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding DatabaseStatusText}"
+                                       Style="{StaticResource Text.Secondary}"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="Sync summary" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding SyncSummaryText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="Last upload attempt" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding LastUploadAttemptText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="Last event received" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding LastEventReceivedText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <StackPanel>
+                        <TextBlock Text="Firestore status" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding FirestoreConnectionStatus}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- ==================== 4. SYSTEM PREFERENCES ==================== -->
-            <Border Grid.Row="5" Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
+            <!-- ==================== 2. DISPLAY ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Text="System Preferences" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,14" />
-
-                    <Grid Style="{StaticResource SettingRow}">
+                    <Grid Margin="0,0,0,14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Start Control Center with Windows" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Saved as a preference; startup registration isn't wired up yet." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding StartWithWindows}" VerticalAlignment="Center" />
-                    </Grid>
-
-                    <Grid Style="{StaticResource SettingRow}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Auto-refresh sections" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Saved as a preference for a future phase — sections currently refresh via the Refresh button only."
-                                       Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,2,0,0" MaxWidth="440" />
-                        </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding AutoRefreshEnabled}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="0" Text="Display" Style="{StaticResource Text.SectionHeading}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding SavedStatusText}" Style="{StaticResource Text.Secondary}"
+                                   Foreground="{StaticResource Brush.StatusPositive}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding SavedStatusText, Converter={StaticResource StringToVis}}" />
                     </Grid>
 
                     <Grid Style="{StaticResource SettingRow}">
@@ -271,10 +99,12 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Auto-refresh interval" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Background refresh interval in seconds (10 to 300, 0 = off)."
+                                       Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBox Style="{StaticResource NumericField}" Text="{Binding AutoRefreshIntervalInput, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="seconds" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock Text="sec" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </Grid>
 
@@ -284,10 +114,13 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="Show risk factor breakdown" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Expand an activity row to see why it received its risk score." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                            <TextBlock Text="Default time range" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Time range applied at startup across activity logs and alerts."
+                                       Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding ShowRiskFactorBreakdown}" VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1" Width="140" VerticalAlignment="Center"
+                                  ItemsSource="{Binding AvailableTimeRanges}"
+                                  SelectedItem="{Binding DefaultTimeRange}" />
                     </Grid>
 
                     <Grid Style="{StaticResource SettingRow}">
@@ -297,7 +130,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Highlight Critical rows" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Emphasize Critical-risk rows in Activity Logs and Alerts." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                            <TextBlock Text="Tint Critical-risk rows in Activity and Alerts." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding HighlightCriticalRows}" VerticalAlignment="Center" />
                     </Grid>
@@ -308,78 +141,162 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="Show &quot;Sample Data&quot; banner" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Keeps mock data clearly labeled whenever Firestore is unavailable." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                            <TextBlock Text="Expand risk factors by default" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Sets RowDetailsVisibilityMode on the Activity grid to expanded." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding ShowSampleDataBanner}" VerticalAlignment="Center" />
+                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding ShowRiskFactorBreakdown}" VerticalAlignment="Center" />
                     </Grid>
                 </StackPanel>
             </Border>
 
-            <!-- ==================== MONITORING REFERENCE (read-only) ==================== -->
-            <Border Grid.Row="6" Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
+            <!-- ==================== 3. NOTIFICATIONS ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Text="Monitoring Reference" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
-                    <TextBlock Text="The Monitoring System's own current defaults, shown for context only — not editable from here, and not the same as the (currently inert) Risk Assessment Configuration above."
-                               Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,0,0,14" MaxWidth="640" />
+                    <TextBlock Text="Notifications" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,14" />
 
-                    <Grid>
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Show a message when a new High or Critical alert arrives" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Displays an in-app non-blocking toast notification." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding NotifyOnNewAlert}" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <StackPanel>
+                        <TextBlock Text="Email alerts" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="Email alerts are sent by the Monitoring System." Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== 4. ENGINE DEFAULTS ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Engine defaults" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
+                    <TextBlock Text="Read-only baseline configuration enforced by the Monitoring and Risk Assessment Engine."
+                               Style="{StaticResource Text.Secondary}" Margin="0,0,0,14" />
+
+                    <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,14">
-                            <TextBlock Text="DEFAULT WORKING HOURS" Style="{StaticResource Text.Label}" />
-                            <TextBlock Text="{Binding DefaultWorkingHours}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Working hours" Style="{StaticResource Text.Label}" />
+                            <TextBlock Text="{Binding WorkingHoursText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                         </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,14">
-                            <TextBlock Text="OFF-HOURS PENALTY" Style="{StaticResource Text.Label}" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Off-hours penalty" Style="{StaticResource Text.Label}" />
                             <TextBlock Text="{Binding OffHoursPenalty}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="0">
-                            <TextBlock Text="NEAR-EDGE-OF-HOURS CAUTION" Style="{StaticResource Text.Label}" />
+                    </Grid>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Near-edge caution" Style="{StaticResource Text.Label}" />
                             <TextBlock Text="{Binding NearEdgeOfHoursCaution}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="1">
-                            <TextBlock Text="BURST THRESHOLD" Style="{StaticResource Text.Label}" />
-                            <TextBlock Text="{Binding BurstThresholdReference}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Burst threshold" Style="{StaticResource Text.Label}" />
+                            <TextBlock Text="{Binding BurstThresholdReference}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                         </StackPanel>
                     </Grid>
-                </StackPanel>
-            </Border>
 
-            <!-- ==================== SYSTEM INFORMATION (read-only) ==================== -->
-            <Border Grid.Row="7" Style="{StaticResource Surface.Card}">
-                <StackPanel>
-                    <TextBlock Text="System Information" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,14" />
-
-                    <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="APPLICATION" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding ApplicationVersion}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="Classification weights" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding ClassificationWeightsText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.StatusInactive}" VerticalAlignment="Center" />
-                        <TextBlock Style="{StaticResource Text.Body}" Margin="8,0,0,0">
-                            <Run Text="Firestore: " />
-                            <Run Text="{Binding FirestoreConnectionStatus, Mode=OneWay}" />
-                        </TextBlock>
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="Action weights" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding ActionWeightsText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.StatusInactive}" VerticalAlignment="Center" />
-                        <TextBlock Style="{StaticResource Text.Body}" Margin="8,0,0,0">
-                            <Run Text="Monitoring System: " />
-                            <Run Text="{Binding MonitoringSystemConnectionStatus, Mode=OneWay}" />
-                        </TextBlock>
+                    <StackPanel>
+                        <TextBlock Text="Risk bands" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding RiskBandsText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                     </StackPanel>
                 </StackPanel>
             </Border>
-        </Grid>
+
+            <!-- ==================== 5. NOT ACTIVE YET ==================== -->
+            <Expander Header="Not active yet" IsExpanded="False" Margin="0,0,0,16">
+                <StackPanel IsEnabled="False" Opacity="0.55" Margin="0,10,0,0">
+                    <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Configuration actions" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Cancel" Style="{StaticResource Button.Secondary}" Margin="0,0,8,0" Command="{Binding CancelChangesCommand}" />
+                                <Button Content="Reset to Defaults" Style="{StaticResource Button.Secondary}" Margin="0,0,8,0" Command="{Binding ResetToDefaultsCommand}" />
+                                <Button Content="Save Changes" Style="{StaticResource Button.Primary}" Command="{Binding SaveChangesCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Monitoring configuration" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding MonitoringStatusText}" Style="{StaticResource Text.Secondary}" Margin="0,0,0,8" />
+                            <CheckBox Style="{StaticResource Toggle.Switch}" Content="Monitoring" IsChecked="{Binding MonitoringEnabled}" Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Interval:" Style="{StaticResource Text.Body}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Style="{StaticResource NumericField}" Text="{Binding MonitoringIntervalInput}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Risk assessment configuration" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
+                            <Grid Style="{StaticResource SettingRow}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Medium threshold" Style="{StaticResource Text.Label}" />
+                                    <TextBox Style="{StaticResource NumericField}" Margin="0,4,0,0" Text="{Binding MediumThresholdInput}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="High threshold" Style="{StaticResource Text.Label}" />
+                                    <TextBox Style="{StaticResource NumericField}" Margin="0,4,0,0" Text="{Binding HighThresholdInput}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Critical threshold" Style="{StaticResource Text.Label}" />
+                                    <TextBox Style="{StaticResource NumericField}" Margin="0,4,0,0" Text="{Binding CriticalThresholdInput}" />
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Burst threshold:" Style="{StaticResource Text.Body}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Style="{StaticResource NumericField}" Text="{Binding BurstThresholdInput}" />
+                            </StackPanel>
+                            <CheckBox Style="{StaticResource Toggle.Switch}" Content="Off-hours risk weighting" IsChecked="{Binding OffHoursMonitoringEnabled}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Surface.Card}">
+                        <StackPanel>
+                            <TextBlock Text="Other preferences" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,8" />
+                            <CheckBox Style="{StaticResource Toggle.Switch}" Content="Start Control Center with Windows" IsChecked="{Binding StartWithWindows}" Margin="0,0,0,8" />
+                            <CheckBox Style="{StaticResource Toggle.Switch}" Content="Show Sample Data banner" IsChecked="{Binding ShowSampleDataBanner}" Margin="0,0,0,8" />
+                            <CheckBox Style="{StaticResource Toggle.Switch}" Content="Email notifications" IsChecked="{Binding EmailNotificationsEnabled}" Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <CheckBox Style="{StaticResource Toggle.Switch}" Content="High risk" IsChecked="{Binding NotifyOnHighRisk}" Margin="0,0,16,0" />
+                                <CheckBox Style="{StaticResource Toggle.Switch}" Content="Critical risk" IsChecked="{Binding NotifyOnCriticalRisk}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Expander>
+        </StackPanel>
     </ScrollViewer>
 </UserControl>

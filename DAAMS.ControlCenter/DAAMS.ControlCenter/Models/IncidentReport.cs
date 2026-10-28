@@ -19,9 +19,11 @@ public class IncidentReport
     public required string User { get; init; }
     public required string Device { get; init; }
     public required string Asset { get; init; }
+    public string? Path { get; init; }
     public ActionType Action { get; init; }
     public Classification Classification { get; init; }
     public DateTime Timestamp { get; init; }
+    public int RiskScore { get; init; }
     public RiskLevel RiskLevel { get; init; }
     public required string Description { get; init; }
 

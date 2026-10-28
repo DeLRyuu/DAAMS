@@ -4,6 +4,7 @@
         xmlns:vm="clr-namespace:ControlCenter.ViewModels"
         xmlns:views="clr-namespace:ControlCenter.Views"
         xmlns:conv="clr-namespace:ControlCenter.Converters"
+        xmlns:svc="clr-namespace:ControlCenter.Services"
         Title="DAAMS Control Center"
         Height="820" Width="1360"
         MinHeight="640" MinWidth="1040"
@@ -14,6 +15,7 @@
     <Window.Resources>
         <conv:EnumToBooleanConverter x:Key="EnumToBool" />
         <conv:FirestoreConnectionStateToBrushConverter x:Key="FirestoreStateBrush" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
         <!-- ViewModel -> View mapping. This is the whole navigation mechanism:
              MainViewModel swaps CurrentViewModel, the ContentControl below
@@ -27,11 +29,11 @@
         <DataTemplate DataType="{x:Type vm:ActivityLogsViewModel}">
             <views:ActivityLogsView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:SecurityAlertsViewModel}">
-            <views:SecurityAlertsView />
+        <DataTemplate DataType="{x:Type vm:DevicesViewModel}">
+            <views:DevicesView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:IncidentReportsViewModel}">
-            <views:IncidentReportsView />
+        <DataTemplate DataType="{x:Type vm:CasesViewModel}">
+            <views:CasesView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
             <views:SettingsView />
@@ -63,13 +65,18 @@
                 <Border DockPanel.Dock="Bottom" Margin="20,0,20,20"
                         BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
                     <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource Brush.StatusPositive}" />
+                            <TextBlock Text="{Binding LocalDbStatusText}" ToolTip="{Binding LocalDbPath}" Style="{StaticResource Text.Secondary}"
+                                       Margin="8,0,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="7" Height="7" VerticalAlignment="Center"
                                      Fill="{Binding FirestoreState, Converter={StaticResource FirestoreStateBrush}}" />
                             <TextBlock Text="{Binding FirestoreStatusText}" Style="{StaticResource Text.Secondary}"
                                        Margin="8,0,0,0" TextWrapping="Wrap" />
                         </StackPanel>
-                        <TextBlock Text="Phase 3 — Firestore Integration" Style="{StaticResource Text.Secondary}"
+                        <TextBlock Text="Offline-First Architecture" Style="{StaticResource Text.Secondary}"
                                    Foreground="{StaticResource Brush.TextTertiary}" Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>
@@ -82,15 +89,26 @@
                     <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Protected Assets"
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.ProtectedAssets}"
                                  IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.ProtectedAssets}}" />
-                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Activity Logs"
-                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.ActivityLogs}"
-                                 IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.ActivityLogs}}" />
-                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Security Alerts"
+                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Activity Logs" Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.ActivityLogs}" IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.ActivityLogs}, Mode=OneWay}" />
+                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Devices"
+                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.Devices}"
+                                 IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.Devices}}" />
+                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}"
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.SecurityAlerts}"
-                                 IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.SecurityAlerts}}" />
-                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Incident Reports"
-                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.IncidentReports}"
-                                 IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.IncidentReports}}" />
+                                 IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.SecurityAlerts}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Alerts" />
+                            <Border Background="{StaticResource Brush.Accent}"
+                                    CornerRadius="8" Padding="6,1" Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding CasesViewModel.HasNeedsReview, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="{Binding CasesViewModel.NeedsReviewCount, Mode=OneWay}"
+                                           Foreground="{StaticResource Brush.TextOnAccent}"
+                                           FontSize="{StaticResource FontSize.Micro}"
+                                           FontWeight="SemiBold" />
+                            </Border>
+                        </StackPanel>
+                    </RadioButton>
                     <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Settings"
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.Settings}"
                                  IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.Settings}}" />
@@ -99,6 +117,26 @@
         </Border>
 
         <!-- ==================== CONTENT ==================== -->
-        <ContentControl Grid.Column="1" Content="{Binding CurrentViewModel}" />
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,28,0">
+                <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="Today" Margin="0,0,4,0"
+                             IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Today}}" />
+                <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="7 days" Margin="0,0,4,0"
+                             IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Last7Days}}" />
+                <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="30 days" Margin="0,0,4,0"
+                             IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Last30Days}}" />
+                <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="All"
+                             IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.All}}" />
+
+                <TextBlock Text="{Binding LastUpdatedText}" Style="{StaticResource Text.Secondary}" VerticalAlignment="Center" Margin="16,0,0,0" />
+            </StackPanel>
+
+            <ContentControl Grid.Row="1" Content="{Binding CurrentViewModel}" />
+        </Grid>
     </Grid>
 </Window>

@@ -86,3 +86,14 @@ public enum InvestigationStatus
     Resolved,
     Dismissed
 }
+
+/// <summary>
+/// Merged lifecycle state for a security case (alert + incident).
+/// </summary>
+public enum CaseStatus
+{
+    New,
+    Investigating,
+    Resolved,
+    Dismissed
+}

@@ -1,0 +1,315 @@
+<UserControl x:Class="ControlCenter.Views.DevicesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="clr-namespace:ControlCenter.Converters"
+             mc:Ignorable="d"
+             d:DesignWidth="1100" d:DesignHeight="720"
+             Background="{StaticResource Brush.Background}">
+
+    <UserControl.Resources>
+        <conv:RiskLevelToBrushConverter x:Key="RiskBrush" />
+        <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
+    </UserControl.Resources>
+
+    <Grid Style="{StaticResource Layout.PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Devices" Style="{StaticResource Text.PageTitle}" />
+        </Grid>
+
+        <!-- Content Area: Left list (380px) and Right card (*) -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT: Device list + advisory note -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Style="{StaticResource Surface.Card}" Padding="0">
+                    <ListBox ItemsSource="{Binding Devices}"
+                             SelectedItem="{Binding SelectedDevice}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="14,12" />
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="ItemBorder" Background="Transparent" BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,0,0,1" Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource Brush.AccentSubtleBg}" />
+                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource Brush.SurfaceElevated}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding LastActivityText, StringFormat='Last activity {0}'}" Style="{StaticResource Text.Secondary}" Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="{StaticResource Brush.AccentSubtleBg}" BorderBrush="{StaticResource Brush.Accent}" BorderThickness="1" CornerRadius="10" Padding="8,2" VerticalAlignment="Center">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding OpenCases}" Value="0">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding OpenCases, StringFormat='{}{0} open'}" FontSize="11" Foreground="{StaticResource Brush.Accent}" FontWeight="SemiBold" />
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+                <!-- Under the list advisory note -->
+                <TextBlock Grid.Row="1"
+                           Text="Based on activity received by this Control Center. A device with no recent activity may simply be idle."
+                           Style="{StaticResource Text.Secondary}"
+                           TextWrapping="Wrap"
+                           Margin="4,10,4,0"
+                           FontSize="11.5" />
+            </Grid>
+
+            <!-- RIGHT: Device Details Card -->
+            <Border Grid.Column="2" Style="{StaticResource Surface.Card}" Padding="24">
+                <Grid>
+                    <!-- Fallback if no device selected -->
+                    <TextBlock Text="Select a device to view activity and risk profile."
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Secondary}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedDevice}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <!-- Device Details Content -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer.Style>
+                            <Style TargetType="ScrollViewer">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedDevice}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ScrollViewer.Style>
+
+                        <StackPanel>
+                            <!-- Device Header -->
+                            <TextBlock Text="{Binding SelectedDevice.Name}" Style="{StaticResource Text.SectionHeading}" FontSize="20" />
+                            <TextBlock Text="{Binding SelectedDevice.AccountsText, StringFormat='Windows accounts: {0}'}"
+                                       Style="{StaticResource Text.Secondary}"
+                                       ToolTip="Accounts, not necessarily individual people"
+                                       Margin="0,4,0,16" />
+
+                            <!-- Quiet inline metrics strip -->
+                            <Border Background="{StaticResource Brush.SurfaceElevated}"
+                                    BorderBrush="{StaticResource Brush.BorderSubtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="14,10"
+                                    Margin="0,0,0,24">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Events 24 h -->
+                                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                        <TextBlock Text="Events 24 h" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding SelectedDevice.Events24h}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                    </StackPanel>
+
+                                    <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource Brush.BorderSubtle}" Margin="0,2" />
+
+                                    <!-- Events 7 days -->
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                        <TextBlock Text="Events 7 days" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding SelectedDevice.Events7d}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                    </StackPanel>
+
+                                    <Rectangle Grid.Column="3" Width="1" Fill="{StaticResource Brush.BorderSubtle}" Margin="0,2" />
+
+                                    <!-- Open cases -->
+                                    <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                                        <TextBlock Text="Open cases" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding SelectedDevice.OpenCases}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                    </StackPanel>
+
+                                    <Rectangle Grid.Column="5" Width="1" Fill="{StaticResource Brush.BorderSubtle}" Margin="0,2" />
+
+                                    <!-- Highest risk (risk-colored value) -->
+                                    <StackPanel Grid.Column="6" HorizontalAlignment="Center">
+                                        <TextBlock Text="Highest risk" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding SelectedDevice.HighestRisk, TargetNullValue='None'}"
+                                                   Foreground="{Binding SelectedDevice.HighestRisk, Converter={StaticResource RiskBrush}}"
+                                                   Style="{StaticResource Text.Body}"
+                                                   FontWeight="SemiBold"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Most touched assets (7 days) -->
+                            <TextBlock Text="Most touched assets (7 days)" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,10" />
+                            <Border Background="{StaticResource Brush.SurfaceElevated}"
+                                    BorderBrush="{StaticResource Brush.BorderSubtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="14,10"
+                                    Margin="0,0,0,24">
+                                <StackPanel>
+                                    <TextBlock Text="No file activity recorded in the last 7 days.">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Secondary}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedDevice.TopAssets.Count}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <ItemsControl ItemsSource="{Binding SelectedDevice.TopAssets}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Asset}" Style="{StaticResource Text.Body}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Count, StringFormat='{}{0} events'}" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Activity by hour (7 days) -->
+                            <TextBlock Text="Activity by hour (7 days)" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,10" />
+                            <Border Background="{StaticResource Brush.SurfaceElevated}"
+                                    BorderBrush="{StaticResource Brush.BorderSubtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="16,16,16,10"
+                                    Margin="0,0,0,24">
+                                <StackPanel>
+                                    <!-- 24 Hour Bars -->
+                                    <ItemsControl ItemsSource="{Binding SelectedDevice.HourBars}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Rows="1" Columns="24" Height="48" VerticalAlignment="Bottom" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid VerticalAlignment="Bottom" Height="48">
+                                                    <Rectangle Width="7" Height="{Binding HeightPx}" RadiusX="2" RadiusY="2" VerticalAlignment="Bottom"
+                                                               ToolTip="{Binding Hour, StringFormat='Hour {0}:00'}">
+                                                        <Rectangle.Style>
+                                                            <Style TargetType="Rectangle">
+                                                                <Setter Property="Fill" Value="{StaticResource Brush.TextTertiary}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsWorkHour}" Value="True">
+                                                                        <Setter Property="Fill" Value="{StaticResource Brush.AccentMuted}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Rectangle.Style>
+                                                    </Rectangle>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <!-- Labels only at 0, 6, 12, 18 -->
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="00:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="06:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="2" Text="12:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="3" Text="18:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Navigation buttons -->
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="View activity"
+                                        Command="{Binding ViewActivityCommand}"
+                                        Style="{StaticResource Button.Primary}"
+                                        Margin="0,0,12,0" />
+                                <Button Content="View alerts"
+                                        Command="{Binding ViewCasesCommand}"
+                                        Style="{StaticResource Button.Secondary}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

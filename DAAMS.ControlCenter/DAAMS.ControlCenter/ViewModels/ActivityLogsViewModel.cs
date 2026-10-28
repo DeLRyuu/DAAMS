@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -13,22 +16,49 @@ using ControlCenter.Services;
 namespace ControlCenter.ViewModels;
 
 /// <summary>
+/// Value converter for day group headers in the Activity Logs time-ordered stream.
+/// Formats group dates as "Today", "Yesterday", or "dddd, MMM d" in sentence case.
+/// </summary>
+public class DateToDayGroupConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is DateTime dt)
+        {
+            DateTime date = dt.Date;
+            DateTime today = DateTime.Today;
+            if (date == today)
+            {
+                return "Today";
+            }
+            if (date == today.AddDays(-1))
+            {
+                return "Yesterday";
+            }
+            return date.ToString("dddd, MMM d", CultureInfo.CurrentCulture);
+        }
+
+        return value?.ToString() ?? string.Empty;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>
 /// Activity Logs: detected-activity history for protected assets, read from
 /// Firestore's activity_logs collection, as reported by the DAAMS Monitoring
 /// System. This view only displays events — it never invents or simulates
 /// them (reference doc §9/§19).
-///
-/// Phase 4 adds: filtering by Classification (Action/RiskLevel filters
-/// already existed from Phase 2), a Reset Filters action, and search
-/// coverage across Asset Path/Action/Classification/Risk Level text in
-/// addition to User/Device/Asset. Sorting is handled by the DataGrid's
-/// built-in column-header click-to-sort against this view's ICollectionView
-/// (no extra sort UI needed — newest-first remains the default ordering).
 /// </summary>
 public class ActivityLogsViewModel : DataSectionViewModelBase
 {
-    private readonly FirestoreService _firestore;
+    private readonly LocalDatabaseService _db;
+    private readonly FirestoreService? _firestore;
+    private readonly Action<NavigationSection, string> _navigateWith;
     private readonly ObservableCollection<ActivityLog> _allActivity = new();
+    private readonly List<ActivityLog> _rawActivity = new();
+    private List<CaseItem>? _cachedCases;
 
     public ICollectionView Activity { get; }
 
@@ -52,7 +82,50 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         }
     }
 
-    public List<FilterOption<ActionType>> ActionOptions { get; } = FilterOption<ActionType>.AllOptions("All Actions");
+    // Quick chips
+    private bool _filterLast24Hours;
+    public bool FilterLast24Hours
+    {
+        get => _filterLast24Hours;
+        set
+        {
+            if (SetProperty(ref _filterLast24Hours, value))
+            {
+                Activity.Refresh();
+                RecomputeCounts();
+            }
+        }
+    }
+
+    private bool _filterOffHours;
+    public bool FilterOffHours
+    {
+        get => _filterOffHours;
+        set
+        {
+            if (SetProperty(ref _filterOffHours, value))
+            {
+                Activity.Refresh();
+                RecomputeCounts();
+            }
+        }
+    }
+
+    private bool _filterHighAndAbove;
+    public bool FilterHighAndAbove
+    {
+        get => _filterHighAndAbove;
+        set
+        {
+            if (SetProperty(ref _filterHighAndAbove, value))
+            {
+                Activity.Refresh();
+                RecomputeCounts();
+            }
+        }
+    }
+
+    public ObservableCollection<FilterOption<ActionType>> ActionOptions { get; } = new();
 
     private FilterOption<ActionType> _selectedAction;
     public FilterOption<ActionType> SelectedAction
@@ -97,33 +170,81 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         }
     }
 
-    /// <summary>Clears search text and all dropdown filters back to "All" in one step.</summary>
+    /// <summary>Clears search text, dropdown filters, and quick chips back to defaults in one step.</summary>
     public ICommand ResetFiltersCommand { get; }
 
-    public ActivityLogsViewModel(FirestoreService firestore)
+    public ICommand OpenCaseCommand { get; }
+    public ICommand ViewDeviceCommand { get; }
+    public ICommand ExportCsvCommand { get; }
+
+    public ActivityLogsViewModel(LocalDatabaseService db, Action<NavigationSection, string> navigateWith, FirestoreService? firestore = null)
     {
+        _db = db;
+        _navigateWith = navigateWith;
         _firestore = firestore;
 
-        Activity = CollectionViewSource.GetDefaultView(_allActivity);
-        Activity.Filter = FilterPredicate;
-
+        foreach (var opt in FilterOption<ActionType>.AllOptions("All Actions"))
+        {
+            ActionOptions.Add(opt);
+        }
         _selectedAction = ActionOptions[0];
         _selectedClassification = ClassificationOptions[0];
         _selectedRiskLevel = RiskLevelOptions[0];
 
+        Activity = CollectionViewSource.GetDefaultView(_allActivity);
+        Activity.Filter = FilterPredicate;
+        Activity.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ActivityLog.Date)));
+        Activity.SortDescriptions.Add(new SortDescription(nameof(ActivityLog.Timestamp), ListSortDirection.Descending));
+
         ResetFiltersCommand = new RelayCommand(_ => ResetFilters());
+
+        OpenCaseCommand = new RelayCommand(param =>
+        {
+            string? alertId = param as string;
+            if (alertId == null && param is ActivityLog log)
+            {
+                alertId = log.MatchedAlertId;
+            }
+
+            if (!string.IsNullOrEmpty(alertId))
+            {
+                _navigateWith(NavigationSection.SecurityAlerts, alertId);
+            }
+        });
+
+        ViewDeviceCommand = new RelayCommand(param =>
+        {
+            string? device = param as string;
+            if (string.IsNullOrWhiteSpace(device) && param is ActivityLog log)
+            {
+                device = log.Device;
+            }
+
+            if (!string.IsNullOrWhiteSpace(device))
+            {
+                _navigateWith(NavigationSection.Devices, device);
+            }
+        });
+
+        ExportCsvCommand = new RelayCommand(_ => ExportCsv());
+
+        ViewContext.Current.RangeChanged += () =>
+        {
+            Activity.Refresh();
+            RecomputeCounts();
+        };
     }
 
     private void ResetFilters()
     {
-        // Set fields directly and refresh once at the end, rather than going
-        // through the property setters (which would call Activity.Refresh()
-        // four times in a row for one user action).
         _searchText = string.Empty;
         OnPropertyChanged(nameof(SearchText));
 
-        _selectedAction = ActionOptions[0];
-        OnPropertyChanged(nameof(SelectedAction));
+        if (ActionOptions.Count > 0)
+        {
+            _selectedAction = ActionOptions[0];
+            OnPropertyChanged(nameof(SelectedAction));
+        }
 
         _selectedClassification = ClassificationOptions[0];
         OnPropertyChanged(nameof(SelectedClassification));
@@ -131,12 +252,35 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         _selectedRiskLevel = RiskLevelOptions[0];
         OnPropertyChanged(nameof(SelectedRiskLevel));
 
+        _filterLast24Hours = false;
+        OnPropertyChanged(nameof(FilterLast24Hours));
+
+        _filterOffHours = false;
+        OnPropertyChanged(nameof(FilterOffHours));
+
+        _filterHighAndAbove = false;
+        OnPropertyChanged(nameof(FilterHighAndAbove));
+
         Activity.Refresh();
+    }
+
+    protected override void ApplyPendingSearch(string s)
+    {
+        SearchText = s;
     }
 
     protected override async Task<int> LoadFromFirestoreAsync()
     {
-        List<ActivityLog> activity = await _firestore.GetActivityLogsAsync();
+        try
+        {
+            _cachedCases = await _db.GetCasesAsync();
+        }
+        catch
+        {
+            _cachedCases = null;
+        }
+
+        List<ActivityLog> activity = await _db.GetActivityLogsAsync();
         Apply(activity);
         return activity.Count;
     }
@@ -145,13 +289,143 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
 
     private void Apply(List<ActivityLog> activity)
     {
+        _rawActivity.Clear();
+        _rawActivity.AddRange(activity);
+
+        MatchCases(_rawActivity, _cachedCases);
+
+        var collapsed = CollapseRepeats(_rawActivity);
+
         _allActivity.Clear();
-        foreach (ActivityLog entry in activity.OrderByDescending(a => a.Timestamp))
+        foreach (ActivityLog entry in collapsed.OrderByDescending(a => a.Timestamp))
         {
             _allActivity.Add(entry);
         }
 
-        TotalCount = _allActivity.Count;
+        UpdateActionOptions(activity);
+        RecomputeCounts();
+    }
+
+    private static void MatchCases(IEnumerable<ActivityLog> logs, List<CaseItem>? cases)
+    {
+        if (cases == null)
+        {
+            return;
+        }
+
+        foreach (var c in cases)
+        {
+            if (c == null)
+            {
+                continue;
+            }
+
+            var detectedAt = c.DetectedAt;
+            var path = c.Path;
+            var action = c.Action;
+            var alertId = c.AlertId;
+
+            if (string.IsNullOrEmpty(alertId))
+            {
+                continue;
+            }
+
+            foreach (var log in logs)
+            {
+                if (!string.IsNullOrEmpty(log.MatchedAlertId))
+                {
+                    continue;
+                }
+
+                if (detectedAt == log.Timestamp &&
+                    string.Equals(path, log.Path, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(action.ToString(), log.Action.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    log.MatchedAlertId = alertId;
+                }
+            }
+        }
+    }
+
+    private static List<ActivityLog> CollapseRepeats(List<ActivityLog> logs)
+    {
+        var sorted = logs.OrderByDescending(a => a.Timestamp).ToList();
+        var collapsed = new List<ActivityLog>();
+
+        ActivityLog? currentAnchor = null;
+        var currentTimestamps = new List<DateTime>();
+        int currentRepeatCount = 1;
+
+        foreach (var item in sorted)
+        {
+            if (currentAnchor == null)
+            {
+                currentAnchor = item;
+                currentTimestamps = new List<DateTime> { item.Timestamp };
+                currentRepeatCount = 1;
+                continue;
+            }
+
+            bool isSameGroup = string.Equals(currentAnchor.User, item.User, StringComparison.OrdinalIgnoreCase)
+                               && string.Equals(currentAnchor.Device, item.Device, StringComparison.OrdinalIgnoreCase)
+                               && string.Equals(currentAnchor.Asset, item.Asset, StringComparison.OrdinalIgnoreCase)
+                               && currentAnchor.Action == item.Action
+                               && (currentAnchor.Timestamp - item.Timestamp) <= TimeSpan.FromSeconds(60)
+                               && (currentAnchor.Timestamp - item.Timestamp) >= TimeSpan.Zero;
+
+            if (isSameGroup)
+            {
+                currentRepeatCount++;
+                currentTimestamps.Add(item.Timestamp);
+                if (string.IsNullOrEmpty(currentAnchor.MatchedAlertId) && !string.IsNullOrEmpty(item.MatchedAlertId))
+                {
+                    currentAnchor.MatchedAlertId = item.MatchedAlertId;
+                }
+            }
+            else
+            {
+                currentAnchor.RepeatCount = currentRepeatCount;
+                currentAnchor.MergedTimestamps = currentTimestamps;
+                collapsed.Add(currentAnchor);
+
+                currentAnchor = item;
+                currentTimestamps = new List<DateTime> { item.Timestamp };
+                currentRepeatCount = 1;
+            }
+        }
+
+        if (currentAnchor != null)
+        {
+            currentAnchor.RepeatCount = currentRepeatCount;
+            currentAnchor.MergedTimestamps = currentTimestamps;
+            collapsed.Add(currentAnchor);
+        }
+
+        return collapsed;
+    }
+
+    private void UpdateActionOptions(List<ActivityLog> activity)
+    {
+        var selectedValue = SelectedAction?.Value;
+        var existingActions = activity.Select(a => a.Action).ToHashSet();
+
+        var allOptions = FilterOption<ActionType>.AllOptions("All Actions");
+        var matchingOptions = allOptions
+            .Where(opt => opt.Value is not ActionType act || existingActions.Contains(act))
+            .ToList();
+
+        ActionOptions.Clear();
+        foreach (var opt in matchingOptions)
+        {
+            ActionOptions.Add(opt);
+        }
+
+        SelectedAction = ActionOptions.FirstOrDefault(o => Equals(o.Value, selectedValue)) ?? ActionOptions[0];
+    }
+
+    private void RecomputeCounts()
+    {
+        TotalCount = _allActivity.Count(a => ViewContext.Current.IsInRange(a.Timestamp));
     }
 
     private bool FilterPredicate(object obj)
@@ -161,17 +435,48 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
             return false;
         }
 
-        if (SelectedAction.Value is ActionType action && entry.Action != action)
+        if (!ViewContext.Current.IsInRange(entry.Timestamp))
         {
             return false;
         }
 
-        if (SelectedClassification.Value is Classification classification && entry.Classification != classification)
+        if (FilterLast24Hours)
+        {
+            DateTime localTimestamp = entry.Timestamp.Kind == DateTimeKind.Utc ? entry.Timestamp.ToLocalTime() : entry.Timestamp;
+            if (localTimestamp < DateTime.Now.AddHours(-24))
+            {
+                return false;
+            }
+        }
+
+        if (FilterOffHours)
+        {
+            int hour = entry.Timestamp.Hour;
+            if (hour >= 7 && hour < 19)
+            {
+                return false;
+            }
+        }
+
+        if (FilterHighAndAbove)
+        {
+            if (entry.RiskLevel is not (RiskLevel.High or RiskLevel.Critical))
+            {
+                return false;
+            }
+        }
+
+        if (SelectedAction?.Value is ActionType action && entry.Action != action)
         {
             return false;
         }
 
-        if (SelectedRiskLevel.Value is RiskLevel riskLevel && entry.RiskLevel != riskLevel)
+        if (SelectedClassification?.Value is Classification classification && entry.Classification != classification)
+        {
+            return false;
+        }
+
+        if (SelectedRiskLevel?.Value is RiskLevel riskLevel && entry.RiskLevel != riskLevel)
         {
             return false;
         }
@@ -179,13 +484,13 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
             string term = SearchText.Trim();
-            bool matches = entry.User.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || entry.Device.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || entry.Asset.Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || (entry.Path?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
-                           || entry.Action.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || entry.Classification.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
-                           || (entry.RiskLevel?.ToString().Contains(term, StringComparison.OrdinalIgnoreCase) ?? false);
+            bool matches = StringMatch.Has(entry.User, term)
+                           || StringMatch.Has(entry.Device, term)
+                           || StringMatch.Has(entry.Asset, term)
+                           || StringMatch.Has(entry.Path, term)
+                           || StringMatch.Has(entry.Action.ToString(), term)
+                           || StringMatch.Has(entry.Classification.ToString(), term)
+                           || StringMatch.Has(entry.RiskLevel?.ToString(), term);
             if (!matches)
             {
                 return false;
@@ -194,4 +499,71 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
 
         return true;
     }
+
+    private void ExportCsv()
+    {
+        var rowsToExport = _rawActivity.Where(FilterPredicate).OrderByDescending(a => a.Timestamp).ToList();
+
+        var sfd = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = $"daams-activity-{DateTime.Now:yyyyMMdd-HHmm}.csv",
+            Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
+            DefaultExt = ".csv"
+        };
+
+        if (sfd.ShowDialog() == true)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Time,User,Device,Asset,Path,Action,Classification,RiskScore,RiskLevel,RiskFactors");
+
+            foreach (var row in rowsToExport)
+            {
+                var factors = string.Join("; ", (row.RiskFactors ?? new List<RiskFactor>()).Select(rf => rf.Description ?? rf.ToString()));
+                var line = string.Join(",",
+                    EscapeCsv(row.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")),
+                    EscapeCsv(row.User),
+                    EscapeCsv(row.Device),
+                    EscapeCsv(row.Asset),
+                    EscapeCsv(row.Path),
+                    EscapeCsv(row.Action.ToString()),
+                    EscapeCsv(row.Classification.ToString()),
+                    EscapeCsv(row.RiskScore?.ToString()),
+                    EscapeCsv(row.RiskLevel?.ToString()),
+                    EscapeCsv(factors)
+                );
+                sb.AppendLine(line);
+            }
+
+            try
+            {
+                File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                ActionError = $"Export failed: {ex.Message}";
+                return;
+            }
+        }
+    }
+
+    private static string EscapeCsv(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        if (value.Contains('"') || value.Contains(',') || value.Contains('\r') || value.Contains('\n'))
+        {
+            return $"\"{value.Replace("\"", "\"\"")}\"";
+        }
+
+        return value;
+    }
+
+
+
+                     
+                                  
+        
 }

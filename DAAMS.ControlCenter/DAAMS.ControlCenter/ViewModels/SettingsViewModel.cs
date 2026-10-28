@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Windows.Threading;
 using ControlCenter.Models;
 using ControlCenter.Services;
 
@@ -11,23 +15,223 @@ namespace ControlCenter.ViewModels;
 /// locally via SettingsService (see Services/SettingsService.cs — a plain
 /// JSON file in %AppData%\DAAMS\ControlCenter, not Firestore).
 ///
-/// IMPORTANT SCOPE NOTE (Phase 6): every toggle/threshold on this page is
-/// configuration UI only. None of it currently changes how the Python
-/// Monitoring Engine detects activity, scores risk, or sends notifications —
-/// that engine remains untouched, per the Phase 6 boundary. Values are saved
-/// so a later integration phase has somewhere real to read them from.
-///
-/// Numeric fields are edited as strings (e.g. MonitoringIntervalInput) and
-/// only parsed/validated when Save Changes runs. An invalid value is
-/// rejected with a message and the previously saved configuration is kept —
-/// nothing bad is ever written to disk.
+/// Display & Notification preferences save immediately with a 2-second "Saved"
+/// indicator. System information is loaded live from LocalDatabaseService.
 /// </summary>
-public class SettingsViewModel : ViewModelBase
+public class SettingsViewModel : ViewModelBase, IDataSection
 {
     private readonly SettingsService _settingsService;
+    private readonly LocalDatabaseService? _dbService;
+    private readonly DispatcherTimer? _autoRefreshTimer;
+    private readonly Func<string>? _getFirestoreStatus;
+    private DispatcherTimer? _savedIndicatorTimer;
+    private bool _isInitializing;
 
     // ============================================================
-    // 1. Monitoring Configuration
+    // 1. System Information (Live)
+    // ============================================================
+    public string ApplicationVersion => "DAAMS Control Center — Phase 6 (Settings & Configuration)";
+
+    public string DatabasePath => _dbService?.DatabasePath ?? LocalDatabaseService.ResolveDatabasePath();
+
+    public string DatabaseStatusText => (_dbService != null ? _dbService.DatabaseFound : File.Exists(DatabasePath))
+        ? "Found"
+        : "Not found";
+
+    private string _syncSummaryText = "Loading...";
+    public string SyncSummaryText
+    {
+        get => _syncSummaryText;
+        private set => SetProperty(ref _syncSummaryText, value);
+    }
+
+    private string _lastUploadAttemptText = "Loading...";
+    public string LastUploadAttemptText
+    {
+        get => _lastUploadAttemptText;
+        private set => SetProperty(ref _lastUploadAttemptText, value);
+    }
+
+    private string _lastEventReceivedText = "Loading...";
+    public string LastEventReceivedText
+    {
+        get => _lastEventReceivedText;
+        private set => SetProperty(ref _lastEventReceivedText, value);
+    }
+
+    public string FirestoreConnectionStatus => _getFirestoreStatus?.Invoke() ?? "Not Connected";
+    public string MonitoringSystemConnectionStatus => "Not Connected";
+
+    // ============================================================
+    // 2. Display (Real, Saved immediately)
+    // ============================================================
+    private string? _savedStatusText;
+    public string? SavedStatusText
+    {
+        get => _savedStatusText;
+        private set => SetProperty(ref _savedStatusText, value);
+    }
+
+    private string _defaultTimeRange = "All time";
+    public string DefaultTimeRange
+    {
+        get => _defaultTimeRange;
+        set
+        {
+            if (SetProperty(ref _defaultTimeRange, value))
+            {
+                TriggerSavedIndicator();
+            }
+        }
+    }
+
+    public IReadOnlyList<string> AvailableTimeRanges { get; } = new[]
+    {
+        "All time",
+        "Today",
+        "Last 24 hours",
+        "Last 7 days",
+        "Last 30 days"
+    };
+
+    private bool _autoRefreshEnabled;
+    public bool AutoRefreshEnabled
+    {
+        get => _autoRefreshEnabled;
+        set
+        {
+            if (SetProperty(ref _autoRefreshEnabled, value))
+            {
+                ApplyAutoRefreshTimer();
+                if (!_isInitializing)
+                {
+                    SaveImmediate();
+                }
+            }
+        }
+    }
+
+    private string _autoRefreshIntervalInput = "30";
+    public string AutoRefreshIntervalInput
+    {
+        get => _autoRefreshIntervalInput;
+        set
+        {
+            if (SetProperty(ref _autoRefreshIntervalInput, value))
+            {
+                ApplyAutoRefreshTimer();
+                if (!_isInitializing)
+                {
+                    SaveImmediate();
+                }
+            }
+        }
+    }
+
+    private bool _highlightCriticalRows = true;
+    public bool HighlightCriticalRows
+    {
+        get => _highlightCriticalRows;
+        set
+        {
+            if (SetProperty(ref _highlightCriticalRows, value))
+            {
+                if (!_isInitializing)
+                {
+                    SaveImmediate();
+                }
+            }
+        }
+    }
+
+    private bool _showRiskFactorBreakdown = true;
+    public bool ShowRiskFactorBreakdown
+    {
+        get => _showRiskFactorBreakdown;
+        set
+        {
+            if (SetProperty(ref _showRiskFactorBreakdown, value))
+            {
+                if (!_isInitializing)
+                {
+                    SaveImmediate();
+                }
+            }
+        }
+    }
+
+    // ============================================================
+    // 3. Notifications
+    // ============================================================
+    private bool _notifyOnNewAlert = true;
+    public bool NotifyOnNewAlert
+    {
+        get => _notifyOnNewAlert;
+        set
+        {
+            if (SetProperty(ref _notifyOnNewAlert, value))
+            {
+                if (!_isInitializing)
+                {
+                    SaveImmediate();
+                }
+            }
+        }
+    }
+
+    private bool _notifyOnHighRisk = true;
+    public bool NotifyOnHighRisk
+    {
+        get => _notifyOnHighRisk;
+        set
+        {
+            if (SetProperty(ref _notifyOnHighRisk, value))
+            {
+                MarkDirty();
+            }
+        }
+    }
+
+    private bool _notifyOnCriticalRisk = true;
+    public bool NotifyOnCriticalRisk
+    {
+        get => _notifyOnCriticalRisk;
+        set
+        {
+            if (SetProperty(ref _notifyOnCriticalRisk, value))
+            {
+                MarkDirty();
+            }
+        }
+    }
+
+    private bool _emailNotificationsEnabled;
+    public bool EmailNotificationsEnabled
+    {
+        get => _emailNotificationsEnabled;
+        set
+        {
+            if (SetProperty(ref _emailNotificationsEnabled, value))
+            {
+                MarkDirty();
+            }
+        }
+    }
+
+    // ============================================================
+    // 4. Engine Defaults (Read-only reference)
+    // ============================================================
+    public string DefaultWorkingHours => "07:00 – 19:00";
+    public string WorkingHoursText => "07:00 to 19:00";
+    public string OffHoursPenalty => "+25";
+    public string NearEdgeOfHoursCaution => "+8";
+    public string BurstThresholdReference => "3 actions";
+    public string ClassificationWeightsText => "Public 5, Internal 15, Confidential 25, Restricted 35";
+    public string ActionWeightsText => "Open (+5), Modify (+15), Copy (+20), Move (+25), Delete (+30)";
+    public string RiskBandsText => "Low 0 to 24, Medium 25 to 49, High 50 to 74, Critical 75 and above";
+
+    // ============================================================
+    // 5. Inactive / Legacy Configuration Properties
     // ============================================================
     private bool _monitoringEnabled;
     public bool MonitoringEnabled
@@ -43,7 +247,6 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Purely a label reflecting the toggle above — this page does not actually start/stop the Monitoring System.</summary>
     public string MonitoringStatusText => MonitoringEnabled
         ? "Active (configuration only — does not start/stop the Monitoring System)"
         : "Paused (configuration only — does not start/stop the Monitoring System)";
@@ -61,9 +264,6 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    // ============================================================
-    // 2. Risk Assessment Configuration
-    // ============================================================
     private string _mediumThresholdInput = "25";
     public string MediumThresholdInput
     {
@@ -129,64 +329,6 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    // ============================================================
-    // 3. Notification Settings
-    // ============================================================
-    private bool _notifyOnNewAlert = true;
-    public bool NotifyOnNewAlert
-    {
-        get => _notifyOnNewAlert;
-        set
-        {
-            if (SetProperty(ref _notifyOnNewAlert, value))
-            {
-                MarkDirty();
-            }
-        }
-    }
-
-    private bool _notifyOnHighRisk = true;
-    public bool NotifyOnHighRisk
-    {
-        get => _notifyOnHighRisk;
-        set
-        {
-            if (SetProperty(ref _notifyOnHighRisk, value))
-            {
-                MarkDirty();
-            }
-        }
-    }
-
-    private bool _notifyOnCriticalRisk = true;
-    public bool NotifyOnCriticalRisk
-    {
-        get => _notifyOnCriticalRisk;
-        set
-        {
-            if (SetProperty(ref _notifyOnCriticalRisk, value))
-            {
-                MarkDirty();
-            }
-        }
-    }
-
-    private bool _emailNotificationsEnabled;
-    public bool EmailNotificationsEnabled
-    {
-        get => _emailNotificationsEnabled;
-        set
-        {
-            if (SetProperty(ref _emailNotificationsEnabled, value))
-            {
-                MarkDirty();
-            }
-        }
-    }
-
-    // ============================================================
-    // 4. System Preferences
-    // ============================================================
     private bool _startWithWindows;
     public bool StartWithWindows
     {
@@ -194,58 +336,6 @@ public class SettingsViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _startWithWindows, value))
-            {
-                MarkDirty();
-            }
-        }
-    }
-
-    private bool _autoRefreshEnabled;
-    public bool AutoRefreshEnabled
-    {
-        get => _autoRefreshEnabled;
-        set
-        {
-            if (SetProperty(ref _autoRefreshEnabled, value))
-            {
-                MarkDirty();
-            }
-        }
-    }
-
-    private string _autoRefreshIntervalInput = "30";
-    public string AutoRefreshIntervalInput
-    {
-        get => _autoRefreshIntervalInput;
-        set
-        {
-            if (SetProperty(ref _autoRefreshIntervalInput, value))
-            {
-                MarkDirty();
-            }
-        }
-    }
-
-    private bool _showRiskFactorBreakdown = true;
-    public bool ShowRiskFactorBreakdown
-    {
-        get => _showRiskFactorBreakdown;
-        set
-        {
-            if (SetProperty(ref _showRiskFactorBreakdown, value))
-            {
-                MarkDirty();
-            }
-        }
-    }
-
-    private bool _highlightCriticalRows = true;
-    public bool HighlightCriticalRows
-    {
-        get => _highlightCriticalRows;
-        set
-        {
-            if (SetProperty(ref _highlightCriticalRows, value))
             {
                 MarkDirty();
             }
@@ -265,9 +355,6 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    // ============================================================
-    // 5. Configuration Actions / state
-    // ============================================================
     private bool _hasUnsavedChanges;
     public bool HasUnsavedChanges
     {
@@ -289,7 +376,6 @@ public class SettingsViewModel : ViewModelBase
         private set => SetProperty(ref _successMessage, value);
     }
 
-    /// <summary>True after the first "Reset to Defaults" click, while awaiting confirmation.</summary>
     private bool _isConfirmingReset;
     public bool IsConfirmingReset
     {
@@ -303,7 +389,6 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Convenience for XAML — the built-in BooleanToVisibilityConverter has no "invert" option, so the normal action-buttons panel binds to this instead of adding a custom converter for one spot.</summary>
     public bool IsNotConfirmingReset => !IsConfirmingReset;
 
     public ICommand SaveChangesCommand { get; }
@@ -313,24 +398,30 @@ public class SettingsViewModel : ViewModelBase
     public ICommand CancelChangesCommand { get; }
 
     // ============================================================
-    // Read-only reference info (unchanged from earlier phases)
+    // Constructors
     // ============================================================
-    public string ApplicationVersion => "DAAMS Control Center — Phase 6 (Settings & Configuration)";
-    public string FirestoreConnectionStatus => "Not Connected";
-    public string MonitoringSystemConnectionStatus => "Not Connected";
-
-    public string DefaultWorkingHours => "07:00 – 19:00";
-    public string OffHoursPenalty => "+25";
-    public string NearEdgeOfHoursCaution => "+8";
-    public string BurstThresholdReference => "3 recent relevant actions (Copy / Move / Delete on Private or Confidential assets)";
-
-    public SettingsViewModel() : this(new SettingsService())
+    public SettingsViewModel() : this(new SettingsService(), null, null, null)
     {
     }
 
-    public SettingsViewModel(SettingsService settingsService)
+    public SettingsViewModel(
+        LocalDatabaseService? dbService,
+        DispatcherTimer? autoRefreshTimer = null,
+        Func<string>? getFirestoreStatus = null)
+        : this(new SettingsService(), dbService, autoRefreshTimer, getFirestoreStatus)
+    {
+    }
+
+    public SettingsViewModel(
+        SettingsService settingsService,
+        LocalDatabaseService? dbService = null,
+        DispatcherTimer? autoRefreshTimer = null,
+        Func<string>? getFirestoreStatus = null)
     {
         _settingsService = settingsService;
+        _dbService = dbService;
+        _autoRefreshTimer = autoRefreshTimer;
+        _getFirestoreStatus = getFirestoreStatus;
 
         SaveChangesCommand = new RelayCommand(_ => SaveChanges());
         ResetToDefaultsCommand = new RelayCommand(_ => IsConfirmingReset = true);
@@ -338,7 +429,128 @@ public class SettingsViewModel : ViewModelBase
         CancelResetCommand = new RelayCommand(_ => IsConfirmingReset = false);
         CancelChangesCommand = new RelayCommand(_ => CancelChanges());
 
-        LoadFrom(_settingsService.Load());
+        _isInitializing = true;
+        try
+        {
+            LoadFrom(_settingsService.Load());
+        }
+        finally
+        {
+            _isInitializing = false;
+        }
+
+        ApplyAutoRefreshTimer();
+        _ = RefreshAsync();
+    }
+
+    // ============================================================
+    // Methods
+    // ============================================================
+    public void EnsureLoaded()
+    {
+        _ = RefreshAsync();
+    }
+
+    public async Task RefreshAsync()
+    {
+        if (_dbService != null && _dbService.DatabaseFound)
+        {
+            try
+            {
+                var (total, pending) = await _dbService.GetSyncSummaryAsync();
+                SyncSummaryText = $"{total} records, {pending} waiting to upload";
+            }
+            catch
+            {
+                SyncSummaryText = "Error reading database";
+            }
+
+            try
+            {
+                string? lastAttempt = await _dbService.GetLastSyncAttemptAsync();
+                LastUploadAttemptText = string.IsNullOrWhiteSpace(lastAttempt)
+                    ? "No upload attempts recorded"
+                    : lastAttempt;
+            }
+            catch
+            {
+                LastUploadAttemptText = "No upload attempts recorded";
+            }
+
+            try
+            {
+                var logs = await _dbService.GetActivityLogsAsync();
+                if (logs.Count > 0)
+                {
+                    LastEventReceivedText = logs[0].Timestamp.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    LastEventReceivedText = "No events recorded";
+                }
+            }
+            catch
+            {
+                LastEventReceivedText = "None";
+            }
+        }
+        else
+        {
+            SyncSummaryText = "Database not found";
+            LastUploadAttemptText = "No upload attempts recorded";
+            LastEventReceivedText = "None";
+        }
+
+        OnPropertyChanged(nameof(FirestoreConnectionStatus));
+        OnPropertyChanged(nameof(DatabasePath));
+        OnPropertyChanged(nameof(DatabaseStatusText));
+    }
+
+    private void TriggerSavedIndicator()
+    {
+        SavedStatusText = "Saved";
+        _savedIndicatorTimer?.Stop();
+        _savedIndicatorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _savedIndicatorTimer.Tick += (_, _) =>
+        {
+            _savedIndicatorTimer.Stop();
+            SavedStatusText = null;
+        };
+        _savedIndicatorTimer.Start();
+    }
+
+    private void ApplyAutoRefreshTimer()
+    {
+        if (_autoRefreshTimer == null) return;
+
+        if (int.TryParse(AutoRefreshIntervalInput?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int interval))
+        {
+            if (interval == 0 || !AutoRefreshEnabled)
+            {
+                _autoRefreshTimer.Stop();
+            }
+            else if (interval >= 10 && interval <= 300)
+            {
+                _autoRefreshTimer.Interval = TimeSpan.FromSeconds(interval);
+                if (!_autoRefreshTimer.IsEnabled)
+                {
+                    _autoRefreshTimer.Start();
+                }
+            }
+        }
+    }
+
+    private void SaveImmediate()
+    {
+        if (TryValidate(out AppSettingsData data, out _))
+        {
+            if (_settingsService.Save(data))
+            {
+                HasUnsavedChanges = false;
+                ValidationMessage = null;
+                TriggerSavedIndicator();
+            }
+        }
     }
 
     private void MarkDirty()
@@ -370,9 +582,6 @@ public class SettingsViewModel : ViewModelBase
         _highlightCriticalRows = data.HighlightCriticalRows;
         _showSampleDataBanner = data.ShowSampleDataBanner;
 
-        // Raise change notifications for every bindable property in one pass
-        // rather than going through each setter (which would each mark the
-        // page dirty and clear messages — wrong for a fresh load/reset/cancel).
         OnPropertyChanged(string.Empty);
 
         HasUnsavedChanges = false;
@@ -381,28 +590,35 @@ public class SettingsViewModel : ViewModelBase
 
     private void CancelChanges()
     {
-        LoadFrom(_settingsService.Load());
+        _isInitializing = true;
+        try
+        {
+            LoadFrom(_settingsService.Load());
+        }
+        finally
+        {
+            _isInitializing = false;
+        }
         SuccessMessage = "Changes discarded.";
     }
 
     private void ResetToDefaults()
     {
         IsConfirmingReset = false;
-        LoadFrom(AppSettingsData.Defaults);
+        _isInitializing = true;
+        try
+        {
+            LoadFrom(AppSettingsData.Defaults);
+        }
+        finally
+        {
+            _isInitializing = false;
+        }
 
-        // Defaults are always internally valid, but Reset should still go
-        // through the same single Save path as every other change — the
-        // user sees the defaults populated and clicks Save Changes to
-        // actually commit them, exactly like any other edit.
         HasUnsavedChanges = true;
         SuccessMessage = "Fields restored to defaults. Click Save Changes to apply.";
     }
 
-    /// <summary>
-    /// Parses and validates every numeric field. Returns true only if all
-    /// values are valid positive numbers AND Medium &lt; High &lt; Critical.
-    /// Never partially applies — either everything is valid, or nothing is saved.
-    /// </summary>
     private bool TryValidate(out AppSettingsData data, out string? error)
     {
         data = new AppSettingsData();
@@ -444,9 +660,12 @@ public class SettingsViewModel : ViewModelBase
             return false;
         }
 
-        if (!TryParsePositiveInt(AutoRefreshIntervalInput, out int autoRefreshInterval))
+        if (!int.TryParse(AutoRefreshIntervalInput?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int autoRefreshInterval) ||
+            autoRefreshInterval < 0 ||
+            (autoRefreshInterval > 0 && autoRefreshInterval < 10) ||
+            autoRefreshInterval > 300)
         {
-            error = "The Auto-Refresh Interval must be a positive whole number of seconds.";
+            error = "Auto-Refresh Interval must be 0 (off) or between 10 and 300 seconds.";
             return false;
         }
 
@@ -467,7 +686,7 @@ public class SettingsViewModel : ViewModelBase
             EmailNotificationsEnabled = EmailNotificationsEnabled,
 
             StartWithWindows = StartWithWindows,
-            AutoRefreshEnabled = AutoRefreshEnabled,
+            AutoRefreshEnabled = autoRefreshInterval > 0 && AutoRefreshEnabled,
             AutoRefreshIntervalSeconds = autoRefreshInterval.ToString(CultureInfo.InvariantCulture),
             ShowRiskFactorBreakdown = ShowRiskFactorBreakdown,
             HighlightCriticalRows = HighlightCriticalRows,
@@ -490,7 +709,7 @@ public class SettingsViewModel : ViewModelBase
         {
             ValidationMessage = error;
             SuccessMessage = null;
-            return; // Nothing is written — the last valid saved configuration remains in effect.
+            return;
         }
 
         bool saved = _settingsService.Save(data);
@@ -499,11 +718,10 @@ public class SettingsViewModel : ViewModelBase
             ValidationMessage = null;
             SuccessMessage = "Settings saved.";
             HasUnsavedChanges = false;
+            TriggerSavedIndicator();
         }
         else
         {
-            // SettingsService already logged the real exception — the user
-            // only ever sees this friendly message, never a stack trace.
             ValidationMessage = "Unable to save settings. Check that the application has permission to write to your user data folder.";
         }
     }

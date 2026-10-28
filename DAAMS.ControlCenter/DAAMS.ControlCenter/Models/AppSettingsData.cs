@@ -35,6 +35,7 @@ public class AppSettingsData
     public bool NotifyOnHighRisk { get; set; } = true;
     public bool NotifyOnCriticalRisk { get; set; } = true;
     public bool EmailNotificationsEnabled { get; set; }
+    public string NotificationEmail { get; set; } = string.Empty;
 
     // --- System Preferences ---
     public bool StartWithWindows { get; set; }

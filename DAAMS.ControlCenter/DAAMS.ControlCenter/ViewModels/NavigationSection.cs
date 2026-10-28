@@ -1,14 +1,14 @@
 namespace ControlCenter.ViewModels;
 
 /// <summary>
-/// The six persistent main navigation destinations.
+/// The persistent main navigation destinations.
 /// </summary>
 public enum NavigationSection
 {
     Dashboard,
     ProtectedAssets,
     ActivityLogs,
+    Devices,
     SecurityAlerts,
-    IncidentReports,
     Settings
 }

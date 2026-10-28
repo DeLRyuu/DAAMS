@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using ControlCenter.Services;
 
 namespace ControlCenter.ViewModels;
 
@@ -38,12 +39,19 @@ public abstract class DataSectionViewModelBase : ViewModelBase, IDataSection
         protected set => SetProperty(ref _isShowingSampleFallback, value);
     }
 
+    private string? _actionError;
+    public string? ActionError
+    {
+        get => _actionError;
+        protected set => SetProperty(ref _actionError, value);
+    }
+
     public ICommand RefreshCommand { get; }
     public ICommand ShowSampleDataCommand { get; }
 
     protected DataSectionViewModelBase()
     {
-        RefreshCommand = new RelayCommand(async _ => await RefreshAsync());
+        RefreshCommand = RelayCommand.FromAsync(_ => RefreshAsync(), ex => ActionError = ex.Message);
         ShowSampleDataCommand = new RelayCommand(_ => LoadSampleFallback());
     }
 
@@ -60,7 +68,10 @@ public abstract class DataSectionViewModelBase : ViewModelBase, IDataSection
 
     public async Task RefreshAsync()
     {
-        LoadState = DataLoadState.Loading;
+        if (LoadState != DataLoadState.Loaded)
+        {
+            LoadState = DataLoadState.Loading;
+        }
         ErrorMessage = null;
         IsShowingSampleFallback = false;
 
@@ -68,13 +79,24 @@ public abstract class DataSectionViewModelBase : ViewModelBase, IDataSection
         {
             int count = await LoadFromFirestoreAsync();
             LoadState = count > 0 ? DataLoadState.Loaded : DataLoadState.Empty;
+            ViewContext.Current.LastUpdated = DateTime.Now;
+
+            var s = ViewContext.Current.TakePendingSearch();
+            if (s != null)
+            {
+                ApplyPendingSearch(s);
+            }
         }
         catch (Exception ex)
         {
             LoadState = DataLoadState.Error;
-            ErrorMessage = "Unable to load data from Firestore. Check your connection and Firestore configuration.";
-            Debug.WriteLine($"[{GetType().Name}] Firestore load failed: {ex}");
+            ErrorMessage = "Unable to load data. Check local database and configuration.";
+            Debug.WriteLine($"[{GetType().Name}] Data load failed: {ex}");
         }
+    }
+
+    protected virtual void ApplyPendingSearch(string s)
+    {
     }
 
     private void LoadSampleFallback()

@@ -40,4 +40,13 @@ public class ActivityLog
     /// assessment hasn't been performed.
     /// </summary>
     public string? Advisory { get; init; }
+
+    // Display-only properties
+    public DateTime Date => Timestamp.Date;
+    public int RepeatCount { get; set; } = 1;
+    public bool HasRepeats => RepeatCount > 1;
+    public string RepeatCountDisplay => RepeatCount > 1 ? $" ×{RepeatCount}" : string.Empty;
+    public List<DateTime> MergedTimestamps { get; set; } = new();
+    public string? MatchedAlertId { get; set; }
+    public bool HasMatchingCase => !string.IsNullOrEmpty(MatchedAlertId);
 }
