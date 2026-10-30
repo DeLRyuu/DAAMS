@@ -1,0 +1,10 @@
+
+serviceAccountKey.json
+.env
+data/daams.db
+data/daams.db-shm
+data/daams.db-wal
+data/security_settings.json
+logs/
+__pycache__/
+*.pyc
