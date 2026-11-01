@@ -93,7 +93,9 @@ def _show_fatal(err: str) -> None:
 _log(f"START argv={sys.argv} exe={sys.executable} cwd={os.getcwd()}")
 
 try:
+    import ntpath
     from core import asset_registry as ar
+    from core.clipboard_watcher import find_covering_asset
     from ui import glass_ui
     from cli import pin_auth
 except BaseException:
@@ -114,6 +116,40 @@ CLASSIFICATION_DESCRIPTIONS = {
 }
 
 
+def check_already_protected(path: str, assets: list = None) -> tuple:
+    """
+    Check whether `path` is already protected or inside a protected folder.
+
+    Returns:
+        ("self", record) if `path` itself is currently protected.
+        ("folder", record) if `path` is inside a currently protected folder.
+        (None, None) if `path` is not protected (or its status is 'unprotected').
+    """
+    if not path:
+        return None, None
+
+    if assets is None:
+        try:
+            assets = ar.get_all_assets(only_protected=True)
+        except Exception as e:
+            _log(f"check_already_protected error: {e}")
+            assets = []
+
+    # Only consider records that are actively protected
+    protected = [a for a in assets if a.get("status", "protected") == "protected"]
+    covering = find_covering_asset(path, protected)
+    if not covering:
+        return None, None
+
+    cov_path = covering.get("path", "")
+    norm_path = ntpath.normcase(ntpath.normpath(path))
+    norm_cov = ntpath.normcase(ntpath.normpath(cov_path))
+
+    if norm_path == norm_cov:
+        return "self", covering
+    return "folder", covering
+
+
 def main():
     if len(sys.argv) < 2:
         glass_ui.show_message("error", "No path provided", "No file or folder path was provided.")
@@ -122,16 +158,25 @@ def main():
     path = sys.argv[1]
     asset_type = "folder" if os.path.isdir(path) else "file"
 
-    # Check for duplicate protection FIRST, before asking for a PIN --
+    # Check for duplicate protection or covering folder FIRST, before asking for a PIN --
     # if nothing is actually going to change, there's no action to gate.
-    existing = ar.get_asset(path)
-    if existing and existing.get("status") == "protected":
+    status_kind, covering = check_already_protected(path)
+    if status_kind == "self":
+        classification = covering.get("classification", "Protected")
         glass_ui.show_message(
             "info",
             "Already protected",
-            f"This {asset_type} is already protected as "
-            f"'{existing.get('classification')}'.\n\n"
-            f"To change its classification or remove protection, use the DAAMS Control Center.",
+            f"This {asset_type} is already protected as {classification}.",
+        )
+        return
+
+    if status_kind == "folder":
+        folder_name = covering.get("asset_name") or ntpath.basename(ntpath.normpath(covering.get("path", "")))
+        classification = covering.get("classification", "Protected")
+        glass_ui.show_message(
+            "info",
+            "Already protected",
+            f"This {asset_type} is already covered by the protected folder {folder_name} ({classification}).",
         )
         return
 
