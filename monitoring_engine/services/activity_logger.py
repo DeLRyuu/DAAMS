@@ -102,10 +102,12 @@ def build_activity_record(asset_path: str, action: str) -> dict:
         action     - One of: Create, Modify, Rename, Delete
         timestamp  - ISO-like readable timestamp string
     """
+    affected_path = asset_path.split(" -> ", 1)[-1] if " -> " in asset_path else asset_path
     return {
         "user": get_windows_username(),
         "device": get_device_name(),
         "asset": asset_path,
+        "asset_path": affected_path,
         "action": action,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
@@ -220,7 +222,9 @@ def _assess_risk_safely(record: dict, classification: str) -> dict:
         }
 
 
-def record_activity(asset_path: str, action: str, classification: str = None) -> dict:
+def record_activity(asset_path: str, action: str, classification: str = None,
+                    detection_note: str = None, protected_root: str = None,
+                    force_alert: bool = False) -> dict:
     """
     Build, assess risk for, locally log, upload to Firestore, display,
     and (if warranted) alert on an activity, in that order:
@@ -244,11 +248,20 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
     Args:
         asset_path: the file/folder path the event happened to.
         action: one of the actions the Monitoring Engine detects
-            (Create, Modify, Rename, Delete as of Phase 1-4).
+            (Create, Modify, Rename, Delete, Copy, or Move).
         classification: the protected asset's classification from the
             Phase 4 registry, passed through to risk_engine.py and (for
             display purposes only) into any resulting Security Alert.
             None is handled safely if unavailable.
+        detection_note: optional short "Detection: ..." text for actions
+            that are INFERRED rather than reported by Windows (Copy, and
+            Move detected as delete+create -- see event_aggregator.py).
+            It is appended to risk_factors AFTER scoring (it adds no
+            points), so it is stored, synced and displayed with the
+            record without any schema change.
+        force_alert: create an alert for exceptional monitoring-integrity
+            events such as a protected asset missing at startup, even if
+            the calculated behavioral risk is below the normal alert level.
 
     Returns the final record (including risk fields) in case the caller
     needs it.
@@ -256,6 +269,8 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
     record = build_activity_record(asset_path, action)
     if classification:
         record["classification"] = classification
+    if protected_root:
+        record["protected_root"] = protected_root
 
     # B. Risk assessment (Phase 5) -- merged into the SAME record dict,
     # so everything downstream (local log, Firestore, display, alerting)
@@ -263,10 +278,14 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
     # change.
     risk = _assess_risk_safely(record, classification)
     record.update(risk)
+    if detection_note:
+        record["risk_factors"] = list(record.get("risk_factors") or []) + [detection_note]
 
     # C. Local SQLite Database -- saved locally first for offline-first architecture.
     try:
         database.save_activity(record)
+        if record.pop("_deduplicated", False):
+            return record
     except Exception as e:
         print(f"[WARNING] Could not save activity to SQLite database: {e}")
 
@@ -291,7 +310,9 @@ def record_activity(asset_path: str, action: str, classification: str = None) ->
     # alert, and if so builds/stores/displays it. This is an extra
     # safety net on top of alert_manager.py never raising on its own.
     try:
-        alert_manager.process_activity(record, classification=classification)
+        alert_manager.process_activity(
+            record, classification=classification, force=force_alert
+        )
     except Exception as e:
         print(f"[WARNING] Unexpected error during alert processing: {e}")
 

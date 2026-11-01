@@ -5,7 +5,8 @@ Phase 6: Security Alert generation.
 
 Turns an ALREADY risk-assessed activity record (Phase 5's risk_score /
 risk_level / risk_factors -- never recalculated here) into a Security
-Alert when the risk level is High or Critical, persists it locally
+Alert when the risk level is High or Critical, or when an explicitly
+forced monitoring-integrity event requires an alert, persists it locally
 (security_alerts.jsonl) and mirrors it to Firestore's `security_alerts`
 collection, using the same tolerant, non-blocking patterns already
 established for activity_logs (Phase 3) and protected_assets (Phase 4).
@@ -133,7 +134,7 @@ def _display_alert(alert: dict) -> None:
     print(f"Reason: {' + '.join(reason_parts) if reason_parts else 'Not specified'}")
 
 
-def process_activity(record: dict, classification: str = None):
+def process_activity(record: dict, classification: str = None, force: bool = False):
     """
     Given a FULLY risk-assessed activity record (must already contain
     risk_score/risk_level/risk_factors from risk_engine.py -- this
@@ -141,7 +142,7 @@ def process_activity(record: dict, classification: str = None):
     Security Alert, and if so, build, store, and display it.
 
     Returns the generated alert dict, or None if no alert was warranted
-    (Low/Medium risk, or a detected duplicate) or generation failed.
+    (Low/Medium risk without force, or a detected duplicate) or generation failed.
 
     NEVER raises, and never lets an alert-related failure stop the
     Monitoring Engine -- every internal step is individually guarded,
@@ -149,7 +150,7 @@ def process_activity(record: dict, classification: str = None):
     """
     try:
         risk_level = record.get("risk_level")
-        if risk_level not in ALERT_RISK_LEVELS:
+        if risk_level not in ALERT_RISK_LEVELS and not force:
             return None  # Low/Medium -- no alert, per Phase 6 spec.
 
         # Duplicate-alert guard -- see module docstring.

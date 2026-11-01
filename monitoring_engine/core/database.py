@@ -118,6 +118,8 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     risk_level TEXT,
     risk_factors TEXT,
     advisory TEXT,
+    asset_path TEXT,
+    protected_root TEXT,
     sync_status TEXT NOT NULL DEFAULT 'PENDING',
     synced_at TEXT,
     sync_error TEXT,
@@ -216,30 +218,48 @@ CREATE TABLE IF NOT EXISTS sync_history (
 
 
 def initialize_database() -> None:
-    """
-    Initialize SQLite schema and apply migrations.
-    Safely migrates existing legacy JSON/JSONL files if database is fresh.
-    """
     with _DB_LOCK:
         conn = get_connection()
         try:
+            fresh_database = False
             with conn:
                 conn.executescript(SCHEMA_V1_DDL)
-
-                # Check migration version
                 cur = conn.cursor()
                 cur.execute("SELECT version FROM schema_migrations WHERE version = 1;")
-                row = cur.fetchone()
-                if not row:
+                if not cur.fetchone():
+                    fresh_database = True
                     cur.execute(
                         "INSERT INTO schema_migrations (version, applied_at, description) VALUES (?, ?, ?);",
                         (1, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Initial offline-first schema"),
                     )
-
-            # Perform safe initial data import from JSON/JSONL
-            _migrate_existing_json_data(conn)
+            if fresh_database:
+                _migrate_existing_json_data(conn)
+            _migrate_schema_v2(conn)
         finally:
             conn.close()
+
+
+def _migrate_schema_v2(conn: sqlite3.Connection) -> None:
+    """Add activity path metadata while preserving existing activity rows."""
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(activity_logs);")
+    }
+    with conn:
+        if "asset_path" not in columns:
+            conn.execute("ALTER TABLE activity_logs ADD COLUMN asset_path TEXT;")
+        if "protected_root" not in columns:
+            conn.execute("ALTER TABLE activity_logs ADD COLUMN protected_root TEXT;")
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO schema_migrations (version, applied_at, description)
+            VALUES (?, ?, ?);
+            """,
+            (
+                2,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "Activity asset path and protected root metadata",
+            ),
+        )
 
 
 def _migrate_existing_json_data(conn: sqlite3.Connection) -> None:
@@ -458,18 +478,34 @@ def save_activity(record: dict) -> dict:
         conn = get_connection()
         try:
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            timestamp = record.get("timestamp", now_str)
+            source, destination = _activity_source_destination(
+                record.get("asset", "")
+            )
+            duplicate = _find_duplicate_activity(
+                conn,
+                action=record.get("action", ""),
+                source=source,
+                destination=destination,
+                timestamp=timestamp,
+            )
+            if duplicate:
+                record["_deduplicated"] = True
+                return record
+
             act_id = record.get("activity_id") or _generate_activity_id(record.get("timestamp"))
             record["activity_id"] = act_id
 
             risk_factors = record.get("risk_factors")
             risk_factors_json = json.dumps(risk_factors) if isinstance(risk_factors, list) else (risk_factors or "[]")
+            asset_path = record.get("asset_path") or destination or source
 
             with conn:
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO activity_logs
-                    (activity_id, user, device, asset, action, timestamp, classification, risk_score, risk_level, risk_factors, advisory, sync_status, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?);
+                    (activity_id, user, device, asset, action, timestamp, classification, risk_score, risk_level, risk_factors, advisory, asset_path, protected_root, sync_status, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?);
                     """,
                     (
                         act_id,
@@ -483,12 +519,70 @@ def save_activity(record: dict) -> dict:
                         record.get("risk_level"),
                         risk_factors_json,
                         record.get("advisory"),
+                        asset_path,
+                        record.get("protected_root"),
                         now_str,
                     ),
                 )
             return record
         finally:
             conn.close()
+
+
+def _activity_source_destination(asset: str) -> Tuple[Optional[str], Optional[str]]:
+    """Split the display value used by rename, move, and copy records."""
+    if " -> " in asset:
+        source, destination = asset.split(" -> ", 1)
+        return source, destination
+    return None, asset
+
+
+def _normalized_activity_path(path: Optional[str]) -> Optional[str]:
+    if not path:
+        return None
+    return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
+
+def _find_duplicate_activity(
+    conn: sqlite3.Connection,
+    action: str,
+    source: Optional[str],
+    destination: Optional[str],
+    timestamp: str,
+) -> bool:
+    """Find a same-action, same-path record no more than one second away."""
+    try:
+        target_time = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError):
+        return False
+    source_key = _normalized_activity_path(source)
+    destination_key = _normalized_activity_path(destination)
+    rows = conn.execute(
+        """
+        SELECT asset, timestamp FROM activity_logs
+        WHERE action = ?
+          AND timestamp BETWEEN datetime(?, '-1 second') AND datetime(?, '+1 second');
+        """,
+        (action, timestamp, timestamp),
+    )
+    for row in rows:
+        existing_source, existing_destination = _activity_source_destination(
+            row["asset"]
+        )
+        if (
+            _normalized_activity_path(existing_source) != source_key
+            or _normalized_activity_path(existing_destination) != destination_key
+        ):
+            continue
+        try:
+            existing_time = datetime.strptime(
+                row["timestamp"], "%Y-%m-%d %H:%M:%S"
+            )
+        except (TypeError, ValueError):
+            continue
+        if abs((existing_time - target_time).total_seconds()) <= 1:
+            return True
+    return False
 
 
 def get_all_activities(limit: int = 1000) -> List[dict]:
@@ -776,7 +870,7 @@ def get_all_protected_assets(only_protected: bool = True) -> List[dict]:
 
 
 def get_protected_asset(path: str) -> Optional[dict]:
-    """Return asset by path (case-insensitive check on Windows)."""
+    """Return an asset of either status by path, case-insensitive on Windows."""
     with _DB_LOCK:
         conn = get_connection()
         try:
@@ -789,6 +883,109 @@ def get_protected_asset(path: str) -> Optional[dict]:
                 if row_norm == normalized_target:
                     return row_dict
             return None
+        finally:
+            conn.close()
+
+
+def relocate_protected_asset(old_path: str, new_path: str) -> bool:
+    """Keep protection at the new path and retain the old path as unprotected history."""
+    with _DB_LOCK:
+        conn = get_connection()
+        try:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            normalized_old = os.path.normcase(os.path.normpath(os.path.abspath(old_path)))
+            normalized_new = os.path.normcase(os.path.normpath(os.path.abspath(new_path)))
+            if normalized_old == normalized_new:
+                return False
+
+            with conn:
+                rows = conn.execute("SELECT * FROM protected_assets;").fetchall()
+                old_row = next(
+                    (row for row in rows
+                     if os.path.normcase(os.path.normpath(os.path.abspath(row["path"])))
+                     == normalized_old),
+                    None,
+                )
+                if old_row is None:
+                    return False
+                if any(
+                    os.path.normcase(os.path.normpath(os.path.abspath(row["path"])))
+                    == normalized_new
+                    for row in rows
+                ):
+                    return False
+
+                conn.execute(
+                    """
+                    UPDATE protected_assets
+                    SET status = 'unprotected', sync_status = 'PENDING',
+                        updated_at = ?
+                    WHERE path = ?;
+                    """,
+                    (now_str, old_row["path"]),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO protected_assets
+                    (path, asset_id, asset_name, asset_type, classification,
+                     protected_at, protected_by, status, sync_status, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'protected', 'PENDING', ?);
+                    """,
+                    (
+                        new_path,
+                        _asset_doc_id(new_path),
+                        os.path.basename(os.path.normpath(new_path)),
+                        old_row["asset_type"],
+                        old_row["classification"],
+                        old_row["protected_at"],
+                        old_row["protected_by"],
+                        now_str,
+                    ),
+                )
+            return True
+        finally:
+            conn.close()
+
+
+def save_engine_heartbeat(status: str) -> dict:
+    """Persist the current engine state and heartbeat timestamp in app_settings."""
+    if status not in {"started", "running", "stopped", "failed"}:
+        raise ValueError(f"Unsupported engine heartbeat status: {status}")
+    heartbeat = {
+        "status": status,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "process_id": os.getpid(),
+    }
+    with _DB_LOCK:
+        conn = get_connection()
+        try:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO app_settings (key, value, updated_at)
+                    VALUES ('engine_heartbeat', ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = excluded.updated_at;
+                    """,
+                    (
+                        json.dumps(heartbeat),
+                        heartbeat["timestamp"],
+                    ),
+                )
+        finally:
+            conn.close()
+    return heartbeat
+
+
+def get_engine_heartbeat() -> Optional[dict]:
+    with _DB_LOCK:
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = 'engine_heartbeat';"
+            ).fetchone()
+            return json.loads(row["value"]) if row else None
         finally:
             conn.close()
 
@@ -958,4 +1155,3 @@ try:
     initialize_database()
 except Exception as _e:
     print(f"[DATABASE WARNING] Failed initial database setup: {_e}")
-

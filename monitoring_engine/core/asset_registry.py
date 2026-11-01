@@ -16,10 +16,9 @@ now" for the whole DAAMS system. It is used by:
     reserved for the WPF console by project decision
 
 Storage model:
-  - A local JSON file (protected_assets.json) is the SOURCE OF TRUTH.
-    The Monitoring Engine reads ONLY this file, so it keeps working even
-    if Firebase/Firestore or the network is temporarily unavailable --
-    this matches the Phase 4 requirement directly.
+  - SQLite is the SOURCE OF TRUTH for protected assets.
+  - A local JSON file (protected_assets.json) is read only when SQLite
+    raises an error, for compatibility during database outages.
   - Firestore (protected_assets collection) is kept in sync on a
     best-effort basis via firestore_logger.upload_protected_asset(),
     using the same "never crash, just warn" pattern established for
@@ -62,6 +61,13 @@ def _normalize(path: str) -> str:
     return os.path.normcase(os.path.normpath(os.path.abspath(path)))
 
 
+def _is_within(child: str, parent: str) -> bool:
+    """Return whether child is parent or is below it at a path boundary."""
+    child_path = _normalize(child)
+    parent_path = _normalize(parent).rstrip("\\")
+    return child_path == parent_path or child_path.startswith(parent_path + "\\")
+
+
 def _load_registry() -> dict:
     """
     Load the registry as a dict keyed by normalized path -> asset record.
@@ -79,41 +85,19 @@ def _load_registry() -> dict:
         return {}
 
 
-def _save_registry(data: dict) -> bool:
-    """
-    Save the registry atomically: write to a temp file, then rename it
-    over the real file. This means a crash or power loss mid-write can
-    never leave a half-written, corrupted registry behind -- the old
-    file stays intact until the new one is fully written.
-    """
-    try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        tmp_path = REGISTRY_FILE + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp_path, REGISTRY_FILE)
-        return True
-    except OSError as e:
-        print(f"[REGISTRY WARNING] Could not save protected asset registry: {e}")
-        return False
-
-
 def is_protected(path: str) -> bool:
     """Return True if `path` is currently a protected asset."""
-    asset = database.get_protected_asset(path)
-    if asset:
-        return asset.get("status") == "protected"
-    # Fallback to local JSON if database had no hit
-    record = _load_registry().get(_normalize(path))
+    record = get_asset(path)
     return bool(record and record.get("status") == "protected")
 
 
 def get_asset(path: str) -> Optional[dict]:
     """Return the registry record for `path` (protected or not), or None."""
-    asset = database.get_protected_asset(path)
-    if asset:
-        return asset
-    return _load_registry().get(_normalize(path))
+    try:
+        return database.get_protected_asset(path)
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not read asset from SQLite: {e}")
+        return _load_registry().get(_normalize(path))
 
 
 def get_all_assets(only_protected: bool = True) -> list:
@@ -122,14 +106,52 @@ def get_all_assets(only_protected: bool = True) -> list:
     By default, only currently-protected assets are returned -- this is
     what the Monitoring Engine calls to build its watch list.
     """
-    db_assets = database.get_all_protected_assets(only_protected=only_protected)
-    if db_assets:
-        return db_assets
+    try:
+        return database.get_all_protected_assets(only_protected=only_protected)
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not read assets from SQLite: {e}")
+        assets = list(_load_registry().values())
+        if only_protected:
+            assets = [a for a in assets if a.get("status") == "protected"]
+        return assets
 
-    assets = list(_load_registry().values())
-    if only_protected:
-        assets = [a for a in assets if a.get("status") == "protected"]
-    return assets
+
+def get_covering_asset(path: str) -> Optional[dict]:
+    """Return the most-specific protected asset covering `path`, if any."""
+    matches = [
+        asset for asset in get_all_assets()
+        if asset.get("path") and _is_within(path, asset["path"])
+        and (
+            asset.get("asset_type") == "folder"
+            or _normalize(path) == _normalize(asset["path"])
+        )
+    ]
+    return max(matches, key=lambda asset: len(_normalize(asset["path"])), default=None)
+
+
+def list_children(folder: str) -> list:
+    """Return registered descendants of `folder`, including unprotected rows."""
+    return [
+        asset for asset in get_all_assets(only_protected=False)
+        if asset.get("path")
+        and _normalize(asset["path"]) != _normalize(folder)
+        and _is_within(asset["path"], folder)
+    ]
+
+
+def relocate_asset(old_path: str, new_path: str) -> bool:
+    """Keep a protected registry entry attached to a folder after it moves."""
+    try:
+        relocated = database.relocate_protected_asset(old_path, new_path)
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not relocate protected asset: {e}")
+        return False
+    if relocated:
+        try:
+            sync_service.trigger_sync()
+        except Exception as e:
+            print(f"[SYNC WARNING] Could not schedule protected asset sync: {e}")
+    return relocated
 
 
 def protect_asset(path: str, classification: str, protected_by: str = None) -> tuple:
@@ -157,10 +179,12 @@ def protect_asset(path: str, classification: str, protected_by: str = None) -> t
     if not os.path.exists(path):
         return False, f"Path does not exist: {path}"
 
-    key = _normalize(path)
-    registry = _load_registry()
+    try:
+        existing = database.get_protected_asset(path)
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not read asset from SQLite: {e}")
+        existing = _load_registry().get(_normalize(path))
 
-    existing = registry.get(key)
     if existing and existing.get("status") == "protected":
         return False, (
             f"'{path}' is already protected (classification: "
@@ -170,7 +194,7 @@ def protect_asset(path: str, classification: str, protected_by: str = None) -> t
 
     asset_type = "folder" if os.path.isdir(path) else "file"
     record = {
-        "path": path,
+        "path": existing.get("path", path) if existing else path,
         "asset_name": os.path.basename(os.path.normpath(path)),
         "asset_type": asset_type,
         "classification": classification,
@@ -179,15 +203,11 @@ def protect_asset(path: str, classification: str, protected_by: str = None) -> t
         "status": "protected",
     }
 
-    registry[key] = record
-    if not _save_registry(registry):
-        return False, "Failed to save the protected asset registry locally. Protection was NOT applied."
-
-    # Save to SQLite database first (offline-first)
     try:
-        database.upsert_protected_asset(record)
+        if not database.upsert_protected_asset(record):
+            return False, "Failed to save the protected asset registry to SQLite."
     except Exception as e:
-        print(f"[REGISTRY WARNING] Could not save asset to SQLite database: {e}")
+        return False, f"Failed to save the protected asset registry to SQLite: {e}"
 
     # Trigger cloud sync
     try:
@@ -212,22 +232,21 @@ def change_classification(path: str, new_classification: str) -> tuple:
             f"{', '.join(VALID_CLASSIFICATIONS)}."
         )
 
-    key = _normalize(path)
-    registry = _load_registry()
-    record = registry.get(key) or database.get_protected_asset(path)
+    try:
+        record = database.get_protected_asset(path)
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not read asset from SQLite: {e}")
+        record = _load_registry().get(_normalize(path))
 
     if not record or record.get("status") != "protected":
         return False, f"'{path}' is not currently protected. Nothing to change."
 
     record["classification"] = new_classification
-    registry[key] = record
-    if not _save_registry(registry):
-        return False, "Failed to save the classification change locally."
-
     try:
-        database.upsert_protected_asset(record)
+        if not database.upsert_protected_asset(record):
+            return False, "Failed to save the classification change to SQLite."
     except Exception as e:
-        print(f"[REGISTRY WARNING] Could not update asset in SQLite: {e}")
+        return False, f"Failed to save the classification change to SQLite: {e}"
 
     try:
         sync_service.trigger_sync()
@@ -246,22 +265,21 @@ def remove_protection(path: str) -> tuple:
 
     Returns (success: bool, message: str).
     """
-    key = _normalize(path)
-    registry = _load_registry()
-    record = registry.get(key) or database.get_protected_asset(path)
+    try:
+        record = database.get_protected_asset(path)
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not read asset from SQLite: {e}")
+        record = _load_registry().get(_normalize(path))
 
     if not record or record.get("status") != "protected":
         return False, f"'{path}' is not currently protected."
 
     record["status"] = "unprotected"
-    registry[key] = record
-    if not _save_registry(registry):
-        return False, "Failed to save the protection removal locally."
-
     try:
-        database.upsert_protected_asset(record)
+        if not database.upsert_protected_asset(record):
+            return False, "Failed to save the protection removal to SQLite."
     except Exception as e:
-        print(f"[REGISTRY WARNING] Could not update asset in SQLite: {e}")
+        return False, f"Failed to save the protection removal to SQLite: {e}"
 
     try:
         sync_service.trigger_sync()

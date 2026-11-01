@@ -27,17 +27,10 @@ that gets stored. None of those three responsibilities live in the same
 file, and none of them import risk-scoring logic from each other.
 
 Honesty notes (also covered in README):
-- Only actions the Monitoring Engine actually detects (Create, Modify,
-  Rename, Delete as of Phase 1-4) ever reach this module in practice.
-  Open/Copy/Move weights exist in config.ACTION_WEIGHTS because the
-  Phase 5 brief specifies them, but they will never be applied to a real
-  activity until a future phase adds real detection for those actions --
-  this module does not fabricate activity that wasn't detected.
-- "Create" is NOT in the brief's action-weight table, even though it IS
-  one of the four actions this system actually detects today. Rather
-  than inventing an unofficial weight, it defaults to 0 points and is
-  flagged by name in risk_factors every time, so this gap stays visible
-  instead of silently guessed at.
+- Only actions the Monitoring Engine detects or infers (Create, Modify,
+  Rename, Delete, Copy, and Move) reach this module in practice. Open
+  has a configured weight but is not observable through Watchdog.
+- "Create" has an explicit moderate weight in config.ACTION_WEIGHTS.
 - Burst/frequency tracking is in-memory only, per protected asset path,
   and resets whenever the Monitoring Engine process restarts -- there is
   no persisted history of past bursts across runs. See README
@@ -52,6 +45,7 @@ Honesty notes (also covered in README):
 
 from collections import defaultdict
 from datetime import datetime
+import os
 
 from config.settings import (
     CLASSIFICATION_WEIGHTS,
@@ -93,8 +87,8 @@ def _classification_risk(classification):
 def _action_risk(action):
     """
     Returns (points, factor_label). An action with no configured weight
-    in config.ACTION_WEIGHTS (notably "Create" -- see module docstring)
-    defaults to 0 points rather than an invented number.
+    in config.ACTION_WEIGHTS defaults to 0 points and is identified in
+    risk_factors rather than silently guessed at.
     """
     if not action:
         return 0, "Missing action on activity record (default 0)"
@@ -111,12 +105,21 @@ def _time_risk(timestamp_str):
     unparseable timestamp safely contributes 0 (no time-based risk
     applied) rather than guessing.
     """
-    try:
-        dt = datetime.strptime(timestamp_str, TIMESTAMP_FORMAT)
-    except (TypeError, ValueError):
-        return 0, "Could not parse activity timestamp; time-based risk skipped"
-
-    hour_decimal = dt.hour + dt.minute / 60
+    test_hours = os.environ.get("DAAMS_TEST_HOURS")
+    if test_hours is not None:
+        try:
+            test_hour = int(test_hours)
+            if not 0 <= test_hour <= 23:
+                raise ValueError
+        except ValueError:
+            return 0, "Invalid DAAMS_TEST_HOURS; time-based risk skipped"
+        hour_decimal = float(test_hour)
+    else:
+        try:
+            dt = datetime.strptime(timestamp_str, TIMESTAMP_FORMAT)
+        except (TypeError, ValueError):
+            return 0, "Could not parse activity timestamp; time-based risk skipped"
+        hour_decimal = dt.hour + dt.minute / 60
 
     if not (WORK_HOURS_START <= hour_decimal < WORK_HOURS_END):
         return AFTER_HOURS_RISK_POINTS, f"Outside normal working hours (+{AFTER_HOURS_RISK_POINTS})"

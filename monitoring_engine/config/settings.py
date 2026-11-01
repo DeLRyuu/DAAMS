@@ -57,6 +57,9 @@ def is_disallowed_root(path: str) -> bool:
 # "keep this phase simple" while closing the "changes don't show up until
 # restart" gap.
 REGISTRY_RELOAD_INTERVAL_SECONDS = 3
+FILE_WATCH_RECURSIVE = True
+DISK_SCAN_INTERVAL_SECONDS = 180
+ENGINE_HEARTBEAT_INTERVAL_SECONDS = 60
 
 # ---------------------------------------------------------------------------
 # FIRESTORE CONFIGURATION (Phase 3, extended in Phase 4)
@@ -127,16 +130,11 @@ CLASSIFICATION_WEIGHTS = {
 
 # Base risk contribution from the detected action.
 #
-# NOTE -- honest gap: the Phase 5 brief's action-weight table does not
-# include "Create", even though Create is one of the four actions this
-# Monitoring Engine actually detects (Phase 1). Rather than inventing an
-# unofficial number, risk_engine.py defaults any action missing from this
-# dict (including "Create") to 0 points and records that explicitly in
-# risk_factors, so the gap stays visible instead of silently guessed at.
-# If an official weight for Create is decided later, add it here --
-# nothing else needs to change.
+# Create receives a moderate weight (8), matching Modify: both introduce
+# or change data within a protected scope, without implying deletion risk.
 ACTION_WEIGHTS = {
     "Open": 2,
+    "Create": 8,
     "Modify": 8,
     "Rename": 6,
     "Copy": 18,
@@ -226,3 +224,28 @@ SMTP_PASSWORD = os.environ.get("DAAMS_SMTP_PASSWORD", "")
 
 # Where security alert / incident notifications are sent.
 NOTIFICATION_EMAIL = os.environ.get("DAAMS_NOTIFICATION_EMAIL", "")
+
+# ---------------------------------------------------------------------------
+# EVENT COALESCING AND COPY/MOVE INFERENCE -- see event_aggregator.py
+# ---------------------------------------------------------------------------
+# Windows reports one user action (copy, move, save) as several raw
+# filesystem events. Events on the same path are merged until the path has
+# been quiet for COALESCE_QUIET_SECONDS, so one action produces one record.
+# Records therefore appear about this long after the real action.
+COALESCE_QUIET_SECONDS = 1.0
+
+# A path that keeps changing (a large file still being copied) is reported
+# anyway after this long.
+COALESCE_MAX_WAIT_SECONDS = 10.0
+
+# A Delete and a Create of the same file within this window are reported as
+# one Move; a path that vanishes and reappears is reported as one Modify.
+MOVE_PAIRING_WINDOW_SECONDS = 2.0
+
+# Copy/Move inference compares SHA-256 hashes of files inside the protected
+# scope (kept in memory only, never stored). Files larger than this are not
+# hashed, so Copy cannot be inferred for them.
+HASH_MAX_BYTES = 50 * 1024 * 1024
+
+# Safety cap on how many files of ONE protected folder are indexed.
+MAX_INDEXED_FILES_PER_ASSET = 2000
