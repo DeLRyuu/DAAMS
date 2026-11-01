@@ -29,3 +29,23 @@ Open (file read) detection is powered by the Windows Security audit log (Event I
 - **Audit Setup**: Run `powershell -ExecutionPolicy Bypass -File tools/enable_open_audit.ps1 -Path <FileOrFolder>` as Administrator to enable File System auditing (`auditpol /set /subcategory:'File System' /success:enable`) and apply a `ReadData` Success audit rule for `Everyone` to the target path.
 - **Administrator Requirement**: Querying the Windows Security log (`wevtutil qe Security`) requires elevated administrator rights. If the engine is launched without elevation, Open detection is disabled (`Open detection is off: run the engine as Administrator`) while all other monitoring continues running normally.
 - **Reliability Note**: Open detection is the least certain detection feature. It depends on Windows audit policies, ACL inheritance, and event generation timings rather than direct filesystem hooks.
+
+## Work Hours Configuration
+
+Normal working hours (24-hour clock) can be customized via environment variables:
+- `DAAMS_WORK_START`: Integer between 0 and 24 (inclusive) representing the start of work hours. Defaults to `7` (7:00 AM) if unset or invalid.
+- `DAAMS_WORK_END`: Integer between 0 and 24 (exclusive) representing the end of work hours. Defaults to `19` (7:00 PM) if unset or invalid.
+
+Activity outside these hours incurs after-hours risk points.
+
+## Email Setup
+
+Email notifications for High and Critical security alerts are configured via environment variables:
+- `DAAMS_EMAIL_ENABLED`: Set to `true` to enable email sending (default: `false`).
+- `DAAMS_SMTP_HOST`: Hostname of the SMTP relay.
+- `DAAMS_SMTP_PORT`: SMTP port (e.g., `587` for STARTTLS or `465` for SSL/TLS; defaults to `587`).
+- `DAAMS_SMTP_USERNAME`: Username for SMTP server authentication.
+- `DAAMS_SMTP_PASSWORD`: App password or account password for SMTP server authentication.
+- `DAAMS_NOTIFICATION_EMAIL`: Recipient email address for alert notifications.
+
+Use `python tools/send_test_email.py` to test your SMTP configuration.

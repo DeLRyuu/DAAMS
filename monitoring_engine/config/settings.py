@@ -142,10 +142,24 @@ ACTION_WEIGHTS = {
     "Delete": 22,
 }
 
+def _parse_work_hour(env_var: str, default: int) -> int:
+    val = os.environ.get(env_var)
+    if val is None or not val.strip():
+        return default
+    try:
+        hour = int(val.strip())
+        if 0 <= hour <= 24:
+            return hour
+    except (ValueError, TypeError):
+        pass
+    return default
+
+
 # Normal working hours, 24-hour clock. WORK_HOURS_START is inclusive,
 # WORK_HOURS_END is exclusive (so 19 means "up to but not including 7:00 PM").
-WORK_HOURS_START = 7
-WORK_HOURS_END = 19
+# Configurable via DAAMS_WORK_START and DAAMS_WORK_END (0-24, defaults: 7, 19).
+WORK_HOURS_START = _parse_work_hour("DAAMS_WORK_START", 7)
+WORK_HOURS_END = _parse_work_hour("DAAMS_WORK_END", 19)
 AFTER_HOURS_RISK_POINTS = 25
 
 # Smaller risk contribution for activity that falls just inside working
