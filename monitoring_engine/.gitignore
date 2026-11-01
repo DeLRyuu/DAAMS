@@ -8,3 +8,7 @@ data/security_settings.json
 logs/
 __pycache__/
 *.pyc
+data/
+*.db
+*.db-shm
+*.db-wal

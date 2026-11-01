@@ -1,56 +1,28 @@
 # DAAMS Control Center
 
-Manager/supervisor-side GUI for DAAMS (Digital Asset Access Monitoring and Risk
-Assessment System). C# / WPF / .NET 8 / MVVM.
+The Windows desktop administration console for DAAMS, built with C#, WPF, and
+MVVM. It is separate from the Python `monitoring_engine/`.
 
-This folder is the `control_center/` component described in the DAAMS repo layout.
-It does not include, modify, or duplicate the Python `monitoring_engine/`.
-
-## Status: Phase 1 — Foundation
-
-Implemented:
-- Project shell, MVVM structure, navigation, global theme
-- Dashboard with mock/sample data (clearly labeled)
-- Placeholder screens for Protected Assets, Activity Logs, Security Alerts,
-  Incident Reports, Settings (real implementations land in Phases 3–7)
-
-Not implemented yet (by design — see project reference doc):
-- Firestore integration
-- Risk calculation
-- Real monitoring data
-- Alerts/incident logic
-- Authentication
-- Installer
+The console provides a dashboard and views for protected assets, activity,
+devices, security alerts/cases, and settings. It reads Firestore data and uses
+the shared local SQLite database for offline data and sync status. Sample data
+is available as an explicit fallback when remote data cannot be loaded.
 
 ## Requirements
 
 - Windows 10/11
-- .NET 8 SDK (with the Windows Desktop workload)
-- Visual Studio 2022 (recommended) or `dotnet` CLI
+- .NET 10 SDK with the Windows Desktop workload
+- Visual Studio 2022 or the `dotnet` CLI
 
 ## Run
 
-```
-cd control_center
+From the repository root:
+
+```powershell
+cd DAAMS.ControlCenter\DAAMS.ControlCenter
 dotnet restore
 dotnet run
 ```
 
-Or open `ControlCenter.csproj` in Visual Studio and press F5.
-
-## Project layout
-
-```
-control_center/
-├── ControlCenter.csproj
-├── App.xaml / App.xaml.cs
-├── MainWindow.xaml / MainWindow.xaml.cs
-├── Models/          DAAMS data contracts (ActivityLog, ProtectedAsset, SecurityAlert, IncidentReport, enums)
-├── ViewModels/       MVVM state + navigation (MainViewModel, DashboardViewModel, ...)
-├── Views/            XAML screens
-├── Converters/        XAML value converters (risk color, enum-to-bool nav, etc.)
-├── Data/              MockDataProvider — sample data only, swapped out in Phase 8
-├── Services/          (reserved for future Firestore/navigation services)
-└── Resources/         Colors.xaml, Typography.xaml, Styles.xaml
-```
-Design change: Security Alerts and Incident Reports are merged into a single Cases workflow. A case is created from a High/Critical alert, tracks investigation status (New → Investigating → Resolved/Dismissed), and holds notes and a resolution.
+The project targets `net10.0-windows`; the repository's `global.json` selects
+the .NET SDK version.
