@@ -20,6 +20,9 @@ public class ProtectedAsset : INotifyPropertyChanged
     public ProtectionStatus Status { get; init; }
 
     // Display-only properties (not persisted)
+    public bool IsInherited { get; init; }
+    public string? InheritedFrom { get; init; }
+
     private DateTime? _lastActivity;
     public DateTime? LastActivity
     {
@@ -31,6 +34,7 @@ public class ProtectedAsset : INotifyPropertyChanged
                 _lastActivity = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(HasNoRecentActivity));
+                OnPropertyChanged(nameof(ActivityNote));
             }
         }
     }
@@ -94,18 +98,12 @@ public class ProtectedAsset : INotifyPropertyChanged
 
     public string HighestRiskText => HighestRisk.HasValue ? HighestRisk.Value.ToString() : "None";
 
-    public bool HasNoRecentActivity
-    {
-        get
-        {
-            if (!LastActivity.HasValue)
-            {
-                return true;
-            }
-            DateTime now = LastActivity.Value.Kind == DateTimeKind.Utc ? DateTime.UtcNow : DateTime.Now;
-            return (now - LastActivity.Value).TotalDays > 30;
-        }
-    }
+    public string ActivityNote =>
+        LastActivity is null && ProtectedAt > DateTime.Now.AddDays(-30) ? "No activity since protected" :
+        LastActivity is null ? "No activity recorded" :
+        LastActivity < DateTime.Now.AddDays(-30) ? "No activity in 30 days" : string.Empty;
+
+    public bool HasNoRecentActivity => !string.IsNullOrEmpty(ActivityNote);
 
     public int BaseRiskWeight => Classification switch
     {

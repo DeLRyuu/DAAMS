@@ -30,7 +30,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     // ============================================================
     // 1. System Information (Live)
     // ============================================================
-    public string ApplicationVersion => "DAAMS Control Center — Phase 6 (Settings & Configuration)";
+    public string ApplicationVersion => $"DAAMS Control Center {typeof(App).Assembly.GetName().Version?.ToString(3) ?? "dev"}";
 
     public string DatabasePath => _dbService?.DatabasePath ?? LocalDatabaseService.ResolveDatabasePath();
 
@@ -59,7 +59,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         private set => SetProperty(ref _lastEventReceivedText, value);
     }
 
-    public string FirestoreConnectionStatus => _getFirestoreStatus?.Invoke() ?? "Not Connected";
+    public string FirestoreConnectionStatus => "Not connected. This app reads the local database.";
     public string MonitoringSystemConnectionStatus => "Not Connected";
 
     // ============================================================
@@ -72,26 +72,32 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         private set => SetProperty(ref _savedStatusText, value);
     }
 
-    private string _defaultTimeRange = "All time";
-    public string DefaultTimeRange
+    public sealed record TimeRangeOption(TimeRange Range, string Label);
+
+    private TimeRange _defaultTimeRange = TimeRange.Today;
+    public TimeRange DefaultTimeRange
     {
         get => _defaultTimeRange;
         set
         {
             if (SetProperty(ref _defaultTimeRange, value))
             {
-                TriggerSavedIndicator();
+                ViewContext.Current.Range = value;
+                if (!_isInitializing)
+                {
+                    TriggerSavedIndicator();
+                    SaveImmediate();
+                }
             }
         }
     }
 
-    public IReadOnlyList<string> AvailableTimeRanges { get; } = new[]
+    public IReadOnlyList<TimeRangeOption> AvailableTimeRanges { get; } = new[]
     {
-        "All time",
-        "Today",
-        "Last 24 hours",
-        "Last 7 days",
-        "Last 30 days"
+        new TimeRangeOption(TimeRange.Today, "Today"),
+        new TimeRangeOption(TimeRange.Last7Days, "7 days"),
+        new TimeRangeOption(TimeRange.Last30Days, "30 days"),
+        new TimeRangeOption(TimeRange.All, "All")
     };
 
     private bool _autoRefreshEnabled;
@@ -221,13 +227,12 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     // ============================================================
     // 4. Engine Defaults (Read-only reference)
     // ============================================================
-    public string DefaultWorkingHours => "07:00 – 19:00";
-    public string WorkingHoursText => "07:00 to 19:00";
-    public string OffHoursPenalty => "+25";
-    public string NearEdgeOfHoursCaution => "+8";
-    public string BurstThresholdReference => "3 actions";
-    public string ClassificationWeightsText => "Public 5, Internal 15, Confidential 25, Restricted 35";
-    public string ActionWeightsText => "Open (+5), Modify (+15), Copy (+20), Move (+25), Delete (+30)";
+    public string WorkingHoursText => $"{EngineDefaults.WorkStartHour:00}:00 to {EngineDefaults.WorkEndHour:00}:00";
+    public string OffHoursPenalty => $"+{EngineDefaults.OffHoursPenalty}";
+    public string NearEdgeOfHoursCaution => $"+{EngineDefaults.NearEdgePenalty}";
+    public string BurstThresholdReference => EngineDefaults.BurstThreshold.ToString(CultureInfo.InvariantCulture);
+    public string ClassificationWeightsText => EngineDefaults.ClassificationText;
+    public string ActionWeightsText => EngineDefaults.ActionText;
     public string RiskBandsText => "Low 0 to 24, Medium 25 to 49, High 50 to 74, Critical 75 and above";
 
     // ============================================================
@@ -470,7 +475,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
                 string? lastAttempt = await _dbService.GetLastSyncAttemptAsync();
                 LastUploadAttemptText = string.IsNullOrWhiteSpace(lastAttempt)
                     ? "No upload attempts recorded"
-                    : lastAttempt;
+                    : $"Last attempt {lastAttempt} (success)";
             }
             catch
             {
@@ -519,7 +524,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         _savedIndicatorTimer.Start();
     }
 
-    private void ApplyAutoRefreshTimer()
+    public void ApplyAutoRefreshTimer()
     {
         if (_autoRefreshTimer == null) return;
 
@@ -562,6 +567,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     private void LoadFrom(AppSettingsData data)
     {
         _monitoringEnabled = data.MonitoringEnabled;
+        _defaultTimeRange = data.DefaultTimeRange;
         _monitoringIntervalInput = data.MonitoringIntervalSeconds;
 
         _mediumThresholdInput = data.MediumRiskThreshold;
@@ -600,6 +606,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
             _isInitializing = false;
         }
         SuccessMessage = "Changes discarded.";
+        ApplyAutoRefreshTimer();
     }
 
     private void ResetToDefaults()
@@ -617,6 +624,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
         HasUnsavedChanges = true;
         SuccessMessage = "Fields restored to defaults. Click Save Changes to apply.";
+        ApplyAutoRefreshTimer();
     }
 
     private bool TryValidate(out AppSettingsData data, out string? error)
@@ -691,6 +699,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
             ShowRiskFactorBreakdown = ShowRiskFactorBreakdown,
             HighlightCriticalRows = HighlightCriticalRows,
             ShowSampleDataBanner = ShowSampleDataBanner,
+            DefaultTimeRange = DefaultTimeRange,
         };
 
         return true;

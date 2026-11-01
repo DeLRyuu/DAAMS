@@ -24,6 +24,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -79,8 +80,34 @@
                       DisplayMemberPath="Label" />
         </Grid>
 
+        <!-- Folder breadcrumb -->
+        <Grid Grid.Row="2" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="{Binding CurrentBreadcrumb}"
+                       Style="{StaticResource Text.Secondary}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       ToolTip="{Binding CurrentFolder}" />
+            <Button Grid.Row="0" Grid.Column="1"
+                    Content="Up"
+                    Style="{StaticResource Button.Secondary}"
+                    Command="{Binding GoUpCommand}"
+                    IsEnabled="{Binding CanGoUp}" />
+            <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+                       Text="{Binding ActionError}"
+                       Style="{StaticResource Text.Secondary}"
+                       TextWrapping="Wrap" />
+        </Grid>
+
         <!-- Content area -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
 
             <!-- Loaded State with DataGrid + Detail Drawer -->
             <Grid Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
@@ -95,8 +122,20 @@
                               SelectedItem="{Binding SelectedAsset}"
                               SelectionMode="Single"
                               Style="{StaticResource Grid.Data}">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Status}" Value="Unprotected">
+                                        <Setter Property="Opacity" Value="0.6" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.InputBindings>
                             <KeyBinding Key="Escape" Command="{Binding CloseDrawerCommand}" />
+                            <MouseBinding Gesture="LeftDoubleClick"
+                                          Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                          CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
                         </DataGrid.InputBindings>
                         <DataGrid.Columns>
                             <!-- ASSET (name, ellipsis + ToolTip full path, and inactive note) -->
@@ -108,7 +147,7 @@
                                                        Style="{StaticResource Text.Body}"
                                                        TextTrimming="CharacterEllipsis"
                                                        ToolTip="{Binding Path}" />
-                                            <TextBlock Text="No activity in 30 days"
+                                            <TextBlock Text="{Binding ActivityNote}"
                                                        Style="{StaticResource Text.Secondary}"
                                                        FontSize="{StaticResource FontSize.Micro}"
                                                        Foreground="{StaticResource Brush.TextTertiary}"
@@ -134,8 +173,23 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
+                            <DataGridTemplateColumn Header="Status" Width="0.9*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border x:Name="StatusBadge" Style="{StaticResource Badge.Base}" Background="{StaticResource Brush.SurfaceAlt}">
+                                            <TextBlock x:Name="StatusText" Text="{Binding Status}" Style="{StaticResource Badge.Text}" />
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding Status}" Value="Unprotected">
+                                                <Setter TargetName="StatusText" Property="Foreground" Value="{StaticResource Brush.TextTertiary}" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
                             <DataGridTextColumn Header="Last activity" Binding="{Binding LastActivityText}" Width="1.1*" />
-                            <DataGridTextColumn Header="EVENTS (RANGE)" Binding="{Binding EventsInRange}" Width="1*" />
+                            <DataGridTextColumn Header="Events in range" Binding="{Binding EventsInRange}" Width="1*" />
                             <DataGridTextColumn Header="Open cases" Binding="{Binding OpenCases}" Width="0.9*" />
 
                             <DataGridTemplateColumn Header="Highest risk" Width="1.1*">
@@ -190,11 +244,18 @@
                             </Grid>
 
                             <!-- Full Path (Text.Mono, wrapped) -->
-                            <TextBlock Text="ASSET PATH" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                            <TextBlock Text="Asset path" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
                             <TextBlock Text="{Binding SelectedAsset.Path}"
                                        Style="{StaticResource Text.Mono}"
                                        TextWrapping="Wrap"
                                        Margin="0,0,0,14" />
+                            <StackPanel Margin="0,0,0,14"
+                                        Visibility="{Binding SelectedAsset.IsInherited, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Protected via folder" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                                <TextBlock Text="{Binding SelectedAsset.InheritedFrom}"
+                                           Style="{StaticResource Text.Mono}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
 
                             <!-- Classification & Base risk -->
                             <TextBlock Text="Classification &amp; base risk" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
@@ -211,7 +272,7 @@
                             </StackPanel>
 
                             <!-- Protected by and Protected at -->
-                            <TextBlock Text="PROTECTION DETAILS" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                            <TextBlock Text="Protection details" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
                             <Grid Margin="0,0,0,14">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -234,14 +295,14 @@
                             </Grid>
 
                             <!-- Open cases count -->
-                            <TextBlock Text="OPEN CASES" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                            <TextBlock Text="Open cases" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
                             <TextBlock Style="{StaticResource Text.Body}" Margin="0,0,0,14">
                                 <Run Text="{Binding SelectedAsset.OpenCases, Mode=OneWay}" FontWeight="SemiBold" />
                                 <Run Text=" active open cases" />
                             </TextBlock>
 
                             <!-- Last 5 events (time, action, risk badge) -->
-                            <TextBlock Text="LAST 5 EVENTS" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+                            <TextBlock Text="Last 5 events" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
                             <ItemsControl ItemsSource="{Binding RecentEvents}" Margin="0,0,0,8">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -302,14 +363,16 @@
                                         <ComboBox Grid.Column="0"
                                                   Style="{StaticResource Input.ComboBox}"
                                                   ItemsSource="{Binding AvailableClassifications}"
-                                                  SelectedItem="{Binding DrawerSelectedClassification}" />
+                                                  SelectedItem="{Binding DrawerSelectedClassification}"
+                                                  IsEnabled="{Binding IsSelectedAssetProtected}" />
                                         <Button Grid.Column="2"
                                                 Content="Change"
                                                 Style="{StaticResource Button.Secondary}"
-                                                Command="{Binding ChangeClassificationCommand}" />
+                                                Command="{Binding ChangeClassificationCommand}"
+                                                IsEnabled="{Binding IsSelectedAssetProtected}" />
                                     </Grid>
 
-                                    <TextBlock Text="REMOVE PROTECTION" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                                    <TextBlock Text="Remove protection" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
                                     <TextBlock Text="The file is not touched. Activity history is kept."
                                                Style="{StaticResource Text.Secondary}"
                                                TextWrapping="Wrap"

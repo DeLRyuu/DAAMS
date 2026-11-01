@@ -7,7 +7,7 @@
         xmlns:svc="clr-namespace:ControlCenter.Services"
         Title="DAAMS Control Center"
         Height="820" Width="1360"
-        MinHeight="640" MinWidth="1040"
+        MinHeight="700" MinWidth="1100"
         Background="{StaticResource Brush.Background}"
         FontFamily="{StaticResource Font.Primary}"
         WindowStartupLocation="CenterScreen">
@@ -67,7 +67,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                             <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource Brush.StatusPositive}" />
-                            <TextBlock Text="{Binding LocalDbStatusText}" ToolTip="{Binding LocalDbPath}" Style="{StaticResource Text.Secondary}"
+                            <TextBlock Text="Local DB: 2 pending sync" ToolTip="Local DB: 2 pending sync" Style="{StaticResource Text.Secondary}"
                                        Margin="8,0,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal">
@@ -76,8 +76,6 @@
                             <TextBlock Text="{Binding FirestoreStatusText}" Style="{StaticResource Text.Secondary}"
                                        Margin="8,0,0,0" TextWrapping="Wrap" />
                         </StackPanel>
-                        <TextBlock Text="Offline-First Architecture" Style="{StaticResource Text.Secondary}"
-                                   Foreground="{StaticResource Brush.TextTertiary}" Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>
 
@@ -124,14 +122,16 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,28,0">
-                <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="Today" Margin="0,0,4,0"
-                             IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Today}}" />
-                <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="7 days" Margin="0,0,4,0"
-                             IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Last7Days}}" />
-                <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="30 days" Margin="0,0,4,0"
-                             IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Last30Days}}" />
-                <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="All"
-                             IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.All}}" />
+                <StackPanel Orientation="Horizontal" Visibility="{Binding IsRangeBarVisible, Converter={StaticResource BoolToVisibility}}">
+                    <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="Today" Margin="0,0,4,0"
+                                 IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Today}}" />
+                    <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="7 days" Margin="0,0,4,0"
+                                 IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Last7Days}}" />
+                    <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="30 days" Margin="0,0,4,0"
+                                 IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Last30Days}}" />
+                    <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="All"
+                                 IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.All}}" />
+                </StackPanel>
 
                 <TextBlock Text="{Binding LastUpdatedText}" Style="{StaticResource Text.Secondary}" VerticalAlignment="Center" Margin="16,0,0,0" />
             </StackPanel>

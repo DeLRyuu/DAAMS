@@ -14,6 +14,8 @@ public class FilterOption<T> where T : struct, Enum
     public string Label { get; init; } = string.Empty;
     public T? Value { get; init; }
 
+    public override string ToString() => Label;
+
     public static List<FilterOption<T>> AllOptions(string allLabel = "All")
     {
         var options = new List<FilterOption<T>>

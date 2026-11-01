@@ -46,7 +46,7 @@ public static class DeviceService
 
             int events24h = devAct.Count(a => a.Timestamp >= twentyFourHoursAgo);
             int events7d = devAct.Count(a => a.Timestamp >= sevenDaysAgo);
-            int openCases = devCases.Count(c => c.Group != "Closed");
+            int openCases = devCases.Count(c => c.Status.IsOpen());
 
             var last7dAct = devAct.Where(a => a.Timestamp >= sevenDaysAgo).ToList();
 

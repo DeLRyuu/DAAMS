@@ -20,9 +20,14 @@
         <conv:StringToVisibilityConverter x:Key="StringToVis" />
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Style="{StaticResource Layout.PageRoot}">
-            <TextBlock Text="Settings" Style="{StaticResource Text.PageTitle}" Margin="0,0,0,16" />
+    <Grid Style="{StaticResource Layout.PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="Settings" Style="{StaticResource Text.PageTitle}" Margin="0,0,0,16" />
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
 
             <!-- ==================== 1. SYSTEM INFORMATION ==================== -->
             <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
@@ -103,8 +108,8 @@
                                        Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBox Style="{StaticResource NumericField}" Text="{Binding AutoRefreshIntervalInput, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="sec" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                            <TextBox Width="64" Height="32" HorizontalContentAlignment="Right" Style="{StaticResource Input.TextBox}" Text="{Binding AutoRefreshIntervalInput, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="seconds" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </Grid>
 
@@ -115,12 +120,15 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Default time range" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Time range applied at startup across activity logs and alerts."
+                            <TextBlock Text="The range selected when the app starts."
                                        Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <ComboBox Grid.Column="1" Width="140" VerticalAlignment="Center"
+                                  Style="{StaticResource Input.ComboBox}"
                                   ItemsSource="{Binding AvailableTimeRanges}"
-                                  SelectedItem="{Binding DefaultTimeRange}" />
+                                  DisplayMemberPath="Label"
+                                  SelectedValuePath="Range"
+                                  SelectedValue="{Binding DefaultTimeRange}" />
                     </Grid>
 
                     <Grid Style="{StaticResource SettingRow}">
@@ -130,7 +138,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Highlight Critical rows" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Tint Critical-risk rows in Activity and Alerts." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                            <TextBlock Text="Tint Critical-risk rows in Activity Logs and Alerts." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding HighlightCriticalRows}" VerticalAlignment="Center" />
                     </Grid>
@@ -142,7 +150,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Expand risk factors by default" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Sets RowDetailsVisibilityMode on the Activity grid to expanded." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                            <TextBlock Text="Show the risk factors under every row in Activity Logs." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding ShowRiskFactorBreakdown}" VerticalAlignment="Center" />
                     </Grid>
@@ -228,7 +236,10 @@
             </Border>
 
             <!-- ==================== 5. NOT ACTIVE YET ==================== -->
-            <Expander Header="Not active yet" IsExpanded="False" Margin="0,0,0,16">
+            <Expander IsExpanded="False" Margin="0,0,0,16">
+                <Expander.Header>
+                    <TextBlock Text="Not active yet" Style="{StaticResource Text.Secondary}" />
+                </Expander.Header>
                 <StackPanel IsEnabled="False" Opacity="0.55" Margin="0,10,0,0">
                     <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,12">
                         <StackPanel>
@@ -297,6 +308,7 @@
                     </Border>
                 </StackPanel>
             </Expander>
-        </StackPanel>
-    </ScrollViewer>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

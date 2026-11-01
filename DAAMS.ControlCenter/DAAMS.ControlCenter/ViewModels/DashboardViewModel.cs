@@ -52,6 +52,13 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         private set => SetProperty(ref _needsReviewCount, value);
     }
 
+    private string _latestHighRiskText = string.Empty;
+    public string LatestHighRiskText
+    {
+        get => _latestHighRiskText;
+        private set => SetProperty(ref _latestHighRiskText, value);
+    }
+
     private int _totalProtectedAssets;
     public int TotalProtectedAssets
     {
@@ -98,6 +105,10 @@ public class DashboardViewModel : ViewModelBase, IDataSection
     public int RiskMediumCount { get; private set; }
     public int RiskHighCount { get; private set; }
     public int RiskCriticalCount { get; private set; }
+    public int RiskLowPercent { get; private set; }
+    public int RiskMediumPercent { get; private set; }
+    public int RiskHighPercent { get; private set; }
+    public int RiskCriticalPercent { get; private set; }
 
     public ObservableCollection<CaseItem> NeedsReviewCases { get; } = new();
     public ObservableCollection<ActivityLog> RecentActivity { get; } = new();
@@ -108,6 +119,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
     public ICommand ShowSampleDataCommand { get; }
     public ICommand OpenCaseCommand { get; }
     public ICommand OpenDeviceCommand { get; }
+    public ICommand ViewAllActivityCommand { get; }
 
     public DashboardViewModel(LocalDatabaseService db, Action<NavigationSection, string> navigateWith)
     {
@@ -129,6 +141,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
                 _navigateWith(NavigationSection.Devices, device.Name);
             }
         });
+        ViewAllActivityCommand = new RelayCommand(_ => _navigateWith(NavigationSection.ActivityLogs, string.Empty));
         ViewContext.Current.RangeChanged += () => _ = RefreshAsync();
     }
 
@@ -235,18 +248,21 @@ public class DashboardViewModel : ViewModelBase, IDataSection
             .Where(entry => ViewContext.Current.IsInRange(entry.Timestamp))
             .OrderByDescending(entry => entry.Timestamp)
             .ToList();
-        var rangedCases = cases
-            .Where(item => ViewContext.Current.IsInRange(item.DetectedAt))
-            .ToList();
 
         TotalProtectedAssets = assets.Count(asset => asset.Status == ProtectionStatus.Protected);
         TotalActivityLogs = rangedActivity.Count;
-        NeedsReviewCount = rangedCases.Count(item => item.Status == CaseStatus.New);
-        OpenCases = rangedCases.Count(item => item.Status is CaseStatus.New or CaseStatus.Investigating);
+        NeedsReviewCount = cases.Count(item => item.Status == CaseStatus.New);
+        OpenCases = cases.Count(item => item.Status.IsOpen());
+
+        ActivityLog? latestHighRisk = rangedActivity.FirstOrDefault(entry =>
+            entry.RiskLevel == RiskLevel.High || entry.RiskLevel == RiskLevel.Critical);
+        LatestHighRiskText = latestHighRisk == null
+            ? string.Empty
+            : $"Latest high-risk activity: {latestHighRisk.Action} of {latestHighRisk.Asset} on {latestHighRisk.Device}, {FormatAge(now - latestHighRisk.Timestamp)}";
 
         NeedsReviewCases.Clear();
-        foreach (CaseItem item in rangedCases
-                     .Where(item => item.Status is CaseStatus.New or CaseStatus.Investigating)
+        foreach (CaseItem item in cases
+                     .Where(item => item.Status.IsOpen())
                      .OrderBy(item => item.Status == CaseStatus.New ? 0 : 1)
                      .ThenByDescending(item => item.RiskScore)
                      .ThenByDescending(item => item.DetectedAt)
@@ -256,7 +272,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         }
 
         RecentActivity.Clear();
-        foreach (ActivityLog entry in rangedActivity.Take(8))
+        foreach (ActivityLog entry in ActivityCollapser.Collapse(rangedActivity).Take(8))
         {
             RecentActivity.Add(entry);
         }
@@ -269,6 +285,16 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         OnPropertyChanged(nameof(RiskMediumCount));
         OnPropertyChanged(nameof(RiskHighCount));
         OnPropertyChanged(nameof(RiskCriticalCount));
+
+        int riskTotal = RiskLowCount + RiskMediumCount + RiskHighCount + RiskCriticalCount;
+        RiskLowPercent = Percent(RiskLowCount, riskTotal);
+        RiskMediumPercent = Percent(RiskMediumCount, riskTotal);
+        RiskHighPercent = Percent(RiskHighCount, riskTotal);
+        RiskCriticalPercent = Percent(RiskCriticalCount, riskTotal);
+        OnPropertyChanged(nameof(RiskLowPercent));
+        OnPropertyChanged(nameof(RiskMediumPercent));
+        OnPropertyChanged(nameof(RiskHighPercent));
+        OnPropertyChanged(nameof(RiskCriticalPercent));
 
         var deviceSummaries = DeviceService.Build(activity, cases);
         var deviceNamesInRange = rangedActivity
@@ -305,10 +331,26 @@ public class DashboardViewModel : ViewModelBase, IDataSection
                 Hour = hour,
                 Label = hour % 6 == 0 ? hour.ToString("00") : string.Empty,
                 Count = hourCounts[hour],
+                HourTooltip = $"{hour}:00 to {hour}:59, {hourCounts[hour]} events",
                 HeightPx = maxHourCount == 0 ? 4 : Math.Max(4, hourCounts[hour] * 48d / maxHourCount),
                 IsWorkHour = hour is >= 7 and <= 18
             });
         }
+    }
+
+    private static int Percent(int count, int total) =>
+        total == 0 ? 0 : (int)Math.Round(count * 100d / total);
+
+    private static string FormatAge(TimeSpan age)
+    {
+        int days = Math.Max(0, (int)age.TotalDays);
+        if (days >= 1)
+        {
+            return $"{days} {(days == 1 ? "day" : "days")} ago";
+        }
+
+        int hours = Math.Max(0, (int)age.TotalHours);
+        return hours >= 1 ? $"{hours} {(hours == 1 ? "hour" : "hours")} ago" : "just now";
     }
 
 }
@@ -318,6 +360,7 @@ public class DashboardHourBar
     public int Hour { get; init; }
     public string Label { get; init; } = string.Empty;
     public int Count { get; init; }
+    public string HourTooltip { get; init; } = string.Empty;
     public double HeightPx { get; init; }
     public bool IsWorkHour { get; init; }
 }

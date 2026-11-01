@@ -1,3 +1,5 @@
+using ControlCenter.Services;
+
 namespace ControlCenter.Models;
 
 /// <summary>
@@ -44,6 +46,7 @@ public class AppSettingsData
     public bool ShowRiskFactorBreakdown { get; set; } = true;
     public bool HighlightCriticalRows { get; set; } = true;
     public bool ShowSampleDataBanner { get; set; } = true;
+    public TimeRange DefaultTimeRange { get; set; } = TimeRange.Today;
 
     /// <summary>The one canonical set of defaults — used both for a first run (no settings file yet) and for "Reset to Defaults".</summary>
     public static AppSettingsData Defaults => new();

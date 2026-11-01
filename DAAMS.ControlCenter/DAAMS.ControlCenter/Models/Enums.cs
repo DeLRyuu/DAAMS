@@ -97,3 +97,8 @@ public enum CaseStatus
     Resolved,
     Dismissed
 }
+
+public static class CaseStatusExtensions
+{
+    public static bool IsOpen(this CaseStatus status) => status is CaseStatus.New or CaseStatus.Investigating;
+}

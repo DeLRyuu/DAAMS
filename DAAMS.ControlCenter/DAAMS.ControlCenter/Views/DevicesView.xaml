@@ -21,7 +21,13 @@
 
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <TextBlock Text="Devices" Style="{StaticResource Text.PageTitle}" />
+            <Button Grid.Column="1" Content="Refresh" Style="{StaticResource Button.Secondary}"
+                    Command="{Binding RefreshCommand}" />
         </Grid>
 
         <!-- Content Area: Left list (380px) and Right card (*) -->
@@ -144,7 +150,7 @@
                         <StackPanel>
                             <!-- Device Header -->
                             <TextBlock Text="{Binding SelectedDevice.Name}" Style="{StaticResource Text.SectionHeading}" FontSize="20" />
-                            <TextBlock Text="{Binding SelectedDevice.AccountsText, StringFormat='Windows accounts: {0}'}"
+                            <TextBlock Text="{Binding SelectedDevice.AccountsText, StringFormat='Windows accounts: {0}, last 7 days'}"
                                        Style="{StaticResource Text.Secondary}"
                                        ToolTip="Accounts, not necessarily individual people"
                                        Margin="0,4,0,16" />
@@ -244,7 +250,8 @@
                             </Border>
 
                             <!-- Activity by hour (7 days) -->
-                            <TextBlock Text="Activity by hour (7 days)" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,10" />
+                            <TextBlock Text="Activity by hour (7 days)" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
+                            <TextBlock Text="Blue: working hours 07:00 to 19:00. Gray: outside working hours." Style="{StaticResource Text.Secondary}" Margin="0,0,0,10" TextWrapping="Wrap" />
                             <Border Background="{StaticResource Brush.SurfaceElevated}"
                                     BorderBrush="{StaticResource Brush.BorderSubtle}"
                                     BorderThickness="1"
@@ -262,8 +269,13 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid VerticalAlignment="Bottom" Height="48">
-                                                    <Rectangle Width="7" Height="{Binding HeightPx}" RadiusX="2" RadiusY="2" VerticalAlignment="Bottom"
-                                                               ToolTip="{Binding Hour, StringFormat='Hour {0}:00'}">
+                                                    <Rectangle Width="7" Height="{Binding HeightPx}" RadiusX="2" RadiusY="2" VerticalAlignment="Bottom">
+                                                        <Rectangle.ToolTip>
+                                                            <MultiBinding StringFormat="{}{0}:00 to {0}:59, {1} events">
+                                                                <Binding Path="Hour" />
+                                                                <Binding Path="Count" />
+                                                            </MultiBinding>
+                                                        </Rectangle.ToolTip>
                                                         <Rectangle.Style>
                                                             <Style TargetType="Rectangle">
                                                                 <Setter Property="Fill" Value="{StaticResource Brush.TextTertiary}" />
@@ -288,10 +300,10 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="00:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="1" Text="06:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="2" Text="12:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="3" Text="18:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="0" Text="00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="06" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="2" Text="12" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="3" Text="18" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
                                     </Grid>
                                 </StackPanel>
                             </Border>

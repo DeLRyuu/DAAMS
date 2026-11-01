@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using ControlCenter.Data;
@@ -62,11 +63,35 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
 
     public ICollectionView Activity { get; }
 
+    public DataGridRowDetailsVisibilityMode RowDetailsVisibilityMode { get; }
+
     private int _totalCount;
     public int TotalCount
     {
         get => _totalCount;
         private set => SetProperty(ref _totalCount, value);
+    }
+
+    private int _rawEventCount;
+    public int RawEventCount
+    {
+        get => _rawEventCount;
+        private set => SetProperty(ref _rawEventCount, value);
+    }
+
+    public string CountSummary => $"{TotalCount} rows from {RawEventCount} events";
+
+    private bool _collapseRepeats = true;
+    public bool CollapseRepeats
+    {
+        get => _collapseRepeats;
+        set
+        {
+            if (SetProperty(ref _collapseRepeats, value))
+            {
+                ApplyCollapsedActivity();
+            }
+        }
     }
 
     private string _searchText = string.Empty;
@@ -191,6 +216,12 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         _selectedClassification = ClassificationOptions[0];
         _selectedRiskLevel = RiskLevelOptions[0];
 
+        SettingsService settingsService = new();
+        bool expandRiskFactors = settingsService.Load().ShowRiskFactorBreakdown;
+        RowDetailsVisibilityMode = expandRiskFactors
+            ? DataGridRowDetailsVisibilityMode.Visible
+            : DataGridRowDetailsVisibilityMode.VisibleWhenSelected;
+
         Activity = CollectionViewSource.GetDefaultView(_allActivity);
         Activity.Filter = FilterPredicate;
         Activity.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ActivityLog.Date)));
@@ -294,7 +325,15 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
 
         MatchCases(_rawActivity, _cachedCases);
 
-        var collapsed = CollapseRepeats(_rawActivity);
+        ApplyCollapsedActivity();
+        UpdateActionOptions(activity);
+    }
+
+    private void ApplyCollapsedActivity()
+    {
+        var collapsed = CollapseRepeats
+            ? ActivityCollapser.Collapse(_rawActivity)
+            : _rawActivity.ToList();
 
         _allActivity.Clear();
         foreach (ActivityLog entry in collapsed.OrderByDescending(a => a.Timestamp))
@@ -302,8 +341,8 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
             _allActivity.Add(entry);
         }
 
-        UpdateActionOptions(activity);
         RecomputeCounts();
+        OnPropertyChanged(nameof(CountSummary));
     }
 
     private static void MatchCases(IEnumerable<ActivityLog> logs, List<CaseItem>? cases)
@@ -347,63 +386,6 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         }
     }
 
-    private static List<ActivityLog> CollapseRepeats(List<ActivityLog> logs)
-    {
-        var sorted = logs.OrderByDescending(a => a.Timestamp).ToList();
-        var collapsed = new List<ActivityLog>();
-
-        ActivityLog? currentAnchor = null;
-        var currentTimestamps = new List<DateTime>();
-        int currentRepeatCount = 1;
-
-        foreach (var item in sorted)
-        {
-            if (currentAnchor == null)
-            {
-                currentAnchor = item;
-                currentTimestamps = new List<DateTime> { item.Timestamp };
-                currentRepeatCount = 1;
-                continue;
-            }
-
-            bool isSameGroup = string.Equals(currentAnchor.User, item.User, StringComparison.OrdinalIgnoreCase)
-                               && string.Equals(currentAnchor.Device, item.Device, StringComparison.OrdinalIgnoreCase)
-                               && string.Equals(currentAnchor.Asset, item.Asset, StringComparison.OrdinalIgnoreCase)
-                               && currentAnchor.Action == item.Action
-                               && (currentAnchor.Timestamp - item.Timestamp) <= TimeSpan.FromSeconds(60)
-                               && (currentAnchor.Timestamp - item.Timestamp) >= TimeSpan.Zero;
-
-            if (isSameGroup)
-            {
-                currentRepeatCount++;
-                currentTimestamps.Add(item.Timestamp);
-                if (string.IsNullOrEmpty(currentAnchor.MatchedAlertId) && !string.IsNullOrEmpty(item.MatchedAlertId))
-                {
-                    currentAnchor.MatchedAlertId = item.MatchedAlertId;
-                }
-            }
-            else
-            {
-                currentAnchor.RepeatCount = currentRepeatCount;
-                currentAnchor.MergedTimestamps = currentTimestamps;
-                collapsed.Add(currentAnchor);
-
-                currentAnchor = item;
-                currentTimestamps = new List<DateTime> { item.Timestamp };
-                currentRepeatCount = 1;
-            }
-        }
-
-        if (currentAnchor != null)
-        {
-            currentAnchor.RepeatCount = currentRepeatCount;
-            currentAnchor.MergedTimestamps = currentTimestamps;
-            collapsed.Add(currentAnchor);
-        }
-
-        return collapsed;
-    }
-
     private void UpdateActionOptions(List<ActivityLog> activity)
     {
         var selectedValue = SelectedAction?.Value;
@@ -426,6 +408,8 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
     private void RecomputeCounts()
     {
         TotalCount = _allActivity.Count(a => ViewContext.Current.IsInRange(a.Timestamp));
+        RawEventCount = _rawActivity.Count(a => ViewContext.Current.IsInRange(a.Timestamp));
+        OnPropertyChanged(nameof(CountSummary));
     }
 
     private bool FilterPredicate(object obj)
@@ -452,7 +436,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         if (FilterOffHours)
         {
             int hour = entry.Timestamp.Hour;
-            if (hour >= 7 && hour < 19)
+            if (hour < EngineDefaults.WorkStartHour || hour >= EngineDefaults.WorkEndHour)
             {
                 return false;
             }

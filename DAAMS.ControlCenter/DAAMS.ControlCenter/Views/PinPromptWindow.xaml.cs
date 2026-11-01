@@ -12,7 +12,7 @@ namespace ControlCenter.Views;
 public partial class PinPromptWindow : Window
 {
     [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
     private readonly LocalDatabaseService _db;
 
@@ -26,21 +26,16 @@ public partial class PinPromptWindow : Window
             DescriptionTextBlock.Text = description;
         }
 
-        SourceInitialized += (_, _) =>
-        {
-            try
-            {
-                var handle = new WindowInteropHelper(this).Handle;
-                int useDarkMode = 1;
-                DwmSetWindowAttribute(handle, 20, ref useDarkMode, sizeof(int));
-            }
-            catch
-            {
-                // Non-fatal if OS version does not support dark title bar attribute
-            }
-        };
-
         Loaded += (_, _) => PinBox.Focus();
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        var hwnd = new WindowInteropHelper(this).Handle;
+        int on = 1;
+        if (DwmSetWindowAttribute(hwnd, 20, ref on, sizeof(int)) != 0)
+            DwmSetWindowAttribute(hwnd, 19, ref on, sizeof(int));
     }
 
     private async void ConfirmButton_Click(object sender, RoutedEventArgs e)

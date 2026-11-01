@@ -21,6 +21,8 @@ public class ActivityLog
     public required string Device { get; init; }
     public required string Asset { get; init; }
     public string? Path { get; init; }
+    public string? AssetPath { get; init; }
+    public string? ProtectedRoot { get; init; }
     public ActionType Action { get; init; }
     public DateTime Timestamp { get; init; }
     public Classification Classification { get; init; }

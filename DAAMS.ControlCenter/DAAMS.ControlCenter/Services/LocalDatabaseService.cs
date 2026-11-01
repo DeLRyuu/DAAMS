@@ -126,6 +126,8 @@ public class LocalDatabaseService
                     risk_level TEXT,
                     risk_factors TEXT,
                     advisory TEXT,
+                    asset_path TEXT,
+                    protected_root TEXT,
                     sync_status TEXT NOT NULL DEFAULT 'PENDING',
                     synced_at TEXT,
                     sync_error TEXT,
@@ -357,6 +359,12 @@ public class LocalDatabaseService
             while (reader.Read())
             {
                 string assetFieldValue = reader.GetString(reader.GetOrdinal("asset"));
+                string? assetPath = reader.IsDBNull(reader.GetOrdinal("asset_path"))
+                    ? null
+                    : reader.GetString(reader.GetOrdinal("asset_path"));
+                string? protectedRoot = reader.IsDBNull(reader.GetOrdinal("protected_root"))
+                    ? null
+                    : reader.GetString(reader.GetOrdinal("protected_root"));
                 string? classVal = reader.IsDBNull(reader.GetOrdinal("classification")) ? null : reader.GetString(reader.GetOrdinal("classification"));
                 int? riskScore = reader.IsDBNull(reader.GetOrdinal("risk_score")) ? null : reader.GetInt32(reader.GetOrdinal("risk_score"));
                 string? riskLevelVal = reader.IsDBNull(reader.GetOrdinal("risk_level")) ? null : reader.GetString(reader.GetOrdinal("risk_level"));
@@ -369,6 +377,8 @@ public class LocalDatabaseService
                     Device = reader.GetString(reader.GetOrdinal("device")),
                     Asset = DeriveDisplayName(assetFieldValue),
                     Path = assetFieldValue,
+                    AssetPath = assetPath,
+                    ProtectedRoot = protectedRoot,
                     Action = ParseEnum(reader.GetString(reader.GetOrdinal("action")), ActionType.Open),
                     Timestamp = ParseTimestamp(reader.GetString(reader.GetOrdinal("timestamp"))),
                     Classification = ParseEnum(classVal ?? "Public", Classification.Public),
@@ -1045,4 +1055,3 @@ public class LocalDatabaseService
             : "Flagged by the Risk Assessment Engine.";
     }
 }
-

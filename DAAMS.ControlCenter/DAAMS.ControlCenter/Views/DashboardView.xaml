@@ -45,8 +45,18 @@
                             <DockPanel LastChildFill="False" Margin="0,0,0,12">
                                 <TextBlock Text="Needs review" Style="{StaticResource Text.SectionHeading}"
                                            DockPanel.Dock="Left" />
-                                <TextBlock Text="{Binding NeedsReviewCount}" Style="{StaticResource Text.Metric}"
-                                           DockPanel.Dock="Right" />
+                                <TextBlock Text="{Binding NeedsReviewCount}" DockPanel.Dock="Right">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Metric}">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding NeedsReviewCount}" Value="0">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </DockPanel>
 
                             <ItemsControl ItemsSource="{Binding NeedsReviewCases}">
@@ -95,21 +105,26 @@
                                 </ItemsControl.Style>
                             </ItemsControl>
 
-                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <StackPanel Margin="0,8,0,0">
                                 <StackPanel.Style>
                                     <Style TargetType="{x:Type StackPanel}">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding NeedsReviewCases.Count}" Value="0">
+                                            <DataTrigger Binding="{Binding NeedsReviewCount}" Value="0">
                                                 <Setter Property="Visibility" Value="Visible" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
-                                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                                         Fill="{StaticResource Brush.StatusPositive}" />
-                                <TextBlock Text="No alerts need review." Style="{StaticResource Text.Body}"
-                                           Margin="10,0,0,0" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                             Fill="{StaticResource Brush.StatusPositive}" />
+                                    <TextBlock Text="No alerts need review." Style="{StaticResource Text.Body}"
+                                               Margin="10,0,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding LatestHighRiskText}" Style="{StaticResource Text.Secondary}"
+                                           Margin="18,2,0,0" TextWrapping="Wrap"
+                                           Visibility="{Binding LatestHighRiskText, Converter={StaticResource StringToVis}}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -121,15 +136,8 @@
                         </StackPanel>
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
-                            <TextBlock Style="{StaticResource Text.Metric}">
-                                <Run Text="{Binding TotalActivityLogs, Mode=OneWay}" />
-                                <Run Text=" events" />
-                            </TextBlock>
-                            <TextBlock Style="{StaticResource Text.Secondary}">
-                                <Run Text="Events (" />
-                                <Run Text="{Binding RangeLabel, Mode=OneWay}" />
-                                <Run Text=")" />
-                            </TextBlock>
+                            <TextBlock Text="{Binding TotalActivityLogs, Mode=OneWay}" Style="{StaticResource Text.Metric}" />
+                            <TextBlock Text="{Binding RangeLabel, Mode=OneWay, StringFormat='Events ({0})'}" Style="{StaticResource Text.Secondary}" />
                         </StackPanel>
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
@@ -139,11 +147,7 @@
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
                             <TextBlock Text="{Binding DevicesReportingActivity}" Style="{StaticResource Text.Metric}" />
-                            <TextBlock Style="{StaticResource Text.Secondary}">
-                                <Run Text="Devices reporting activity (" />
-                                <Run Text="{Binding RangeLabel, Mode=OneWay}" />
-                                <Run Text=")" />
-                            </TextBlock>
+                            <TextBlock Text="{Binding RangeLabel, Mode=OneWay, StringFormat='Devices reporting activity ({0})'}" Style="{StaticResource Text.Secondary}" />
                         </StackPanel>
                     </StackPanel>
 
@@ -207,21 +211,25 @@
                                     <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.RiskLow}" VerticalAlignment="Center" />
                                     <TextBlock Text="Low" Style="{StaticResource Text.Secondary}" Margin="6,0,0,0" />
                                     <TextBlock Text="{Binding RiskLowCount}" Style="{StaticResource Text.Secondary}" Margin="5,0,0,0" />
+                                    <TextBlock Text="{Binding RiskLowPercent, StringFormat=' ({0}%)'}" Style="{StaticResource Text.Secondary}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.RiskMedium}" VerticalAlignment="Center" />
                                     <TextBlock Text="Medium" Style="{StaticResource Text.Secondary}" Margin="6,0,0,0" />
                                     <TextBlock Text="{Binding RiskMediumCount}" Style="{StaticResource Text.Secondary}" Margin="5,0,0,0" />
+                                    <TextBlock Text="{Binding RiskMediumPercent, StringFormat=' ({0}%)'}" Style="{StaticResource Text.Secondary}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.RiskHigh}" VerticalAlignment="Center" />
                                     <TextBlock Text="High" Style="{StaticResource Text.Secondary}" Margin="6,0,0,0" />
                                     <TextBlock Text="{Binding RiskHighCount}" Style="{StaticResource Text.Secondary}" Margin="5,0,0,0" />
+                                    <TextBlock Text="{Binding RiskHighPercent, StringFormat=' ({0}%)'}" Style="{StaticResource Text.Secondary}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.RiskCritical}" VerticalAlignment="Center" />
                                     <TextBlock Text="Critical" Style="{StaticResource Text.Secondary}" Margin="6,0,0,0" />
                                     <TextBlock Text="{Binding RiskCriticalCount}" Style="{StaticResource Text.Secondary}" Margin="5,0,0,0" />
+                                    <TextBlock Text="{Binding RiskCriticalPercent, StringFormat=' ({0}%)'}" Style="{StaticResource Text.Secondary}" />
                                 </StackPanel>
                             </UniformGrid>
                         </StackPanel>
@@ -236,6 +244,7 @@
                         <Border Grid.Column="0" Style="{StaticResource Surface.Card}">
                             <StackPanel>
                                 <TextBlock Text="Activity by hour" Style="{StaticResource Text.SectionHeading}" />
+                                <TextBlock Text="Blue: working hours 07:00 to 19:00. Gray: outside working hours." Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" TextWrapping="Wrap" />
                                 <TextBlock Text="Last 30 days" Style="{StaticResource Text.Secondary}" Margin="0,3,0,10"
                                            Visibility="{Binding ShowThirtyDayHourRange, Converter={StaticResource BoolToVis}}" />
                                 <ItemsControl ItemsSource="{Binding ActivityByHour}" Height="82">
@@ -252,7 +261,7 @@
                                                     <RowDefinition Height="Auto" />
                                                 </Grid.RowDefinitions>
                                                 <Border Grid.Row="0" Height="{Binding HeightPx}" VerticalAlignment="Bottom"
-                                                        Width="8" CornerRadius="2">
+                                                        Width="8" CornerRadius="2" ToolTip="{Binding HourTooltip}">
                                                     <Border.Style>
                                                         <Style TargetType="{x:Type Border}">
                                                             <Setter Property="Background" Value="{StaticResource Brush.TextTertiary}" />
@@ -315,28 +324,51 @@
                     <Border Style="{StaticResource Surface.Card}">
                         <StackPanel>
                             <TextBlock Text="Recent activity" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,10" />
-                            <DataGrid ItemsSource="{Binding RecentActivity}" Style="{StaticResource Grid.Data}" MaxHeight="340">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat='MM-dd HH:mm:ss'}" Width="1.2*" />
-                                    <DataGridTextColumn Header="Device" Binding="{Binding Device}" Width="*" />
-                                    <DataGridTextColumn Header="Asset" Binding="{Binding Asset}" Width="1.3*" />
-                                    <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="*" />
-                                    <DataGridTemplateColumn Header="Risk" Width="*">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Border Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}"
-                                                            CornerRadius="3" Padding="5,2">
-                                                        <TextBlock Text="{Binding RiskLevel}" Style="{StaticResource Badge.Text}"
-                                                                   Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
-                                                    </Border>
-                                                    <TextBlock Text="{Binding RiskScore}" Style="{StaticResource Text.Secondary}" Margin="6,0,0,0" />
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.2*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1.3*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Time" Style="{StaticResource Text.Secondary}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" Text="Device" Style="{StaticResource Text.Secondary}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="2" Text="Asset" Style="{StaticResource Text.Secondary}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="3" Text="Action" Style="{StaticResource Text.Secondary}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="4" Text="Risk" Style="{StaticResource Text.Secondary}" FontWeight="SemiBold" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding RecentActivity}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.2*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="1.3*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Timestamp, StringFormat='MM-dd HH:mm:ss'}" Style="{StaticResource Text.Secondary}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Device}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Asset}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Text="{Binding Action}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}"
+                                                        CornerRadius="3" Padding="5,2">
+                                                    <TextBlock Text="{Binding RiskLevel}" Style="{StaticResource Badge.Text}"
+                                                               Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
+                                                </Border>
+                                                <TextBlock Text="{Binding RiskScore}" Style="{StaticResource Text.Secondary}" Margin="6,0,0,0" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Content="View all activity" Command="{Binding ViewAllActivityCommand}"
+                                    HorizontalAlignment="Left" Margin="0,12,0,0"
+                                    Background="Transparent" BorderThickness="0" Padding="0"
+                                    Foreground="{StaticResource Brush.Accent}" Cursor="Hand" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

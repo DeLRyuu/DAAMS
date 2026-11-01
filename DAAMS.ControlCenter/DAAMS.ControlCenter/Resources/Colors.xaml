@@ -21,7 +21,7 @@
     <!-- Text -->
     <Color x:Key="Color.TextPrimary">#E6EAF0</Color>
     <Color x:Key="Color.TextSecondary">#8D98A8</Color>
-    <Color x:Key="Color.TextTertiary">#5C6674</Color>
+    <Color x:Key="Color.TextTertiary">#7F8999</Color>
     <Color x:Key="Color.TextOnAccent">#06121C</Color>
 
     <!-- Single controlled accent -->

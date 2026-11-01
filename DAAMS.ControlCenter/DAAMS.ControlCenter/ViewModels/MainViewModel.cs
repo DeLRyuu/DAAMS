@@ -36,6 +36,7 @@ public class MainViewModel : ViewModelBase
         {
             if (SetProperty(ref _currentSection, value))
             {
+                OnPropertyChanged(nameof(IsRangeBarVisible));
                 if (_sections.TryGetValue(_currentSection, out var sectionVm))
                 {
                     CurrentViewModel = sectionVm;
@@ -49,6 +50,8 @@ public class MainViewModel : ViewModelBase
             }
         }
     }
+
+    public bool IsRangeBarVisible => CurrentSection is not (NavigationSection.Settings or NavigationSection.Devices);
 
     public void NavigateWith(NavigationSection section, string search)
     {
@@ -64,7 +67,7 @@ public class MainViewModel : ViewModelBase
     }
 
     /// <summary>Live Firestore connection status text for the shell footer.</summary>
-    public string FirestoreStatusText => _firestoreConnection.StatusMessage;
+    public string FirestoreStatusText => "Firestore: not connected (using local database)";
 
     /// <summary>Live Firestore connection state for the shell footer's status dot.</summary>
     public FirestoreConnectionState FirestoreState => _firestoreConnection.State;
@@ -107,6 +110,7 @@ public class MainViewModel : ViewModelBase
         _ = CasesViewModel.RefreshAsync();
 
         _settingsViewModel = new SettingsViewModel(_dbService, autoRefreshTimer, () => _firestoreConnection.StatusMessage);
+        ViewContext.Current.Range = _settingsViewModel.DefaultTimeRange;
 
         _sections = new Dictionary<NavigationSection, ViewModelBase>
         {
@@ -145,7 +149,7 @@ public class MainViewModel : ViewModelBase
 
             await CheckForNewAlertNotificationsAsync();
         };
-        autoRefreshTimer.Start();
+        _settingsViewModel.ApplyAutoRefreshTimer();
 
         _ = CheckForNewAlertNotificationsAsync();
     }

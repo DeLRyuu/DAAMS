@@ -14,6 +14,10 @@ namespace ControlCenter.ViewModels;
 
 public class CasesViewModel : DataSectionViewModelBase
 {
+    private const string EngineDefaultNote = "Pending investigation.";
+    private static string CleanNote(string? n) =>
+        string.Equals(n?.Trim(), EngineDefaultNote, StringComparison.OrdinalIgnoreCase) ? string.Empty : n ?? string.Empty;
+
     private readonly LocalDatabaseService _db;
     private readonly FirestoreService? _firestore;
     private readonly ObservableCollection<CaseItem> _allCases = new();
@@ -56,12 +60,15 @@ public class CasesViewModel : DataSectionViewModelBase
         {
             if (SetProperty(ref _selectedCase, value))
             {
-                NotesDraft = _selectedCase?.Notes ?? string.Empty;
+                NotesDraft = CleanNote(_selectedCase?.Notes);
                 ResolutionDraft = _selectedCase?.Resolution ?? string.Empty;
                 StatusError = null;
+                OnPropertyChanged(nameof(HasSelectedClosedCase));
             }
         }
     }
+
+    public bool HasSelectedClosedCase => _selectedCase != null && !_selectedCase.Status.IsOpen();
 
     private string _notesDraft = string.Empty;
     public string NotesDraft
@@ -93,16 +100,24 @@ public class CasesViewModel : DataSectionViewModelBase
             if (SetProperty(ref _needsReviewCount, value))
             {
                 OnPropertyChanged(nameof(HasNeedsReview));
+                OnPropertyChanged(nameof(HasNothingNeedsReview));
             }
         }
     }
     public bool HasNeedsReview => NeedsReviewCount > 0;
+    public bool HasNothingNeedsReview => NeedsReviewCount == 0 && OpenCount == 0;
 
     private int _openCount;
     public int OpenCount
     {
         get => _openCount;
-        private set => SetProperty(ref _openCount, value);
+        private set
+        {
+            if (SetProperty(ref _openCount, value))
+            {
+                OnPropertyChanged(nameof(HasNothingNeedsReview));
+            }
+        }
     }
 
     private int _totalCount;
@@ -204,7 +219,7 @@ public class CasesViewModel : DataSectionViewModelBase
     {
         if (SelectedCase == null) return;
 
-        if (newStatus is CaseStatus.Resolved or CaseStatus.Dismissed && string.IsNullOrWhiteSpace(NotesDraft))
+        if (newStatus is CaseStatus.Resolved or CaseStatus.Dismissed && string.IsNullOrWhiteSpace(CleanNote(NotesDraft)))
         {
             StatusError = "Add a note before closing this case.";
             SelectedCase.RefreshStatusBinding();
@@ -240,21 +255,17 @@ public class CasesViewModel : DataSectionViewModelBase
 
         RecomputeCounts();
 
-        if (savedAlertId != null)
-        {
-            SelectedCase = _allCases.FirstOrDefault(c => c.AlertId == savedAlertId) ?? _allCases.FirstOrDefault();
-        }
-        else
-        {
-            SelectedCase = _allCases.FirstOrDefault();
-        }
+        SelectedCase = (savedAlertId != null
+                            ? _allCases.FirstOrDefault(c => c.AlertId == savedAlertId)
+                            : null)
+                        ?? _allCases.FirstOrDefault(c => c.Status.IsOpen());
     }
 
     private void RecomputeCounts()
     {
         TotalCount = _allCases.Count(c => ViewContext.Current.IsInRange(c.DetectedAt));
-        NeedsReviewCount = _allCases.Count(c => c.Status == CaseStatus.New && ViewContext.Current.IsInRange(c.DetectedAt));
-        OpenCount = _allCases.Count(c => (c.Status == CaseStatus.New || c.Status == CaseStatus.Investigating) && ViewContext.Current.IsInRange(c.DetectedAt));
+        NeedsReviewCount = _allCases.Count(c => c.Status == CaseStatus.New);
+        OpenCount = _allCases.Count(c => c.Status.IsOpen());
     }
 
     protected override void ApplyPendingSearch(string s)
@@ -269,7 +280,8 @@ public class CasesViewModel : DataSectionViewModelBase
             return false;
         }
 
-        if (!ViewContext.Current.IsInRange(item.DetectedAt))
+        bool inRange = ViewContext.Current.IsInRange(item.DetectedAt);
+        if (!item.Status.IsOpen() && !inRange)
         {
             return false;
         }
