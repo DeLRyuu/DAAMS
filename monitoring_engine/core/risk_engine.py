@@ -27,11 +27,11 @@ that gets stored. None of those three responsibilities live in the same
 file, and none of them import risk-scoring logic from each other.
 
 Honesty notes (also covered in README):
-- Only actions the Monitoring Engine detects or infers (Create, Modify,
-  Rename, Delete, Copy, and Move) reach this module in practice. Open
-  has a configured weight but is not observable through Watchdog.
+- Open, Copy and Move are now detected. Actions detected or inferred
+  by the Monitoring Engine (Create, Modify, Rename, Delete, Copy, and Move)
+  reach this module.
 - "Create" has an explicit moderate weight in config.ACTION_WEIGHTS.
-- Burst/frequency tracking is in-memory only, per protected asset path,
+- Burst/frequency tracking is in-memory only, per user and device,
   and resets whenever the Monitoring Engine process restarts -- there is
   no persisted history of past bursts across runs. See README
   limitations.
@@ -64,8 +64,8 @@ from config.settings import (
 
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-# In-memory burst-tracking state: asset path -> list of datetimes of
-# recent relevant activity on that asset. Deliberately NOT persisted to
+# In-memory burst-tracking state: user@device (or fallback asset path) -> list
+# of datetimes of recent relevant activity. Deliberately NOT persisted to
 # disk or Firestore -- see module docstring "Honesty notes".
 _recent_activity = defaultdict(list)
 
@@ -136,30 +136,40 @@ def _time_risk(timestamp_str):
     return 0, None
 
 
-def _burst_risk(asset_path, timestamp_str):
+def _burst_key(activity_record, asset_path):
+    """
+    Returns 'user@device' when both activity_record['user'] and
+    activity_record['device'] exist, otherwise asset_path.
+    """
+    if activity_record and activity_record.get("user") and activity_record.get("device"):
+        return f"{activity_record['user']}@{activity_record['device']}"
+    return asset_path
+
+
+def _burst_risk(target_key, timestamp_str):
     """
     Returns (points, factor_label_or_None). Tracks recent activity
-    per-asset, in memory. If config.BURST_THRESHOLD or more relevant
-    activities have occurred on this SAME asset within
-    config.BURST_WINDOW_SECONDS (including the current one), burst risk
-    is applied.
+    per user and device (or asset path fallback), in memory.
+    If config.BURST_THRESHOLD or more relevant activities have occurred
+    within config.BURST_WINDOW_SECONDS (including the current one),
+    burst risk is applied.
     """
     try:
         now = datetime.strptime(timestamp_str, TIMESTAMP_FORMAT)
     except (TypeError, ValueError):
         return 0, None  # Can't do burst math without a valid timestamp.
 
-    history = _recent_activity[asset_path]
+    history = _recent_activity[target_key]
     history.append(now)
 
     cutoff = now.timestamp() - BURST_WINDOW_SECONDS
-    _recent_activity[asset_path] = [t for t in history if t.timestamp() >= cutoff]
+    _recent_activity[target_key] = [t for t in history if t.timestamp() >= cutoff]
 
-    count = len(_recent_activity[asset_path])
+    count = len(_recent_activity[target_key])
     if count >= BURST_THRESHOLD:
         return (
             BURST_RISK_POINTS,
-            f"Burst activity: {count} actions on this asset within "
+            f"Burst activity: {count} actions by this user within "
             f"{BURST_WINDOW_SECONDS}s (+{BURST_RISK_POINTS})",
         )
     return 0, None
@@ -178,8 +188,8 @@ def assess_risk(activity_record: dict, classification: str = None, session_statu
 
     Args:
         activity_record: the Phase 1-2 record dict. Needs "action" and
-            "timestamp" to score anything meaningful; "asset" is used
-            (as a plain lookup key) for burst tracking.
+            "timestamp" to score anything meaningful; "user" and "device"
+            are used for per-user burst tracking (with "asset" as fallback).
         classification: the protected asset's classification from the
             Phase 4 registry (Public/Sensitive/Private/Confidential), or
             None if unavailable.
@@ -215,7 +225,7 @@ def assess_risk(activity_record: dict, classification: str = None, session_statu
         if label:
             factors.append(label)
 
-        points, label = _burst_risk(asset_path, timestamp)
+        points, label = _burst_risk(_burst_key(activity_record, asset_path), timestamp)
         score += points
         if label:
             factors.append(label)
