@@ -85,14 +85,42 @@ def _load_registry() -> dict:
         return {}
 
 
-def is_protected(path: str) -> bool:
-    """Return True if `path` is currently a protected asset."""
-    record = get_asset(path)
-    return bool(record and record.get("status") == "protected")
+def _save_registry(data: dict) -> bool:
+    """
+    Save the registry atomically: write to a temp file, then rename it
+    over the real file.
+    """
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        tmp_path = REGISTRY_FILE + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp_path, REGISTRY_FILE)
+        return True
+    except OSError as e:
+        print(f"[REGISTRY WARNING] Could not save protected asset registry: {e}")
+        return False
 
 
-def get_asset(path: str) -> Optional[dict]:
-    """Return the registry record for `path` (protected or not), or None."""
+def _backup_to_json() -> bool:
+    """
+    Best-effort backup of all SQLite assets to protected_assets.json.
+    Written after each mutation but never read while SQLite works.
+    """
+    try:
+        records = database.get_all_protected_assets(only_protected=False)
+        data = {_normalize(r["path"]): r for r in records if r.get("path")}
+        return _save_registry(data)
+    except Exception as e:
+        print(f"[REGISTRY WARNING] Could not backup protected asset registry to JSON: {e}")
+        return False
+
+
+def _get_record(path: str) -> Optional[dict]:
+    """
+    Return the database record for `path`, falling back to JSON only if
+    the database raises an exception.
+    """
     try:
         return database.get_protected_asset(path)
     except Exception as e:
@@ -100,11 +128,25 @@ def get_asset(path: str) -> Optional[dict]:
         return _load_registry().get(_normalize(path))
 
 
+def is_protected(path: str) -> bool:
+    """Return True if `path` is currently a protected asset."""
+    record = _get_record(path)
+    return bool(record and record.get("status") == "protected")
+
+
+def get_asset(path: str) -> Optional[dict]:
+    """Return the registry record for `path` (protected or not), or None."""
+    return _get_record(path)
+
+
 def get_all_assets(only_protected: bool = True) -> list:
     """
     Return all registry records as a list.
     By default, only currently-protected assets are returned -- this is
     what the Monitoring Engine calls to build its watch list.
+
+    Uses the database result even when it is empty; uses JSON only if
+    the database call raises an exception.
     """
     try:
         return database.get_all_protected_assets(only_protected=only_protected)
@@ -162,10 +204,7 @@ def protect_asset(path: str, classification: str, protected_by: str = None) -> t
 
     Rejects (does not create a duplicate) if the path is already
     protected -- the caller should direct the admin to the WPF Admin
-    Control Center if they want to change its classification (see
-    change_classification() below, which still exists as the shared
-    logic that console will call -- it's just not exposed from the
-    Windows right-click menu).
+    Control Center if they want to change its classification.
     """
     if classification not in VALID_CLASSIFICATIONS:
         return False, (
@@ -179,11 +218,7 @@ def protect_asset(path: str, classification: str, protected_by: str = None) -> t
     if not os.path.exists(path):
         return False, f"Path does not exist: {path}"
 
-    try:
-        existing = database.get_protected_asset(path)
-    except Exception as e:
-        print(f"[REGISTRY WARNING] Could not read asset from SQLite: {e}")
-        existing = _load_registry().get(_normalize(path))
+    existing = _get_record(path)
 
     if existing and existing.get("status") == "protected":
         return False, (
@@ -192,22 +227,34 @@ def protect_asset(path: str, classification: str, protected_by: str = None) -> t
             f"Control Center to change its classification."
         )
 
-    asset_type = "folder" if os.path.isdir(path) else "file"
-    record = {
-        "path": existing.get("path", path) if existing else path,
-        "asset_name": os.path.basename(os.path.normpath(path)),
-        "asset_type": asset_type,
-        "classification": classification,
-        "protected_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "protected_by": protected_by or getpass.getuser(),
-        "status": "protected",
-    }
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    user = protected_by or getpass.getuser()
+
+    if existing and existing.get("status") == "unprotected":
+        record = existing
+        record["status"] = "protected"
+        record["classification"] = classification
+        record["protected_by"] = user
+        record["protected_at"] = now_str
+    else:
+        asset_type = "folder" if os.path.isdir(path) else "file"
+        record = {
+            "path": existing.get("path", path) if existing else path,
+            "asset_name": os.path.basename(os.path.normpath(path)),
+            "asset_type": asset_type,
+            "classification": classification,
+            "protected_at": now_str,
+            "protected_by": user,
+            "status": "protected",
+        }
 
     try:
         if not database.upsert_protected_asset(record):
             return False, "Failed to save the protected asset registry to SQLite."
     except Exception as e:
         return False, f"Failed to save the protected asset registry to SQLite: {e}"
+
+    _backup_to_json()
 
     # Trigger cloud sync
     try:
@@ -232,11 +279,7 @@ def change_classification(path: str, new_classification: str) -> tuple:
             f"{', '.join(VALID_CLASSIFICATIONS)}."
         )
 
-    try:
-        record = database.get_protected_asset(path)
-    except Exception as e:
-        print(f"[REGISTRY WARNING] Could not read asset from SQLite: {e}")
-        record = _load_registry().get(_normalize(path))
+    record = _get_record(path)
 
     if not record or record.get("status") != "protected":
         return False, f"'{path}' is not currently protected. Nothing to change."
@@ -247,6 +290,8 @@ def change_classification(path: str, new_classification: str) -> tuple:
             return False, "Failed to save the classification change to SQLite."
     except Exception as e:
         return False, f"Failed to save the classification change to SQLite: {e}"
+
+    _backup_to_json()
 
     try:
         sync_service.trigger_sync()
@@ -265,11 +310,7 @@ def remove_protection(path: str) -> tuple:
 
     Returns (success: bool, message: str).
     """
-    try:
-        record = database.get_protected_asset(path)
-    except Exception as e:
-        print(f"[REGISTRY WARNING] Could not read asset from SQLite: {e}")
-        record = _load_registry().get(_normalize(path))
+    record = _get_record(path)
 
     if not record or record.get("status") != "protected":
         return False, f"'{path}' is not currently protected."
@@ -280,6 +321,8 @@ def remove_protection(path: str) -> tuple:
             return False, "Failed to save the protection removal to SQLite."
     except Exception as e:
         return False, f"Failed to save the protection removal to SQLite: {e}"
+
+    _backup_to_json()
 
     try:
         sync_service.trigger_sync()
