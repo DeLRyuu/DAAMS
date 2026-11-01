@@ -65,6 +65,7 @@ from config.settings import (
 )
 from core import database
 from core.asset_registry import get_all_assets, relocate_asset
+from core.clipboard_watcher import ClipboardWatcher
 from core.event_aggregator import EventAggregator, FileIndex
 from services import sync_service
 from services.activity_logger import record_activity
@@ -650,6 +651,7 @@ def start_monitoring():
 
     observer_started = False
     ticker_started = False
+    clipboard_watcher_started = False
     sync_started = False
     shutdown_status = "stopped"
     _save_heartbeat("started")
@@ -660,6 +662,9 @@ def start_monitoring():
         observer_started = True
         ticker.start()
         ticker_started = True
+        clipboard_watcher = ClipboardWatcher(get_assets=lambda: get_all_assets(only_protected=True))
+        clipboard_watcher.start()
+        clipboard_watcher_started = True
         reconcile(initial=True)
 
         if not previous_assets:
@@ -707,6 +712,12 @@ def start_monitoring():
                 ticker.join()
             except Exception:
                 logger.exception("Could not stop the event ticker cleanly")
+        if clipboard_watcher_started:
+            try:
+                clipboard_watcher.stop()
+                clipboard_watcher.join()
+            except Exception:
+                logger.exception("Could not stop the clipboard watcher cleanly")
         try:
             aggregator.flush(force=True)
         except Exception:
