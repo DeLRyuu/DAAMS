@@ -64,11 +64,13 @@ public class CasesViewModel : DataSectionViewModelBase
                 ResolutionDraft = _selectedCase?.Resolution ?? string.Empty;
                 StatusError = null;
                 OnPropertyChanged(nameof(HasSelectedClosedCase));
+                OnPropertyChanged(nameof(SelectedGroup));
             }
         }
     }
 
     public bool HasSelectedClosedCase => _selectedCase != null && !_selectedCase.Status.IsOpen();
+    public string? SelectedGroup => _selectedCase?.Group;
 
     private string _notesDraft = string.Empty;
     public string NotesDraft
@@ -221,7 +223,7 @@ public class CasesViewModel : DataSectionViewModelBase
 
         if (newStatus is CaseStatus.Resolved or CaseStatus.Dismissed && string.IsNullOrWhiteSpace(CleanNote(NotesDraft)))
         {
-            StatusError = "Add a note before closing this case.";
+            StatusError = "Add a note before closing this incident.";
             SelectedCase.RefreshStatusBinding();
             return;
         }

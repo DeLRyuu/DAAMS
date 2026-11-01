@@ -79,7 +79,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         private set => SetProperty(ref _rawEventCount, value);
     }
 
-    public string CountSummary => $"{TotalCount} rows from {RawEventCount} events";
+    public string CountSummary => $"{TotalCount} rows from {RawEventCount} activities";
 
     private bool _collapseRepeats = true;
     public bool CollapseRepeats

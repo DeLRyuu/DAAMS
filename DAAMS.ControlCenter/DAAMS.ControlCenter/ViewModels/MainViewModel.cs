@@ -51,7 +51,7 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    public bool IsRangeBarVisible => CurrentSection is not (NavigationSection.Settings or NavigationSection.Devices);
+    public bool IsRangeBarVisible => CurrentSection is not (NavigationSection.Settings or NavigationSection.Devices or NavigationSection.IncidentReports);
 
     public void NavigateWith(NavigationSection section, string search)
     {
@@ -112,6 +112,8 @@ public class MainViewModel : ViewModelBase
         _settingsViewModel = new SettingsViewModel(_dbService, autoRefreshTimer, () => _firestoreConnection.StatusMessage);
         ViewContext.Current.Range = _settingsViewModel.DefaultTimeRange;
 
+        IncidentReportsViewModel = new IncidentReportsViewModel(_dbService, firestoreService);
+
         _sections = new Dictionary<NavigationSection, ViewModelBase>
         {
             [NavigationSection.Dashboard] = new DashboardViewModel(_dbService, NavigateWith),
@@ -119,6 +121,7 @@ public class MainViewModel : ViewModelBase
             [NavigationSection.ActivityLogs] = new ActivityLogsViewModel(_dbService, NavigateWith, firestoreService),
             [NavigationSection.Devices] = new DevicesViewModel(_dbService, NavigateWith, firestoreService),
             [NavigationSection.SecurityAlerts] = CasesViewModel,
+            [NavigationSection.IncidentReports] = IncidentReportsViewModel,
             [NavigationSection.Settings] = _settingsViewModel,
         };
 
@@ -284,4 +287,5 @@ public class MainViewModel : ViewModelBase
     }
 
     public CasesViewModel CasesViewModel { get; }
+    public IncidentReportsViewModel IncidentReportsViewModel { get; }
 }

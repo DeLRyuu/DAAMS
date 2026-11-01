@@ -72,7 +72,10 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         private set => SetProperty(ref _savedStatusText, value);
     }
 
-    public sealed record TimeRangeOption(TimeRange Range, string Label);
+    public sealed record TimeRangeOption(TimeRange Range, string Label)
+    {
+        public override string ToString() => Label;
+    }
 
     private TimeRange _defaultTimeRange = TimeRange.Today;
     public TimeRange DefaultTimeRange
@@ -227,13 +230,13 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     // ============================================================
     // 4. Engine Defaults (Read-only reference)
     // ============================================================
-    public string WorkingHoursText => $"{EngineDefaults.WorkStartHour:00}:00 to {EngineDefaults.WorkEndHour:00}:00";
-    public string OffHoursPenalty => $"+{EngineDefaults.OffHoursPenalty}";
-    public string NearEdgeOfHoursCaution => $"+{EngineDefaults.NearEdgePenalty}";
-    public string BurstThresholdReference => EngineDefaults.BurstThreshold.ToString(CultureInfo.InvariantCulture);
+    public string WorkingHoursText => EngineDefaults.WorkingHoursText;
+    public string OffHoursPenalty => EngineDefaults.OffHoursText;
+    public string NearEdgeOfHoursCaution => EngineDefaults.NearEdgeText;
+    public string BurstThresholdReference => EngineDefaults.BurstText;
     public string ClassificationWeightsText => EngineDefaults.ClassificationText;
     public string ActionWeightsText => EngineDefaults.ActionText;
-    public string RiskBandsText => "Low 0 to 24, Medium 25 to 49, High 50 to 74, Critical 75 and above";
+    public string RiskBandsText => EngineDefaults.RiskBandsText;
 
     // ============================================================
     // 5. Inactive / Legacy Configuration Properties
@@ -491,7 +494,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
                 }
                 else
                 {
-                    LastEventReceivedText = "No events recorded";
+                    LastEventReceivedText = "No activities recorded";
                 }
             }
             catch

@@ -198,7 +198,7 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
                 return;
             }
 
-            var prompt = new PinPromptWindow(_db, "Applies to future events only. Enter admin PIN to change classification.")
+            var prompt = new PinPromptWindow(_db, "Applies to future activities only. Enter admin PIN to change classification.")
             {
                 Owner = System.Windows.Application.Current?.MainWindow
             };
@@ -339,7 +339,8 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
         List<ProtectedAsset> assets = await _db.GetProtectedAssetsAsync();
         try
         {
-            _cachedLogs = await _db.GetActivityLogsAsync();
+            var rawLogs = await _db.GetActivityLogsAsync();
+            _cachedLogs = ActivityCollapser.Collapse(rawLogs);
         }
         catch (Exception ex)
         {
@@ -366,7 +367,7 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
     protected override void LoadSampleFallbackCore()
     {
         List<ProtectedAsset> assets = MockDataProvider.GetProtectedAssets();
-        _cachedLogs = new();
+        _cachedLogs = ActivityCollapser.Collapse(MockDataProvider.GetActivityLog());
         _cachedCases = new();
         ComputeUsageContext(assets);
         _registeredAssets = assets;

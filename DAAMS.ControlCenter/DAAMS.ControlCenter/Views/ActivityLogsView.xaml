@@ -116,9 +116,15 @@
             <Border Style="{StaticResource Surface.Card}" Padding="18,6,18,10"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
                 <DataGrid ItemsSource="{Binding Activity}" Style="{StaticResource Grid.Data}"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           RowDetailsVisibilityMode="{Binding RowDetailsVisibilityMode}">
                     <DataGrid.GroupStyle>
                         <GroupStyle>
+                            <GroupStyle.Panel>
+                                <ItemsPanelTemplate>
+                                    <DataGridRowsPresenter />
+                                </ItemsPanelTemplate>
+                            </GroupStyle.Panel>
                             <GroupStyle.HeaderTemplate>
                                 <DataTemplate>
                                     <Border BorderBrush="{StaticResource Brush.SurfaceAlt}" BorderThickness="0,0,0,1" Margin="0,10,0,4" Padding="0,0,0,4">
@@ -177,7 +183,7 @@
                         <DataGridTemplateColumn Width="1.1*" SortMemberPath="Classification">
                             <DataGridTemplateColumn.Header>
                                 <TextBlock Text="Classification"
-                                           ToolTip="Classification at the time of the event. It can differ from the asset's current classification." />
+                                           ToolTip="Classification at the time of the activity. It can differ from the asset's current classification." />
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -222,7 +228,7 @@
 
                                     <!-- Navigation Actions -->
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                        <Button Content="Open case" Style="{StaticResource Button.Secondary}"
+                                        <Button Content="Open incident" Style="{StaticResource Button.Secondary}"
                                                 Command="{Binding DataContext.OpenCaseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Visibility="{Binding HasMatchingCase, Converter={StaticResource BoolToVis}}"

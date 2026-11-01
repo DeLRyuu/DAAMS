@@ -69,7 +69,8 @@ public class DevicesViewModel : DataSectionViewModelBase
         var casesTask = _db.GetCasesAsync();
         await Task.WhenAll(actTask, casesTask);
 
-        var summaries = DeviceService.Build(actTask.Result, casesTask.Result);
+        var collapsed = ActivityCollapser.Collapse(actTask.Result);
+        var summaries = DeviceService.Build(collapsed, casesTask.Result);
         Apply(summaries);
         return summaries.Count;
     }

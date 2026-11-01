@@ -35,6 +35,9 @@
         <DataTemplate DataType="{x:Type vm:CasesViewModel}">
             <views:CasesView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:IncidentReportsViewModel}">
+            <views:IncidentReportsView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
             <views:SettingsView />
         </DataTemplate>
@@ -95,7 +98,7 @@
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.SecurityAlerts}"
                                  IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.SecurityAlerts}}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Alerts" />
+                            <TextBlock Text="Security Alerts" />
                             <Border Background="{StaticResource Brush.Accent}"
                                     CornerRadius="8" Padding="6,1" Margin="8,0,0,0"
                                     VerticalAlignment="Center"
@@ -107,6 +110,9 @@
                             </Border>
                         </StackPanel>
                     </RadioButton>
+                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Incident Reports"
+                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.IncidentReports}"
+                                 IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.IncidentReports}}" />
                     <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Settings"
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.Settings}"
                                  IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.Settings}}" />

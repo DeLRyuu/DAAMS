@@ -54,7 +54,23 @@ public class CaseItem : ViewModelBase
     public DateTime? DateResolved
     {
         get => _dateResolved;
-        set => SetProperty(ref _dateResolved, value);
+        set
+        {
+            if (SetProperty(ref _dateResolved, value))
+            {
+                OnPropertyChanged(nameof(DateResolvedText));
+            }
+        }
+    }
+
+    public string DateResolvedText
+    {
+        get
+        {
+            if (DateResolved == null) return string.Empty;
+            if (DateResolved.Value < DetectedAt) return "-";
+            return DateResolved.Value.ToString("yyyy-MM-dd HH:mm:ss");
+        }
     }
 
     private DateTime _updatedAt;

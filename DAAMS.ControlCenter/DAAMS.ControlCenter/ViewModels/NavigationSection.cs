@@ -10,5 +10,6 @@ public enum NavigationSection
     ActivityLogs,
     Devices,
     SecurityAlerts,
+    IncidentReports,
     Settings
 }

@@ -87,7 +87,7 @@
                                                     <Run Text="{Binding AgeText, Mode=OneWay}" />
                                                 </TextBlock>
                                             </StackPanel>
-                                            <Button Grid.Column="3" Content="Open case" Style="{StaticResource Button.Secondary}"
+                                            <Button Grid.Column="3" Content="Open incident" Style="{StaticResource Button.Secondary}"
                                                     Command="{Binding DataContext.OpenCaseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}" VerticalAlignment="Center" Margin="12,0,0,0" />
                                         </Grid>
@@ -137,12 +137,12 @@
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
                             <TextBlock Text="{Binding TotalActivityLogs, Mode=OneWay}" Style="{StaticResource Text.Metric}" />
-                            <TextBlock Text="{Binding RangeLabel, Mode=OneWay, StringFormat='Events ({0})'}" Style="{StaticResource Text.Secondary}" />
+                            <TextBlock Text="{Binding RangeLabel, Mode=OneWay, StringFormat='Activities ({0})'}" Style="{StaticResource Text.Secondary}" />
                         </StackPanel>
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
                             <TextBlock Text="{Binding OpenCases}" Style="{StaticResource Text.Metric}" />
-                            <TextBlock Text="Open cases" Style="{StaticResource Text.Secondary}" />
+                            <TextBlock Text="Open incidents" Style="{StaticResource Text.Secondary}" />
                         </StackPanel>
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
@@ -310,7 +310,7 @@
                                                         <TextBlock Text="{Binding LastActivityText, StringFormat='Last activity {0}'}"
                                                                    Style="{StaticResource Text.Secondary}" />
                                                     </StackPanel>
-                                                    <TextBlock Grid.Column="1" Text="{Binding OpenCases, StringFormat='{}{0} open cases'}"
+                                                    <TextBlock Grid.Column="1" Text="{Binding OpenCases, StringFormat='{}{0} open incidents'}"
                                                                Style="{StaticResource Text.Secondary}" VerticalAlignment="Center" />
                                                 </Grid>
                                             </Button>

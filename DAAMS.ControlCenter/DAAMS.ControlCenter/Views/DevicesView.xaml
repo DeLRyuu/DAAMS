@@ -175,7 +175,7 @@
 
                                     <!-- Events 24 h -->
                                     <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                                        <TextBlock Text="Events 24 h" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Activities 24 h" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
                                         <TextBlock Text="{Binding SelectedDevice.Events24h}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                     </StackPanel>
 
@@ -183,7 +183,7 @@
 
                                     <!-- Events 7 days -->
                                     <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                                        <TextBlock Text="Events 7 days" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Activities 7 days" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
                                         <TextBlock Text="{Binding SelectedDevice.Events7d}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                     </StackPanel>
 
@@ -191,7 +191,7 @@
 
                                     <!-- Open cases -->
                                     <StackPanel Grid.Column="4" HorizontalAlignment="Center">
-                                        <TextBlock Text="Open cases" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Open incidents" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
                                         <TextBlock Text="{Binding SelectedDevice.OpenCases}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                     </StackPanel>
 
@@ -241,7 +241,7 @@
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Grid.Column="0" Text="{Binding Asset}" Style="{StaticResource Text.Body}" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Grid.Column="1" Text="{Binding Count, StringFormat='{}{0} events'}" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Count, StringFormat='{}{0} activities'}" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -271,7 +271,7 @@
                                                 <Grid VerticalAlignment="Bottom" Height="48">
                                                     <Rectangle Width="7" Height="{Binding HeightPx}" RadiusX="2" RadiusY="2" VerticalAlignment="Bottom">
                                                         <Rectangle.ToolTip>
-                                                            <MultiBinding StringFormat="{}{0}:00 to {0}:59, {1} events">
+                                                            <MultiBinding StringFormat="{}{0}:00 to {0}:59, {1} activities">
                                                                 <Binding Path="Hour" />
                                                                 <Binding Path="Count" />
                                                             </MultiBinding>

@@ -294,6 +294,7 @@
                                 </ToggleButton>
                                 <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
                                                   ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                  ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                                                   ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                                   VerticalAlignment="Center" Margin="10,0,28,0" TextBlock.Foreground="{TemplateBinding Foreground}" IsHitTestVisible="False"/>
                             </Grid>
@@ -321,6 +322,8 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <Style TargetType="ComboBox" BasedOn="{StaticResource Input.ComboBox}" />
 
     <!-- ============================================================
          RISK / SEVERITY BADGE
@@ -360,6 +363,7 @@
         <Setter Property="IsReadOnly" Value="True" />
         <Setter Property="SelectionMode" Value="Single" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Body}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
     </Style>
 
     <Style TargetType="DataGridColumnHeader">

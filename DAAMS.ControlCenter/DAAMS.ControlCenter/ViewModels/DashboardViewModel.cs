@@ -244,7 +244,9 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         RangeLabel = from;
         ShowThirtyDayHourRange = ViewContext.Current.Range == TimeRange.All;
 
-        var rangedActivity = activity
+        var collapsedActivity = ActivityCollapser.Collapse(activity);
+
+        var rangedActivity = collapsedActivity
             .Where(entry => ViewContext.Current.IsInRange(entry.Timestamp))
             .OrderByDescending(entry => entry.Timestamp)
             .ToList();
@@ -272,7 +274,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         }
 
         RecentActivity.Clear();
-        foreach (ActivityLog entry in ActivityCollapser.Collapse(rangedActivity).Take(8))
+        foreach (ActivityLog entry in rangedActivity.Take(8))
         {
             RecentActivity.Add(entry);
         }
@@ -296,7 +298,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         OnPropertyChanged(nameof(RiskHighPercent));
         OnPropertyChanged(nameof(RiskCriticalPercent));
 
-        var deviceSummaries = DeviceService.Build(activity, cases);
+        var deviceSummaries = DeviceService.Build(collapsedActivity, cases);
         var deviceNamesInRange = rangedActivity
             .Select(entry => entry.Device)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -331,7 +333,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
                 Hour = hour,
                 Label = hour % 6 == 0 ? hour.ToString("00") : string.Empty,
                 Count = hourCounts[hour],
-                HourTooltip = $"{hour}:00 to {hour}:59, {hourCounts[hour]} events",
+                HourTooltip = $"{hour}:00 to {hour}:59, {hourCounts[hour]} activities",
                 HeightPx = maxHourCount == 0 ? 4 : Math.Max(4, hourCounts[hour] * 48d / maxHourCount),
                 IsWorkHour = hour is >= 7 and <= 18
             });

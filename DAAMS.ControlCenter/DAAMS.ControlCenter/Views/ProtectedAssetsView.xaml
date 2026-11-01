@@ -189,8 +189,8 @@
                             </DataGridTemplateColumn>
 
                             <DataGridTextColumn Header="Last activity" Binding="{Binding LastActivityText}" Width="1.1*" />
-                            <DataGridTextColumn Header="Events in range" Binding="{Binding EventsInRange}" Width="1*" />
-                            <DataGridTextColumn Header="Open cases" Binding="{Binding OpenCases}" Width="0.9*" />
+                            <DataGridTextColumn Header="Activities in range" Binding="{Binding EventsInRange}" Width="1*" />
+                            <DataGridTextColumn Header="Open incidents" Binding="{Binding OpenCases}" Width="0.9*" />
 
                             <DataGridTemplateColumn Header="Highest risk" Width="1.1*">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -295,14 +295,14 @@
                             </Grid>
 
                             <!-- Open cases count -->
-                            <TextBlock Text="Open cases" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
+                            <TextBlock Text="Open incidents" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
                             <TextBlock Style="{StaticResource Text.Body}" Margin="0,0,0,14">
                                 <Run Text="{Binding SelectedAsset.OpenCases, Mode=OneWay}" FontWeight="SemiBold" />
-                                <Run Text=" active open cases" />
+                                <Run Text=" active open incidents" />
                             </TextBlock>
 
                             <!-- Last 5 events (time, action, risk badge) -->
-                            <TextBlock Text="Last 5 events" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
+                            <TextBlock Text="Last 5 activities" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
                             <ItemsControl ItemsSource="{Binding RecentEvents}" Margin="0,0,0,8">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -328,7 +328,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock Text="No events recorded" Margin="0,0,0,14">
+                            <TextBlock Text="No activities recorded" Margin="0,0,0,14">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Secondary}">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -353,7 +353,7 @@
                             <Border BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,14,0,0">
                                 <StackPanel>
                                     <TextBlock Text="Change classification" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
-                                    <TextBlock Text="Applies to future events only" Style="{StaticResource Text.Secondary}" Margin="0,0,0,8" />
+                                    <TextBlock Text="Applies to future activities only" Style="{StaticResource Text.Secondary}" Margin="0,0,0,8" />
                                     <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
