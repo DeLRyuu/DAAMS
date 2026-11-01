@@ -30,6 +30,7 @@ Preview every dialog without touching Explorer:
 """
 
 import math
+import re
 import sys
 import threading
 import time
@@ -153,6 +154,96 @@ def _wrap(text: str, font, max_width: int, chars: bool = False) -> list:
                     cur = word
         lines.append(cur)
     return lines
+
+
+def _wrap_path(path: str, font, max_width: int, max_lines: int = 3) -> list:
+    """
+    Wrap a filesystem path to `max_lines` without cutting any word in half.
+    Breaks at backslashes/slashes (or spaces). If the path exceeds max_lines,
+    shortens the middle directory segments with '…'.
+    """
+    sep = "\\" if "\\" in path else ("/" if "/" in path else "")
+    if not sep:
+        words = path.split(" ")
+        lines, cur = [], ""
+        for w in words:
+            trial = w if not cur else cur + " " + w
+            if not cur or font.measure(trial) <= max_width:
+                cur = trial
+            else:
+                lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        if len(lines) > max_lines:
+            lines = lines[:max_lines - 1] + [lines[max_lines - 1] + "…"]
+        return lines
+
+    pattern = rf"[^\/\\{re.escape(sep)}]+(?:[\/\\]|$)"
+    raw_segments = re.findall(pattern, path)
+    if not raw_segments:
+        raw_segments = [path]
+
+    def shorten_word(w: str, width: int) -> str:
+        if font.measure(w) <= width:
+            return w
+        char_w = max(1, font.measure("0"))
+        budget = max(4, width // char_w - 1)
+        head = budget // 2
+        tail = budget - head
+        short = w[:head] + "…" + w[-tail:]
+        while short and font.measure(short) > width and len(short) > 2:
+            head = max(1, head - 1)
+            tail = max(1, tail - 1)
+            short = w[:head] + "…" + w[-tail:]
+        return short
+
+    def split_segment(seg: str) -> list:
+        if font.measure(seg) <= max_width:
+            return [seg]
+        if " " in seg:
+            words = seg.split(" ")
+            tokens = []
+            for i, w in enumerate(words):
+                tokens.append(w if i == len(words) - 1 else w + " ")
+            return tokens
+        return [shorten_word(seg, max_width)]
+
+    def break_into_lines(seg_list: list) -> list:
+        lines = []
+        cur = ""
+        for seg in seg_list:
+            parts = split_segment(seg)
+            for p in parts:
+                trial = cur + p
+                if not cur or font.measure(trial) <= max_width:
+                    cur = trial
+                else:
+                    lines.append(cur)
+                    cur = p
+        if cur:
+            lines.append(cur)
+        return lines
+
+    lines = break_into_lines(raw_segments)
+    if len(lines) <= max_lines:
+        return lines
+
+    total = len(raw_segments)
+    if total <= 2:
+        return lines[:max_lines]
+
+    for keep_total in range(total - 1, 1, -1):
+        head_n = max(1, keep_total // 3)
+        tail_n = max(1, keep_total - head_n)
+        middle_marker = "…" + sep
+        shortened = raw_segments[:head_n] + [middle_marker] + raw_segments[total - tail_n:]
+        test_lines = break_into_lines(shortened)
+        if len(test_lines) <= max_lines:
+            return test_lines
+
+    fallback = [raw_segments[0], "…" + sep, raw_segments[-1]]
+    return break_into_lines(fallback)[:max_lines]
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +453,7 @@ class GlassWindow:
         self._refs = []
         self._entry = None
         self._on_enter = None
+        self._tooltips = []
 
     # ---- layout plumbing --------------------------------------------------
     def _reserve(self, h: int, gap: int = 14) -> int:
@@ -410,19 +502,51 @@ class GlassWindow:
         self._draws.append(lambda: self.canvas.create_text(
             self.x0, y0, text="\n".join(lines), anchor="nw", font=font, fill=color, state="disabled"))
 
+    def _bind_tooltip(self, tag, text: str) -> None:
+        tip_state = {"tw": None}
+
+        def show(e=None):
+            if tip_state["tw"] or self._closed or not text:
+                return
+            try:
+                x = self.root.winfo_pointerx() + 10
+                y = self.root.winfo_pointery() + 10
+                tw = tk.Toplevel(self.root)
+                tw.wm_overrideredirect(True)
+                tw.wm_geometry(f"+{x}+{y}")
+                tw.attributes("-topmost", True)
+                lbl = tk.Label(
+                    tw, text=text, justify="left",
+                    background="#1A212B", foreground="#E6EAF0",
+                    relief="solid", borderwidth=1,
+                    font=self.fonts["mono"], padx=8, pady=4,
+                )
+                lbl.pack()
+                tip_state["tw"] = tw
+                self._tooltips.append(tw)
+            except Exception:
+                pass
+
+        def hide(e=None):
+            tw = tip_state.get("tw")
+            if tw:
+                try:
+                    if tw in self._tooltips:
+                        self._tooltips.remove(tw)
+                    tw.destroy()
+                except Exception:
+                    pass
+                tip_state["tw"] = None
+
+        self.canvas.tag_bind(tag, "<Enter>", show)
+        self.canvas.tag_bind(tag, "<Leave>", hide)
+        self.canvas.tag_bind(tag, "<ButtonPress>", hide)
+
     def code_block(self, text: str, max_lines: int = 3, truncate: str = "middle") -> None:
         """Mono text on an inset glass chip -- used for paths, IDs and error details."""
         font = self.fonts["mono"]
         inner = self.cw - 28
-        cpl = max(8, inner // max(1, font.measure("0")))
-
-        if truncate == "middle" and len(text) > cpl * max_lines:
-            keep = cpl * max_lines - 1
-            head = keep // 3
-            text = text[:head] + "…" + text[-(keep - head):]
-        lines = _wrap(text, font, inner, chars=True)
-        if len(lines) > max_lines:
-            lines = lines[-max_lines:] if truncate == "tail" else lines[:max_lines]
+        lines = _wrap_path(text, font, inner, max_lines=max_lines)
 
         ls = self._linespace("mono")
         h = len(lines) * ls + 22
@@ -435,10 +559,18 @@ class GlassWindow:
             img.paste(chip, box[:2])
 
         self._bakes.append(bake)
-        self._draws.append(lambda: self.canvas.create_text(
-            self.x0 + 14, y0 + 11, text="\n".join(lines), anchor="nw",
-            font=font, fill=TEXT, state="disabled"))
 
+        tag = f"code_block_{y0}"
+
+        def draw():
+            self.canvas.create_rectangle(box[0], box[1], box[2], box[3], fill="", outline="", tags=tag)
+            self.canvas.create_text(
+                self.x0 + 14, y0 + 11, text="\n".join(lines), anchor="nw",
+                font=font, fill=TEXT, state="disabled", tags=tag)
+            self._bind_tooltip(tag, text)
+
+        self._draws.append(draw)
+
     def field(self, label: str, show: str = "•") -> None:
         h = 46
         ls = self._linespace("small")
@@ -481,39 +613,63 @@ class GlassWindow:
             {"key": ..., "label": str, "fg": "#hex", "bg": "#hex", "sub": optional str}
         Clicking a row closes the window with that item's key.
         """
-        row_h, gap = 50, 8
-        y0 = self._reserve(len(items) * row_h + (len(items) - 1) * gap)
-        badge_w = max(self.fonts["btn"].measure(i["label"]) for i in items) + 34
-        for idx, item in enumerate(items):
-            top = y0 + idx * (row_h + gap)
-            self._draws.append(partial(
-                self._draw_option, (self.x0, top, self.x1, top + row_h), item, badge_w))
+        pad_x, pad_y = 16, 10
+        gap_lines = 4
+        gap = 8
+        font_title = self.fonts["btn"]
+        font_sub = self.fonts["small"]
+        title_ls = font_title.metrics("linespace")
+        sub_ls = font_sub.metrics("linespace")
+        inner_w = self.cw - 2 * pad_x
 
-    def _draw_option(self, box: tuple, item: dict, badge_w: int) -> None:
+        row_data = []
+        for item in items:
+            sub = item.get("sub") or ""
+            if sub:
+                sub_lines = _wrap(sub, font_sub, inner_w, chars=False)
+                h = pad_y * 2 + title_ls + gap_lines + len(sub_lines) * sub_ls
+            else:
+                sub_lines = []
+                h = pad_y * 2 + title_ls
+            row_data.append((item, sub_lines, h))
+
+        total_h = sum(rd[2] for rd in row_data) + (len(items) - 1) * gap
+        y0 = self._reserve(total_h)
+
+        cur_y = y0
+        for item, sub_lines, h in row_data:
+            box = (self.x0, cur_y, self.x1, cur_y + h)
+            self._draws.append(partial(self._draw_option, box, item, sub_lines))
+            cur_y += h + gap
+
+    def _draw_option(self, box: tuple, item: dict, sub_lines: list) -> None:
         w, h = box[2] - box[0], box[3] - box[1]
-        fg, bgc = _rgb(item["fg"]), _rgb(item["bg"])
+        fg = _rgb(item["fg"])
+        bgc = _rgb(item["bg"]) if item.get("bg") else SURFACE_ALT[0]
         crop = self.bg.crop(box)
-        bx, by, bh = 14, (h - 28) // 2, 28
 
         def state(alpha, border, border_alpha):
-            im = _shape(crop, 12, fill=SURFACE_ALT[0], fill_alpha=alpha,
+            im = _shape(crop, 12, fill=bgc, fill_alpha=alpha,
                         border=border, border_alpha=border_alpha)
-            badge = _shape(im.crop((bx, by, bx + badge_w, by + bh)), 14, fill=bgc,
-                           fill_alpha=1.0, border=fg, border_alpha=0.35)
-            im.paste(badge, (bx, by))
             return self._photo(im)
 
         imgs = (state(0.55, (255, 255, 255), 0.08),
                 state(0.95, fg, 0.60),
                 state(0.35, fg, 0.60))
         image_item = self.canvas.create_image(box[0], box[1], image=imgs[0], anchor="nw")
-        self.canvas.create_text(box[0] + bx + badge_w // 2, box[1] + h // 2, text=item["label"],
-                                font=self.fonts["btn"], fill=item["fg"], state="disabled")
-        if item.get("sub"):
-            self.canvas.create_text(box[2] - 16, box[1] + h // 2, text=item["sub"], anchor="e",
-                                    font=self.fonts["mono"], fill=TEXT_DIM, state="disabled")
-        self._bind_button(image_item, imgs, lambda: self.close(item["key"]))
 
+        pad_x, pad_y = 16, 10
+        title_ls = self.fonts["btn"].metrics("linespace")
+        gap_lines = 4
+
+        self.canvas.create_text(box[0] + pad_x, box[1] + pad_y, text=item["label"],
+                                anchor="nw", font=self.fonts["btn"], fill=item["fg"], state="disabled")
+        if sub_lines:
+            desc_y = box[1] + pad_y + title_ls + gap_lines
+            self.canvas.create_text(box[0] + pad_x, desc_y, text="\n".join(sub_lines),
+                                    anchor="nw", font=self.fonts["small"], fill=TEXT_DIM, state="disabled")
+        self._bind_button(image_item, imgs, lambda: self.close(item["key"]))
+
     def progress(self) -> None:
         y0 = self._reserve(22)
         ty = y0 + 8
@@ -647,6 +803,12 @@ class GlassWindow:
             return
         self._closed = True
         self.result = value
+        for tip in getattr(self, "_tooltips", []):
+            try:
+                tip.destroy()
+            except Exception:
+                pass
+        self._tooltips.clear()
         for after_id in self._after_ids.values():
             try:
                 self.root.after_cancel(after_id)
@@ -762,7 +924,7 @@ def ask_classification(path: str, asset_type: str, classifications, sublabels: d
         fg, bg = CLASSIFICATION_COLORS.get(name, (TEXT_DIM, "#171d29"))
         items.append({"key": name, "label": name, "fg": fg, "bg": bg, "sub": sublabels.get(name)})
 
-    win = GlassWindow(width=440)
+    win = GlassWindow(width=480)
     win.header("DAAMS · Protect asset", f"Protect this {asset_type}", icon="shield")
     win.code_block(path)
     win.text("Choose a classification:", "dim")
