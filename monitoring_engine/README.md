@@ -21,3 +21,11 @@ Run the monitor from this directory with `python main.py`. Windows context menu 
 Persistent state is resolved relative to the engine package, not the process working directory. The existing `serviceAccountKey.json` credential remains at the engine root and is ignored by Git. Configure an alternate credential path with `DAAMS_FIREBASE_CREDENTIALS`.
 
 Install dependencies with `python -m pip install -r requirements.txt`.
+
+## Open detection
+
+Open (file read) detection is powered by the Windows Security audit log (Event ID 4663).
+
+- **Audit Setup**: Run `powershell -ExecutionPolicy Bypass -File tools/enable_open_audit.ps1 -Path <FileOrFolder>` as Administrator to enable File System auditing (`auditpol /set /subcategory:'File System' /success:enable`) and apply a `ReadData` Success audit rule for `Everyone` to the target path.
+- **Administrator Requirement**: Querying the Windows Security log (`wevtutil qe Security`) requires elevated administrator rights. If the engine is launched without elevation, Open detection is disabled (`Open detection is off: run the engine as Administrator`) while all other monitoring continues running normally.
+- **Reliability Note**: Open detection is the least certain detection feature. It depends on Windows audit policies, ACL inheritance, and event generation timings rather than direct filesystem hooks.

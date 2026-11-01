@@ -249,3 +249,9 @@ HASH_MAX_BYTES = 50 * 1024 * 1024
 
 # Safety cap on how many files of ONE protected folder are indexed.
 MAX_INDEXED_FILES_PER_ASSET = 2000
+
+
+# ---------------------------------------------------------------------------
+# WINDOWS AUDIT LOG OPEN DETECTION (Phase 3)
+# ---------------------------------------------------------------------------
+ENABLE_OPEN_DETECTION = os.environ.get("DAAMS_OPEN_DETECTION", "true").strip().lower() in ("true", "1", "yes")

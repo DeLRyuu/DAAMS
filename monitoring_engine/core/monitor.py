@@ -62,15 +62,24 @@ from config.settings import (
     MOVE_PAIRING_WINDOW_SECONDS,
     REGISTRY_RELOAD_INTERVAL_SECONDS,
     is_disallowed_root,
+    ENABLE_OPEN_DETECTION,
 )
 from core import database
 from core.asset_registry import get_all_assets, relocate_asset
 from core.clipboard_watcher import ClipboardWatcher
+from core.open_audit_watcher import OpenAuditWatcher
 from core.event_aggregator import EventAggregator, FileIndex
 from services import sync_service
 from services.activity_logger import record_activity
 
 FLUSH_INTERVAL_SECONDS = 0.25
+
+def _is_admin() -> bool:
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
 logger = logging.getLogger(__name__)
 
 
@@ -652,6 +661,7 @@ def start_monitoring():
     observer_started = False
     ticker_started = False
     clipboard_watcher_started = False
+    open_audit_watcher_started = False
     sync_started = False
     shutdown_status = "stopped"
     _save_heartbeat("started")
@@ -665,6 +675,15 @@ def start_monitoring():
         clipboard_watcher = ClipboardWatcher(get_assets=lambda: get_all_assets(only_protected=True))
         clipboard_watcher.start()
         clipboard_watcher_started = True
+        if ENABLE_OPEN_DETECTION and _is_admin():
+            open_audit_watcher = OpenAuditWatcher(
+                get_assets=lambda: get_all_assets(only_protected=True),
+                record=record_activity,
+            )
+            open_audit_watcher.start()
+            open_audit_watcher_started = True
+        else:
+            print("Open detection is off: run the engine as Administrator.")
         reconcile(initial=True)
 
         if not previous_assets:
@@ -718,6 +737,12 @@ def start_monitoring():
                 clipboard_watcher.join()
             except Exception:
                 logger.exception("Could not stop the clipboard watcher cleanly")
+        if open_audit_watcher_started:
+            try:
+                open_audit_watcher.stop()
+                open_audit_watcher.join()
+            except Exception:
+                logger.exception("Could not stop the open audit watcher cleanly")
         try:
             aggregator.flush(force=True)
         except Exception:
