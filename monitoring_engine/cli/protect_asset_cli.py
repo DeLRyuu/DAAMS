@@ -93,7 +93,6 @@ def _show_fatal(err: str) -> None:
 _log(f"START argv={sys.argv} exe={sys.executable} cwd={os.getcwd()}")
 
 try:
-    from config.settings import CLASSIFICATION_WEIGHTS
     from core import asset_registry as ar
     from ui import glass_ui
     from cli import pin_auth
@@ -106,6 +105,13 @@ except BaseException:
 _log("imports finished")
 
 CLASSIFICATIONS = ("Public", "Sensitive", "Private", "Confidential")
+
+CLASSIFICATION_DESCRIPTIONS = {
+    "Public": "Can generally be accessed by anyone",
+    "Sensitive": "Important information with limited access",
+    "Private": "Restricted or personal information",
+    "Confidential": "Highly sensitive, strictest protection",
+}
 
 
 def main():
@@ -136,8 +142,12 @@ def main():
         return  # Wrong PIN or cancelled -- confirm_with_pin already showed why.
     _log("PIN confirmed")
 
-    sublabels = {c: f"base risk +{CLASSIFICATION_WEIGHTS[c]}"
-                 for c in CLASSIFICATIONS if c in CLASSIFICATION_WEIGHTS}
+    sublabels = {
+        "Public": "Can generally be accessed by anyone",
+        "Sensitive": "Important information with limited access",
+        "Private": "Restricted or personal information",
+        "Confidential": "Highly sensitive, strictest protection",
+    }
     classification = glass_ui.ask_classification(path, asset_type, CLASSIFICATIONS, sublabels)
     _log(f"classification chosen: {classification}")
     if not classification:

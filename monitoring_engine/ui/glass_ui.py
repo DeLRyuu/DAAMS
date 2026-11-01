@@ -746,9 +746,17 @@ def ask_confirm(title: str, message: str, path: str = None, note: str = None,
     return bool(win.show())
 
 
+DEFAULT_CLASSIFICATION_DESCRIPTIONS = {
+    "Public": "Can generally be accessed by anyone",
+    "Sensitive": "Important information with limited access",
+    "Private": "Restricted or personal information",
+    "Confidential": "Highly sensitive, strictest protection",
+}
+
+
 def ask_classification(path: str, asset_type: str, classifications, sublabels: dict = None):
     """Classification picker. Returns the chosen classification, or None."""
-    sublabels = sublabels or {}
+    sublabels = DEFAULT_CLASSIFICATION_DESCRIPTIONS if sublabels is None else sublabels
     items = []
     for name in classifications:
         fg, bg = CLASSIFICATION_COLORS.get(name, (TEXT_DIM, "#171d29"))
@@ -810,8 +818,10 @@ if __name__ == "__main__":
                  "You are still using the DEFAULT PIN (1234).\n\nPlease change it soon by running change_pin_cli.py.")
     print("chosen:", ask_classification(
         demo_path, "file", ("Public", "Sensitive", "Private", "Confidential"),
-        {"Public": "base risk +5", "Sensitive": "base risk +15",
-         "Private": "base risk +25", "Confidential": "base risk +35"}))
+        {"Public": "Can generally be accessed by anyone",
+         "Sensitive": "Important information with limited access",
+         "Private": "Restricted or personal information",
+         "Confidential": "Highly sensitive, strictest protection"}))
     run_with_loading("Protecting... please wait.", time.sleep, 3)
     show_message("success", "Protected", f"'{demo_path}' is now protected as Sensitive.")
     print("remove:", ask_confirm("Remove protection", "Remove DAAMS protection from this file?",
