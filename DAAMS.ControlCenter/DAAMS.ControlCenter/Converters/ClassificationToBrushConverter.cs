@@ -7,9 +7,9 @@ using ControlCenter.Models;
 namespace ControlCenter.Converters;
 
 /// <summary>
-/// Maps any Classification to the violet classification brush so classification
-/// badges are visually distinct from risk-level badges (green/amber/orange/red).
-/// ConverterParameter "Bg" returns the muted background tint.
+/// Maps a Classification to a neutral grey/slate ramp:
+/// Public (light grey) -> Sensitive -> Private -> Confidential (strong tone).
+/// ConverterParameter "Bg" returns the matching background tint.
 /// </summary>
 public class ClassificationToBrushConverter : IValueConverter
 {
@@ -17,12 +17,25 @@ public class ClassificationToBrushConverter : IValueConverter
     {
         bool background = string.Equals(parameter as string, "Bg", StringComparison.OrdinalIgnoreCase);
 
-        // Classification uses a single violet family so it is never confused
-        // with the risk-level palette (green/amber/orange/red). The level itself
-        // is still shown as text; color no longer doubles as a risk signal.
-        string key = background ? "Brush.ClassificationBg" : "Brush.Classification";
+        Classification classification = Classification.Public;
+        if (value is Classification c)
+        {
+            classification = c;
+        }
+        else if (value is string s && Enum.TryParse<Classification>(s, true, out var parsed))
+        {
+            classification = parsed;
+        }
 
-        return Application.Current.Resources[key];
+        string key = classification switch
+        {
+            Classification.Sensitive => background ? "Brush.ClassSensitiveBg" : "Brush.ClassSensitive",
+            Classification.Private => background ? "Brush.ClassPrivateBg" : "Brush.ClassPrivate",
+            Classification.Confidential => background ? "Brush.ClassConfidentialBg" : "Brush.ClassConfidential",
+            _ => background ? "Brush.ClassPublicBg" : "Brush.ClassPublic"
+        };
+
+        return Application.Current.Resources[key] ?? Application.Current.Resources["Brush.TextSecondary"];
     }
 
     public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)

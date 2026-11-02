@@ -10,7 +10,7 @@
         <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="4" />
-        <Setter Property="Padding" Value="18" />
+        <Setter Property="Padding" Value="16" />
     </Style>
 
     <!-- Used only for the single primary insight — the one place elevation is earned. -->
@@ -130,7 +130,8 @@
         <Setter Property="Foreground" Value="{StaticResource Brush.TextOnAccent}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Body}" />
-        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="14,6" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Cursor" Value="Hand" />
@@ -148,6 +149,7 @@
                                 BorderThickness="2"
                                 CornerRadius="3"
                                 Opacity="0"
+                                Margin="-2"
                                 IsHitTestVisible="False" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -185,6 +187,7 @@
                                 BorderThickness="2"
                                 CornerRadius="3"
                                 Opacity="0"
+                                Margin="-2"
                                 IsHitTestVisible="False" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -236,6 +239,7 @@
                                 BorderThickness="2"
                                 CornerRadius="3"
                                 Opacity="0"
+                                Margin="-2"
                                 IsHitTestVisible="False" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -263,6 +267,7 @@
         <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="10,6" />
+        <Setter Property="MinHeight" Value="32" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Body}" />
         <Setter Property="ItemContainerStyle">
             <Setter.Value>
@@ -310,6 +315,7 @@
                                 BorderThickness="2"
                                 CornerRadius="3"
                                 Opacity="0"
+                                Margin="-2"
                                 IsHitTestVisible="False" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -381,12 +387,17 @@
     <Style TargetType="DataGridRow">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="MinHeight" Value="32" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{StaticResource Brush.SurfaceElevated}" />
             </Trigger>
             <Trigger Property="IsSelected" Value="True">
                 <Setter Property="Background" Value="{StaticResource Brush.AccentSubtleBg}" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+                <Setter Property="BorderThickness" Value="1" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -410,7 +421,7 @@
          SECTION CONTAINER — consistent page padding/spacing
          ============================================================ -->
     <Style x:Key="Layout.PageRoot" TargetType="FrameworkElement">
-        <Setter Property="Margin" Value="28" />
+        <Setter Property="Margin" Value="24" />
     </Style>
 
     <!-- ============================================================
@@ -483,10 +494,15 @@
          ============================================================ -->
     <Style x:Key="Toggle.Switch" TargetType="CheckBox">
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
-                    <Grid>
+                    <Grid VerticalAlignment="Center">
+                        <Border x:Name="FocusRing" Width="40" Height="24" CornerRadius="12"
+                                BorderBrush="{StaticResource Brush.Accent}" BorderThickness="2"
+                                Opacity="0" HorizontalAlignment="Left" IsHitTestVisible="False" Margin="-2" />
                         <Border x:Name="Track" Width="36" Height="20" CornerRadius="10"
                                 Background="{StaticResource Brush.SurfaceElevated}"
                                 BorderBrush="{StaticResource Brush.Border}" BorderThickness="1"
@@ -504,6 +520,9 @@
                             <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
                             <Setter TargetName="Thumb" Property="Margin" Value="0,0,2,0" />
                         </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -514,27 +533,41 @@
          SEGMENTED CONTROL ITEM (RadioButton)
          ============================================================ -->
     <Style x:Key="Segment.Item" TargetType="RadioButton">
-        <Setter Property="Height" Value="28" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Height" Value="32" />
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Small}" />
         <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Border"
-                            Background="Transparent"
-                            BorderBrush="{StaticResource Brush.Border}"
-                            BorderThickness="1"
-                            CornerRadius="3"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Border"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource Brush.Border}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border x:Name="FocusRing"
+                                BorderBrush="{StaticResource Brush.Accent}"
+                                BorderThickness="2"
+                                CornerRadius="3"
+                                Opacity="0"
+                                Margin="-2"
+                                IsHitTestVisible="False" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource Brush.AccentSubtleBg}" />
                             <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
                             <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -543,27 +576,41 @@
     </Style>
 
     <Style x:Key="Segment.ToggleItem" TargetType="ToggleButton">
-        <Setter Property="Height" Value="28" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Height" Value="32" />
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Small}" />
         <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="Border"
-                            Background="Transparent"
-                            BorderBrush="{StaticResource Brush.Border}"
-                            BorderThickness="1"
-                            CornerRadius="3"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Border"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource Brush.Border}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border x:Name="FocusRing"
+                                BorderBrush="{StaticResource Brush.Accent}"
+                                BorderThickness="2"
+                                CornerRadius="3"
+                                Opacity="0"
+                                Margin="-2"
+                                IsHitTestVisible="False" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource Brush.AccentSubtleBg}" />
                             <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
                             <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

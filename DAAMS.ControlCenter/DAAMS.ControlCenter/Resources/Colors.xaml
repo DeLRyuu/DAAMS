@@ -21,7 +21,7 @@
     <!-- Text -->
     <Color x:Key="Color.TextPrimary">#E6EAF0</Color>
     <Color x:Key="Color.TextSecondary">#8D98A8</Color>
-    <Color x:Key="Color.TextTertiary">#7F8999</Color>
+    <Color x:Key="Color.TextTertiary">#8D98A8</Color>
     <Color x:Key="Color.TextOnAccent">#06121C</Color>
 
     <!-- Single controlled accent -->
@@ -30,22 +30,40 @@
     <Color x:Key="Color.AccentSubtleBg">#132433</Color>
 
     <!-- Risk / severity semantics — the ONLY place color varies by category -->
-    <Color x:Key="Color.RiskLow">#3DBE72</Color>
-    <Color x:Key="Color.RiskMedium">#D9A93B</Color>
-    <Color x:Key="Color.RiskHigh">#E0762F</Color>
-    <Color x:Key="Color.RiskCritical">#E0453F</Color>
+    <Color x:Key="Color.RiskLow">#4ADE80</Color>
+    <Color x:Key="Color.RiskMedium">#FACC15</Color>
+    <Color x:Key="Color.RiskHigh">#FB923C</Color>
+    <Color x:Key="Color.RiskCritical">#F87171</Color>
 
     <Color x:Key="Color.RiskLowBg">#12241B</Color>
     <Color x:Key="Color.RiskMediumBg">#2A2312</Color>
     <Color x:Key="Color.RiskHighBg">#2C1C10</Color>
     <Color x:Key="Color.RiskCriticalBg">#2C1414</Color>
 
-    <!-- Classification semantics — distinct from risk colors (violet) -->
-    <Color x:Key="Color.Classification">#9B6BFF</Color>
-    <Color x:Key="Color.ClassificationBg">#2A1F3D</Color>
-    <SolidColorBrush x:Key="Brush.Classification" Color="{StaticResource Color.Classification}" />
-    <SolidColorBrush x:Key="Brush.ClassificationBg" Color="{StaticResource Color.ClassificationBg}" />
+    <!-- Classification semantics: neutral ramp from light grey (Public) to strong slate tone (Confidential) -->
+    <Color x:Key="Color.ClassPublic">#94A3B8</Color>
+    <Color x:Key="Color.ClassPublicBg">#1A222D</Color>
+    <SolidColorBrush x:Key="Brush.ClassPublic" Color="{StaticResource Color.ClassPublic}" />
+    <SolidColorBrush x:Key="Brush.ClassPublicBg" Color="{StaticResource Color.ClassPublicBg}" />
 
+    <Color x:Key="Color.ClassSensitive">#CBD5E1</Color>
+    <Color x:Key="Color.ClassSensitiveBg">#243040</Color>
+    <SolidColorBrush x:Key="Brush.ClassSensitive" Color="{StaticResource Color.ClassSensitive}" />
+    <SolidColorBrush x:Key="Brush.ClassSensitiveBg" Color="{StaticResource Color.ClassSensitiveBg}" />
+
+    <Color x:Key="Color.ClassPrivate">#E2E8F0</Color>
+    <Color x:Key="Color.ClassPrivateBg">#334155</Color>
+    <SolidColorBrush x:Key="Brush.ClassPrivate" Color="{StaticResource Color.ClassPrivate}" />
+    <SolidColorBrush x:Key="Brush.ClassPrivateBg" Color="{StaticResource Color.ClassPrivateBg}" />
+
+    <Color x:Key="Color.ClassConfidential">#F8FAFC</Color>
+    <Color x:Key="Color.ClassConfidentialBg">#475569</Color>
+    <SolidColorBrush x:Key="Brush.ClassConfidential" Color="{StaticResource Color.ClassConfidential}" />
+    <SolidColorBrush x:Key="Brush.ClassConfidentialBg" Color="{StaticResource Color.ClassConfidentialBg}" />
+
+    <!-- Fallback aliases for any legacy references -->
+    <SolidColorBrush x:Key="Brush.Classification" Color="{StaticResource Color.ClassPublic}" />
+    <SolidColorBrush x:Key="Brush.ClassificationBg" Color="{StaticResource Color.ClassPublicBg}" />
     <!-- Status semantics -->
     <Color x:Key="Color.StatusPositive">#3DBE72</Color>
     <Color x:Key="Color.StatusNeutral">#8D98A8</Color>

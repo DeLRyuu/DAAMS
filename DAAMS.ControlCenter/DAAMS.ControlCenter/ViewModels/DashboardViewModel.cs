@@ -111,6 +111,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
     public ICommand OpenCaseCommand { get; }
     public ICommand OpenDeviceCommand { get; }
     public ICommand ViewAllActivityCommand { get; }
+    public ICommand ViewAllCasesCommand { get; }
 
     public DashboardViewModel(LocalDatabaseService db, Action<NavigationSection, string> navigateWith)
     {
@@ -136,6 +137,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
             }
         });
         ViewAllActivityCommand = new RelayCommand(_ => _navigateWith(NavigationSection.ActivityLogs, string.Empty));
+        ViewAllCasesCommand = new RelayCommand(_ => _navigateWith(NavigationSection.SecurityAlerts, string.Empty));
         ViewContext.Current.RangeChanged += () => _ = RefreshAsync();
     }
 
@@ -297,7 +299,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
                 Label = hour % 6 == 0 ? $"{hour:D2}:00" : string.Empty,
                 Count = hourCounts[hour],
                 HourTooltip = $"{hour:D2}:00 to {hour:D2}:59, {hourCounts[hour]} {(hourCounts[hour] == 1 ? "activity" : "activities")}",
-                HeightPx = maxHourCount == 0 ? 4 : Math.Max(4, hourCounts[hour] * 48d / maxHourCount),
+                HeightPx = (maxHourCount == 0 || hourCounts[hour] == 0) ? 0 : Math.Max(4, hourCounts[hour] * 48d / maxHourCount),
                 IsWorkHour = hour is >= 7 and <= 18
             });
         }

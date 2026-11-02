@@ -1,17 +1,18 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <FontFamily x:Key="Font.Primary">Segoe UI</FontFamily>
     <FontFamily x:Key="Font.Mono">Consolas</FontFamily>
 
-    <!-- Type scale kept deliberately small — this is a data-dense monitoring app,
-         not a marketing page. Sizes exist to create hierarchy, not decoration. -->
-    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="FontSize.Display">30</sys:Double>
-    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="FontSize.Title">20</sys:Double>
-    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="FontSize.Heading">15</sys:Double>
-    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="FontSize.Body">13</sys:Double>
-    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="FontSize.Small">11.5</sys:Double>
-    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="FontSize.Micro">10.5</sys:Double>
+    <!-- Type scale: 12, 13, 14, 16, 20, 28. Nothing below 12. -->
+    <sys:Double x:Key="FontSize.Display">28</sys:Double>
+    <sys:Double x:Key="FontSize.Title">20</sys:Double>
+    <sys:Double x:Key="FontSize.Heading">16</sys:Double>
+    <sys:Double x:Key="FontSize.Subtitle">14</sys:Double>
+    <sys:Double x:Key="FontSize.Body">13</sys:Double>
+    <sys:Double x:Key="FontSize.Small">12</sys:Double>
+    <sys:Double x:Key="FontSize.Micro">12</sys:Double>
 
     <Style x:Key="Text.Display" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Primary}" />
@@ -48,34 +49,39 @@
         <Setter Property="FontFamily" Value="{StaticResource Font.Primary}" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Small}" />
         <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+        <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
     </Style>
 
     <Style x:Key="Text.Label" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Primary}" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Micro}" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource Brush.TextTertiary}" />
+        <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
         <Setter Property="TextAlignment" Value="Left" />
+        <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
     </Style>
 
     <Style x:Key="Text.Metric" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Primary}" />
-        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontSize" Value="{StaticResource FontSize.Display}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+        <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
     </Style>
 
     <Style x:Key="Text.MetricLarge" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Primary}" />
-        <Setter Property="FontSize" Value="44" />
+        <Setter Property="FontSize" Value="{StaticResource FontSize.Display}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+        <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
     </Style>
 
     <Style x:Key="Text.Mono" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Mono}" />
         <Setter Property="FontSize" Value="{StaticResource FontSize.Small}" />
         <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+        <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
     </Style>
 
 </ResourceDictionary>

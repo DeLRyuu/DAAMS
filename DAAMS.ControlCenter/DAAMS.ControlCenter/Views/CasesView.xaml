@@ -102,6 +102,8 @@
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                             <Setter Property="Padding" Value="0" />
                             <Setter Property="Margin" Value="0,0,0,6" />
+                            <Setter Property="MinHeight" Value="32" />
+                            <Setter Property="Cursor" Value="Hand" />
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="{x:Type ListBoxItem}">
@@ -125,6 +127,9 @@
                                                 <Setter TargetName="SelectionBar" Property="Background" Value="{StaticResource Brush.Accent}" />
                                                 <Setter TargetName="ItemBackground" Property="Background" Value="{StaticResource Brush.AccentSubtleBg}" />
                                                 <Setter TargetName="ItemBackground" Property="BorderBrush" Value="{StaticResource Brush.AccentMuted}" />
+                                            </Trigger>
+                                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                                <Setter TargetName="ItemBackground" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -202,10 +207,10 @@
                                             </MultiBinding>
                                         </TextBlock.Text>
                                     </TextBlock>
-                                    <Button Content="View activity for this asset" Height="26" Padding="8,2"
+                                    <Button Content="View activity for this asset" MinHeight="32" Height="32" Padding="10,4"
                                             FontSize="{StaticResource FontSize.Small}" Style="{StaticResource Button.Secondary}" Margin="0,0,8,0"
                                             Command="{Binding DataContext.ViewActivityCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
-                                    <Button Content="View this device" Height="26" Padding="8,2"
+                                    <Button Content="View this device" MinHeight="32" Height="32" Padding="10,4"
                                             FontSize="{StaticResource FontSize.Small}" Style="{StaticResource Button.Secondary}"
                                             Command="{Binding DataContext.ViewDeviceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                                 </WrapPanel>

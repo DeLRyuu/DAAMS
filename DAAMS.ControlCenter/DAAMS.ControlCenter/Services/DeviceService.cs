@@ -80,11 +80,7 @@ public static class DeviceService
             for (int h = 0; h < 24; h++)
             {
                 int count = hourCounts[h];
-                double heightPx = 4;
-                if (maxHour > 0 && count > 0)
-                {
-                    heightPx = 4.0 + ((double)count / maxHour) * 44.0;
-                }
+                double heightPx = (maxHour > 0 && count > 0) ? Math.Max(4, ((double)count / maxHour) * 44.0) : 0;
                 bool isWorkHour = (h >= 7 && h <= 18);
                 hourBars.Add(new DeviceHourBar(h, heightPx, isWorkHour, count));
             }

@@ -6,8 +6,8 @@
         xmlns:conv="clr-namespace:ControlCenter.Converters"
         xmlns:svc="clr-namespace:ControlCenter.Services"
         Title="DAAMS Control Center"
-        Height="820" Width="1360"
-        MinHeight="700" MinWidth="1100"
+        Width="1280" Height="720"
+        MinWidth="1000" MinHeight="560"
         Background="{StaticResource Brush.Background}"
         FontFamily="{StaticResource Font.Primary}"
         WindowStartupLocation="CenterScreen">
@@ -83,7 +83,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Alerts" />
                             <Border Background="{StaticResource Brush.Accent}"
-                                    CornerRadius="8" Padding="6,1" Margin="8,0,0,0"
+                                    CornerRadius="3" Padding="6,1" Margin="8,0,0,0"
                                     VerticalAlignment="Center"
                                     Visibility="{Binding CasesViewModel.HasNeedsReview, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="{Binding CasesViewModel.NeedsReviewCount, Mode=OneWay}"

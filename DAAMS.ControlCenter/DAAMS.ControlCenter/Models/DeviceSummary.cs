@@ -11,6 +11,7 @@ public record DeviceAssetCount(string Asset, int Count)
 public record DeviceHourBar(int Hour, double HeightPx, bool IsWorkHour, int Count = 0)
 {
     public string TooltipText => $"{Hour:D2}:00 to {Hour:D2}:59, {Count} {(Count == 1 ? "activity" : "activities")}";
+    public string Label => Hour % 6 == 0 ? $"{Hour:D2}:00" : string.Empty;
 }
 
 public class DeviceSummary

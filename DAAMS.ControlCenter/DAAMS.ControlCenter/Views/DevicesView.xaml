@@ -53,6 +53,7 @@
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                 <Setter Property="Padding" Value="14,12" />
+                                <Setter Property="MinHeight" Value="32" />
                                 <Setter Property="Cursor" Value="Hand" />
                                 <Setter Property="Template">
                                     <Setter.Value>
@@ -67,6 +68,10 @@
                                                 </Trigger>
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource Brush.SurfaceElevated}" />
+                                                </Trigger>
+                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+                                                    <Setter TargetName="ItemBorder" Property="BorderThickness" Value="1" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -85,7 +90,7 @@
                                         <TextBlock Text="{Binding Name}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" />
                                         <TextBlock Text="{Binding LastActivityText, StringFormat='Last activity {0}'}" Style="{StaticResource Text.Secondary}" Margin="0,3,0,0" />
                                     </StackPanel>
-                                    <Border Grid.Column="1" Background="{StaticResource Brush.AccentSubtleBg}" BorderBrush="{StaticResource Brush.Accent}" BorderThickness="1" CornerRadius="10" Padding="8,2" VerticalAlignment="Center">
+                                    <Border Grid.Column="1" Background="{StaticResource Brush.AccentSubtleBg}" BorderBrush="{StaticResource Brush.Accent}" BorderThickness="1" CornerRadius="3" Padding="8,2" VerticalAlignment="Center">
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Visibility" Value="Visible" />
@@ -96,7 +101,7 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
-                                        <TextBlock Text="{Binding OpenCases, StringFormat='{}{0} open'}" FontSize="11" Foreground="{StaticResource Brush.Accent}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding OpenCases, StringFormat='{}{0} open'}" FontSize="{StaticResource FontSize.Small}" Foreground="{StaticResource Brush.Accent}" FontWeight="SemiBold" />
                                     </Border>
                                 </Grid>
                             </DataTemplate>
@@ -166,7 +171,7 @@
 
                                     <!-- Events 24 h -->
                                     <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                                        <TextBlock Text="Activities 24 h" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Activities 24 h" Style="{StaticResource Text.Secondary}" FontSize="{StaticResource FontSize.Small}" HorizontalAlignment="Center" />
                                         <TextBlock Text="{Binding SelectedDevice.Events24h}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                     </StackPanel>
 
@@ -174,7 +179,7 @@
 
                                     <!-- Events 7 days -->
                                     <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                                        <TextBlock Text="Activities 7 days" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Activities 7 days" Style="{StaticResource Text.Secondary}" FontSize="{StaticResource FontSize.Small}" HorizontalAlignment="Center" />
                                         <TextBlock Text="{Binding SelectedDevice.Events7d}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                     </StackPanel>
 
@@ -182,7 +187,7 @@
 
                                     <!-- Open cases -->
                                     <StackPanel Grid.Column="4" HorizontalAlignment="Center">
-                                        <TextBlock Text="Open incidents" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Open alerts" Style="{StaticResource Text.Secondary}" FontSize="{StaticResource FontSize.Small}" HorizontalAlignment="Center" />
                                         <TextBlock Text="{Binding SelectedDevice.OpenCases}" Style="{StaticResource Text.Body}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                     </StackPanel>
 
@@ -190,7 +195,7 @@
 
                                     <!-- Highest risk (risk-colored value) -->
                                     <StackPanel Grid.Column="6" HorizontalAlignment="Center">
-                                        <TextBlock Text="Highest risk" Style="{StaticResource Text.Secondary}" FontSize="11" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Highest risk" Style="{StaticResource Text.Secondary}" FontSize="{StaticResource FontSize.Small}" HorizontalAlignment="Center" />
                                         <TextBlock Text="{Binding SelectedDevice.HighestRisk, TargetNullValue='None'}"
                                                    Foreground="{Binding SelectedDevice.HighestRisk, Converter={StaticResource RiskBrush}}"
                                                    Style="{StaticResource Text.Body}"
@@ -249,46 +254,40 @@
                                     Padding="16,16,16,10"
                                     Margin="0,0,0,24">
                                 <StackPanel>
-                                    <!-- 24 Hour Bars -->
-                                    <ItemsControl ItemsSource="{Binding SelectedDevice.HourBars}">
+                                    <TextBlock Text="Blue: working hours (07:00 to 19:00). Grey: outside working hours." Style="{StaticResource Text.Secondary}" Margin="0,0,0,8" />
+                                    <!-- 24 Hour Bars with same layout and labels as Dashboard -->
+                                    <ItemsControl ItemsSource="{Binding SelectedDevice.HourBars}" Height="76">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <UniformGrid Rows="1" Columns="24" Height="48" VerticalAlignment="Bottom" />
+                                                <UniformGrid Rows="1" />
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid VerticalAlignment="Bottom" Height="48">
-                                                    <Rectangle Width="7" Height="{Binding HeightPx}" RadiusX="2" RadiusY="2" VerticalAlignment="Bottom" ToolTip="{Binding TooltipText}">
-                                                        <Rectangle.Style>
-                                                            <Style TargetType="Rectangle">
-                                                                <Setter Property="Fill" Value="{StaticResource Brush.TextTertiary}" />
+                                                <Grid Background="Transparent" ToolTip="{Binding TooltipText}">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <Border Grid.Row="0" Height="{Binding HeightPx}" VerticalAlignment="Bottom"
+                                                            Width="7" CornerRadius="2">
+                                                        <Border.Style>
+                                                            <Style TargetType="{x:Type Border}">
+                                                                <Setter Property="Background" Value="{StaticResource Brush.TextTertiary}" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsWorkHour}" Value="True">
-                                                                        <Setter Property="Fill" Value="{StaticResource Brush.AccentMuted}" />
+                                                                        <Setter Property="Background" Value="{StaticResource Brush.AccentMuted}" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
-                                                        </Rectangle.Style>
-                                                    </Rectangle>
+                                                        </Border.Style>
+                                                    </Border>
+                                                    <TextBlock Grid.Row="1" Text="{Binding Label}" Style="{StaticResource Text.Secondary}"
+                                                               FontSize="{StaticResource FontSize.Small}" HorizontalAlignment="Center" Margin="0,4,0,0" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-
-                                    <!-- Labels only at 0, 6, 12, 18 -->
-                                    <Grid Margin="0,8,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="00:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="1" Text="06:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="2" Text="12:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="3" Text="18:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                    </Grid>
                                 </StackPanel>
                             </Border>
 
