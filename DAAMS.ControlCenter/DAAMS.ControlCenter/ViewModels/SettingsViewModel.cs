@@ -123,10 +123,11 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     private string _autoRefreshIntervalInput = "30";
     public string AutoRefreshIntervalInput
     {
-        get => _autoRefreshIntervalInput;
+        get => string.IsNullOrWhiteSpace(_autoRefreshIntervalInput) ? "30" : _autoRefreshIntervalInput;
         set
         {
-            if (SetProperty(ref _autoRefreshIntervalInput, value))
+            string normalized = string.IsNullOrWhiteSpace(value) ? "30" : value;
+            if (SetProperty(ref _autoRefreshIntervalInput, normalized))
             {
                 ApplyAutoRefreshTimer();
                 if (!_isInitializing)
@@ -586,7 +587,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
         _startWithWindows = data.StartWithWindows;
         _autoRefreshEnabled = data.AutoRefreshEnabled;
-        _autoRefreshIntervalInput = data.AutoRefreshIntervalSeconds;
+        _autoRefreshIntervalInput = string.IsNullOrWhiteSpace(data.AutoRefreshIntervalSeconds) ? "30" : data.AutoRefreshIntervalSeconds;
         _showRiskFactorBreakdown = data.ShowRiskFactorBreakdown;
         _highlightCriticalRows = data.HighlightCriticalRows;
         _showSampleDataBanner = data.ShowSampleDataBanner;

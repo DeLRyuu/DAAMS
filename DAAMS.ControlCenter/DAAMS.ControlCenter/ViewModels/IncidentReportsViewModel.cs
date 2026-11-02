@@ -6,7 +6,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Data;
 using System.Windows.Input;
-using ControlCenter.Data;
 using ControlCenter.Models;
 using ControlCenter.Services;
 
@@ -173,8 +172,6 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
         return incidents.Count;
     }
 
-    protected override void LoadSampleFallbackCore() => Apply(MockDataProvider.GetIncidentReports());
-
     /// <summary>
     /// Adds an incident created from the Security Alerts investigation panel
     /// into the local database and visible list, persisting it across refreshes and restarts.
@@ -295,6 +292,7 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
         {
             string term = SearchText.Trim();
             bool matches = StringMatch.Has(incident.IncidentId, term)
+                           || StringMatch.Has(incident.RelatedAlertId, term)
                            || StringMatch.Has(incident.User, term)
                            || StringMatch.Has(incident.Asset, term)
                            || StringMatch.Has(incident.Description, term);

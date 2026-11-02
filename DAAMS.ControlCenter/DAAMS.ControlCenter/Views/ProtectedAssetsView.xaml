@@ -37,11 +37,7 @@
 
             <StackPanel Grid.Column="0" Orientation="Horizontal">
                 <TextBlock Text="Protected Assets" Style="{StaticResource Text.PageTitle}" />
-                <Border Background="{StaticResource Brush.RiskMediumBg}"
-                        CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
-                        Visibility="{Binding IsShowingSampleFallback, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="SAMPLE DATA — FIRESTORE UNAVAILABLE" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.RiskMedium}" />
-                </Border>
+
             </StackPanel>
 
             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
@@ -80,31 +76,12 @@
                       DisplayMemberPath="Label" />
         </Grid>
 
-        <!-- Folder breadcrumb -->
-        <Grid Grid.Row="2" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <TextBlock Text="{Binding CurrentBreadcrumb}"
-                       Style="{StaticResource Text.Secondary}"
-                       VerticalAlignment="Center"
-                       TextTrimming="CharacterEllipsis"
-                       ToolTip="{Binding CurrentFolder}" />
-            <Button Grid.Row="0" Grid.Column="1"
-                    Content="Up"
-                    Style="{StaticResource Button.Secondary}"
-                    Command="{Binding GoUpCommand}"
-                    IsEnabled="{Binding CanGoUp}" />
-            <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
-                       Text="{Binding ActionError}"
-                       Style="{StaticResource Text.Secondary}"
-                       TextWrapping="Wrap" />
-        </Grid>
+        <TextBlock Grid.Row="2"
+                   Text="{Binding ActionError}"
+                   Style="{StaticResource Text.Secondary}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,12"
+                   Visibility="{Binding ActionError, Converter={StaticResource StringToVis}}" />
 
         <!-- Content area -->
         <Grid Grid.Row="3">
@@ -353,7 +330,6 @@
                             <Border BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,14,0,0">
                                 <StackPanel>
                                     <TextBlock Text="Change classification" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
-                                    <TextBlock Text="Applies to future activities only" Style="{StaticResource Text.Secondary}" Margin="0,0,0,8" />
                                     <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -373,10 +349,6 @@
                                     </Grid>
 
                                     <TextBlock Text="Remove protection" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
-                                    <TextBlock Text="The file is not touched. Activity history is kept."
-                                               Style="{StaticResource Text.Secondary}"
-                                               TextWrapping="Wrap"
-                                               Margin="0,0,0,8" />
                                     <Button Content="Remove protection"
                                             Style="{StaticResource Button.Secondary}"
                                             Command="{Binding RemoveProtectionCommand}"
@@ -399,7 +371,7 @@
             <!-- Empty State -->
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
-                <TextBlock Text="No protected assets found in Firestore." Style="{StaticResource Text.Secondary}"
+                <TextBlock Text="No protected assets yet" Style="{StaticResource Text.Secondary}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
 
@@ -412,7 +384,6 @@
                                TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,16" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" Margin="0,0,10,0" />
-                        <Button Content="View Sample Data" Style="{StaticResource Button.Secondary}" Command="{Binding ShowSampleDataCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Border>

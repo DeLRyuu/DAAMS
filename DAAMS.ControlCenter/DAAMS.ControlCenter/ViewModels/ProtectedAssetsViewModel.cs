@@ -8,7 +8,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Data;
 using System.Windows.Input;
-using ControlCenter.Data;
 using ControlCenter.Models;
 using ControlCenter.Services;
 using ControlCenter.Views;
@@ -172,6 +171,8 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
 
         Assets = CollectionViewSource.GetDefaultView(_allAssets);
         Assets.Filter = FilterPredicate;
+        Assets.SortDescriptions.Add(new SortDescription(nameof(ProtectedAsset.HighestRisk), ListSortDirection.Descending));
+        Assets.SortDescriptions.Add(new SortDescription(nameof(ProtectedAsset.AssetName), ListSortDirection.Ascending));
 
         _selectedClassification = ClassificationOptions[0];
         _selectedStatus = StatusOptions[0];
@@ -362,18 +363,6 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
         _registeredAssets = assets;
         await RefreshCurrentFolderAsync();
         return assets.Count;
-    }
-
-    protected override void LoadSampleFallbackCore()
-    {
-        List<ProtectedAsset> assets = MockDataProvider.GetProtectedAssets();
-        _cachedLogs = ActivityCollapser.Collapse(MockDataProvider.GetActivityLog());
-        _cachedCases = new();
-        ComputeUsageContext(assets);
-        _registeredAssets = assets;
-        _folderHistory.Clear();
-        CurrentFolder = null;
-        Apply(assets);
     }
 
     private void ComputeUsageContext(IEnumerable<ProtectedAsset> assets)

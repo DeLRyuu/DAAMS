@@ -35,6 +35,7 @@ public class CasesViewModel : DataSectionViewModelBase
             if (SetProperty(ref _selectedRisk, value))
             {
                 Cases.Refresh();
+                RecomputeCounts();
             }
         }
     }
@@ -48,6 +49,7 @@ public class CasesViewModel : DataSectionViewModelBase
             if (SetProperty(ref _searchText, value))
             {
                 Cases.Refresh();
+                RecomputeCounts();
             }
         }
     }
@@ -241,10 +243,6 @@ public class CasesViewModel : DataSectionViewModelBase
         return cases.Count;
     }
 
-    protected override void LoadSampleFallbackCore()
-    {
-    }
-
     private void Apply(List<CaseItem> cases)
     {
         string? savedAlertId = SelectedCase?.AlertId;
@@ -265,9 +263,10 @@ public class CasesViewModel : DataSectionViewModelBase
 
     private void RecomputeCounts()
     {
-        TotalCount = _allCases.Count(c => ViewContext.Current.IsInRange(c.DetectedAt));
-        NeedsReviewCount = _allCases.Count(c => c.Status == CaseStatus.New);
-        OpenCount = _allCases.Count(c => c.Status.IsOpen());
+        var filtered = _allCases.Where(FilterPredicate).ToList();
+        TotalCount = filtered.Count;
+        NeedsReviewCount = filtered.Count(c => c.Status == CaseStatus.New);
+        OpenCount = filtered.Count(c => c.Status.IsOpen());
     }
 
     protected override void ApplyPendingSearch(string s)
@@ -283,7 +282,7 @@ public class CasesViewModel : DataSectionViewModelBase
         }
 
         bool inRange = ViewContext.Current.IsInRange(item.DetectedAt);
-        if (!item.Status.IsOpen() && !inRange)
+        if (!inRange)
         {
             return false;
         }

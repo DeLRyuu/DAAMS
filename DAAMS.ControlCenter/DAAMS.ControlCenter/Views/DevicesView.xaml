@@ -106,13 +106,6 @@
                     </ListBox>
                 </Border>
 
-                <!-- Under the list advisory note -->
-                <TextBlock Grid.Row="1"
-                           Text="Based on activity received by this Control Center. A device with no recent activity may simply be idle."
-                           Style="{StaticResource Text.Secondary}"
-                           TextWrapping="Wrap"
-                           Margin="4,10,4,0"
-                           FontSize="11.5" />
             </Grid>
 
             <!-- RIGHT: Device Details Card -->
@@ -152,7 +145,7 @@
                             <TextBlock Text="{Binding SelectedDevice.Name}" Style="{StaticResource Text.SectionHeading}" FontSize="20" />
                             <TextBlock Text="{Binding SelectedDevice.AccountsText, StringFormat='Windows accounts: {0}, last 7 days'}"
                                        Style="{StaticResource Text.Secondary}"
-                                       ToolTip="Accounts, not necessarily individual people"
+                                       
                                        Margin="0,4,0,16" />
 
                             <!-- Quiet inline metrics strip -->
@@ -241,7 +234,7 @@
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Grid.Column="0" Text="{Binding Asset}" Style="{StaticResource Text.Body}" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Grid.Column="1" Text="{Binding Count, StringFormat='{}{0} activities'}" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding CountText}" Style="{StaticResource Text.Secondary}" Margin="8,0,0,0" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -251,7 +244,6 @@
 
                             <!-- Activity by hour (7 days) -->
                             <TextBlock Text="Activity by hour (7 days)" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
-                            <TextBlock Text="Blue: working hours 07:00 to 19:00. Gray: outside working hours." Style="{StaticResource Text.Secondary}" Margin="0,0,0,10" TextWrapping="Wrap" />
                             <Border Background="{StaticResource Brush.SurfaceElevated}"
                                     BorderBrush="{StaticResource Brush.BorderSubtle}"
                                     BorderThickness="1"
@@ -269,13 +261,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid VerticalAlignment="Bottom" Height="48">
-                                                    <Rectangle Width="7" Height="{Binding HeightPx}" RadiusX="2" RadiusY="2" VerticalAlignment="Bottom">
-                                                        <Rectangle.ToolTip>
-                                                            <MultiBinding StringFormat="{}{0}:00 to {0}:59, {1} activities">
-                                                                <Binding Path="Hour" />
-                                                                <Binding Path="Count" />
-                                                            </MultiBinding>
-                                                        </Rectangle.ToolTip>
+                                                    <Rectangle Width="7" Height="{Binding HeightPx}" RadiusX="2" RadiusY="2" VerticalAlignment="Bottom" ToolTip="{Binding TooltipText}">
                                                         <Rectangle.Style>
                                                             <Style TargetType="Rectangle">
                                                                 <Setter Property="Fill" Value="{StaticResource Brush.TextTertiary}" />

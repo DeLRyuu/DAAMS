@@ -6,7 +6,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Data;
 using System.Windows.Input;
-using ControlCenter.Data;
 using ControlCenter.Models;
 using ControlCenter.Services;
 
@@ -174,8 +173,6 @@ public class SecurityAlertsViewModel : DataSectionViewModelBase
         Apply(alerts);
         return alerts.Count;
     }
-
-    protected override void LoadSampleFallbackCore() => Apply(MockDataProvider.GetSecurityAlerts());
 
     private void Apply(List<SecurityAlert> alerts)
     {

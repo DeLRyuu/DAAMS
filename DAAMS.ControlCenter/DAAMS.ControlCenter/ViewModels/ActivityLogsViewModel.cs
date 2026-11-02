@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
-using ControlCenter.Data;
 using ControlCenter.Models;
 using ControlCenter.Services;
 
@@ -79,7 +78,8 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         private set => SetProperty(ref _rawEventCount, value);
     }
 
-    public string CountSummary => $"{TotalCount} rows from {RawEventCount} activities";
+    public string CountSummary => $"{TotalCount} {(TotalCount == 1 ? "row" : "rows")} from {RawEventCount} {(RawEventCount == 1 ? "activity" : "activities")}";
+    public string TotalCountText => $"{TotalCount} detected {(TotalCount == 1 ? "activity" : "activities")}";
 
     private bool _collapseRepeats = true;
     public bool CollapseRepeats
@@ -90,6 +90,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
             if (SetProperty(ref _collapseRepeats, value))
             {
                 ApplyCollapsedActivity();
+                RecomputeCounts();
             }
         }
     }
@@ -103,6 +104,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
             if (SetProperty(ref _searchText, value))
             {
                 Activity.Refresh();
+                RecomputeCounts();
             }
         }
     }
@@ -161,6 +163,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
             if (SetProperty(ref _selectedAction, value))
             {
                 Activity.Refresh();
+                RecomputeCounts();
             }
         }
     }
@@ -176,6 +179,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
             if (SetProperty(ref _selectedClassification, value))
             {
                 Activity.Refresh();
+                RecomputeCounts();
             }
         }
     }
@@ -191,6 +195,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
             if (SetProperty(ref _selectedRiskLevel, value))
             {
                 Activity.Refresh();
+                RecomputeCounts();
             }
         }
     }
@@ -316,8 +321,6 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         return activity.Count;
     }
 
-    protected override void LoadSampleFallbackCore() => Apply(MockDataProvider.GetActivityLog());
-
     private void Apply(List<ActivityLog> activity)
     {
         _rawActivity.Clear();
@@ -407,9 +410,11 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
 
     private void RecomputeCounts()
     {
-        TotalCount = _allActivity.Count(a => ViewContext.Current.IsInRange(a.Timestamp));
-        RawEventCount = _rawActivity.Count(a => ViewContext.Current.IsInRange(a.Timestamp));
+        var filtered = _allActivity.Where(FilterPredicate).ToList();
+        TotalCount = filtered.Count;
+        RawEventCount = filtered.Sum(a => a.HasRepeats ? a.MergedTimestamps.Count : 1);
         OnPropertyChanged(nameof(CountSummary));
+        OnPropertyChanged(nameof(TotalCountText));
     }
 
     private bool FilterPredicate(object obj)
@@ -436,7 +441,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         if (FilterOffHours)
         {
             int hour = entry.Timestamp.Hour;
-            if (hour < EngineDefaults.WorkStartHour || hour >= EngineDefaults.WorkEndHour)
+            if (hour >= EngineDefaults.WorkStartHour && hour < EngineDefaults.WorkEndHour)
             {
                 return false;
             }

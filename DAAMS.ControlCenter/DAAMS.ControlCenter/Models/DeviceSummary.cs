@@ -3,9 +3,15 @@ using System.Collections.Generic;
 
 namespace ControlCenter.Models;
 
-public record DeviceAssetCount(string Asset, int Count);
+public record DeviceAssetCount(string Asset, int Count)
+{
+    public string CountText => $"{Count} {(Count == 1 ? "activity" : "activities")}";
+}
 
-public record DeviceHourBar(int Hour, double HeightPx, bool IsWorkHour);
+public record DeviceHourBar(int Hour, double HeightPx, bool IsWorkHour, int Count = 0)
+{
+    public string TooltipText => $"{Hour:D2}:00 to {Hour:D2}:59, {Count} {(Count == 1 ? "activity" : "activities")}";
+}
 
 public class DeviceSummary
 {

@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using ControlCenter.Data;
 using ControlCenter.Models;
 using ControlCenter.Services;
 
@@ -36,13 +35,6 @@ public class DashboardViewModel : ViewModelBase, IDataSection
     {
         get => _actionError;
         private set => SetProperty(ref _actionError, value);
-    }
-
-    private bool _isShowingSampleFallback;
-    public bool IsShowingSampleFallback
-    {
-        get => _isShowingSampleFallback;
-        private set => SetProperty(ref _isShowingSampleFallback, value);
     }
 
     private int _needsReviewCount;
@@ -116,7 +108,6 @@ public class DashboardViewModel : ViewModelBase, IDataSection
     public ObservableCollection<DashboardHourBar> ActivityByHour { get; } = new();
 
     public ICommand RefreshCommand { get; }
-    public ICommand ShowSampleDataCommand { get; }
     public ICommand OpenCaseCommand { get; }
     public ICommand OpenDeviceCommand { get; }
     public ICommand ViewAllActivityCommand { get; }
@@ -126,7 +117,6 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         _db = db;
         _navigateWith = navigateWith;
         RefreshCommand = RelayCommand.FromAsync(_ => RefreshAsync(), ex => ActionError = ex.Message);
-        ShowSampleDataCommand = new RelayCommand(_ => LoadSampleFallback());
         OpenCaseCommand = new RelayCommand(param =>
         {
             if (param is CaseItem item)
@@ -163,7 +153,6 @@ public class DashboardViewModel : ViewModelBase, IDataSection
             LoadState = DataLoadState.Loading;
         }
         ErrorMessage = null;
-        IsShowingSampleFallback = false;
 
         try
         {
@@ -194,38 +183,6 @@ public class DashboardViewModel : ViewModelBase, IDataSection
 
     protected virtual void ApplyPendingSearch(string search)
     {
-    }
-
-    private void LoadSampleFallback()
-    {
-        var cases = MockDataProvider.GetSecurityAlerts().Select(alert => new CaseItem
-        {
-            AlertId = alert.AlertId,
-            User = alert.User,
-            Device = alert.Device,
-            Asset = alert.Asset,
-            Path = alert.Path,
-            Action = alert.Action,
-            Classification = alert.Classification,
-            RiskScore = alert.RiskScore,
-            RiskLevel = alert.RiskLevel,
-            Reason = alert.Reason,
-            RiskFactors = alert.RiskFactors,
-            DetectedAt = alert.CreatedAt,
-            UpdatedAt = alert.CreatedAt,
-            Status = alert.Status switch
-            {
-                AlertStatus.Investigating => CaseStatus.Investigating,
-                AlertStatus.Resolved => CaseStatus.Resolved,
-                AlertStatus.Reviewed => CaseStatus.Dismissed,
-                _ => CaseStatus.New
-            }
-        }).ToList();
-
-        Apply(cases, MockDataProvider.GetActivityLog(), MockDataProvider.GetProtectedAssets());
-        IsShowingSampleFallback = true;
-        ErrorMessage = null;
-        LoadState = DataLoadState.Loaded;
     }
 
     private void Apply(
@@ -333,7 +290,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
                 Hour = hour,
                 Label = hour % 6 == 0 ? hour.ToString("00") : string.Empty,
                 Count = hourCounts[hour],
-                HourTooltip = $"{hour}:00 to {hour}:59, {hourCounts[hour]} activities",
+                HourTooltip = $"{hour:D2}:00 to {hour:D2}:59, {hourCounts[hour]} {(hourCounts[hour] == 1 ? "activity" : "activities")}",
                 HeightPx = maxHourCount == 0 ? 4 : Math.Max(4, hourCounts[hour] * 48d / maxHourCount),
                 IsWorkHour = hour is >= 7 and <= 18
             });

@@ -32,20 +32,13 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <TextBlock Text="Activity Logs" Style="{StaticResource Text.PageTitle}" />
-                <Border Background="{StaticResource Brush.RiskMediumBg}"
-                        CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
-                        Visibility="{Binding IsShowingSampleFallback, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="SAMPLE DATA — FIRESTORE UNAVAILABLE" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.RiskMedium}" />
-                </Border>
+                <TextBlock Text="Activities" Style="{StaticResource Text.PageTitle}" />
+
             </StackPanel>
 
             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                 <Button Content="Refresh" Style="{StaticResource Button.Secondary}" Command="{Binding RefreshCommand}" HorizontalAlignment="Right" />
-                <TextBlock HorizontalAlignment="Right" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0">
-                    <Run Text="{Binding TotalCount, Mode=OneWay}" />
-                    <Run Text=" detected activities" />
-                </TextBlock>
+                <TextBlock HorizontalAlignment="Right" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0" Text="{Binding TotalCountText, Mode=OneWay}" />
             </StackPanel>
         </Grid>
 
@@ -143,7 +136,7 @@
 
                         <DataGridTextColumn Binding="{Binding User}" Width="*" SortMemberPath="User">
                             <DataGridTextColumn.Header>
-                                <TextBlock Text="User" ToolTip="Windows account, not necessarily one individual." />
+                                <TextBlock Text="User" />
                             </DataGridTextColumn.Header>
                         </DataGridTextColumn>
 
@@ -183,7 +176,7 @@
                         <DataGridTemplateColumn Width="1.1*" SortMemberPath="Classification">
                             <DataGridTemplateColumn.Header>
                                 <TextBlock Text="Classification"
-                                           ToolTip="Classification at the time of the activity. It can differ from the asset's current classification." />
+                                           />
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -271,25 +264,24 @@
 
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loading}">
-                <TextBlock Text="Loading activity logs…" Style="{StaticResource Text.Secondary}"
+                <TextBlock Text="Loading activities…" Style="{StaticResource Text.Secondary}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
 
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
-                <TextBlock Text="No activity has been recorded in Firestore yet." Style="{StaticResource Text.Secondary}"
+                <TextBlock Text="No activities yet" Style="{StaticResource Text.Secondary}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
 
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Error}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420">
-                    <TextBlock Text="Unable to load Activity Logs" Style="{StaticResource Text.SectionHeading}" HorizontalAlignment="Center" TextAlignment="Center" />
+                    <TextBlock Text="Unable to load Activities" Style="{StaticResource Text.SectionHeading}" HorizontalAlignment="Center" TextAlignment="Center" />
                     <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource Text.Secondary}"
                                TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,16" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" Margin="0,0,10,0" />
-                        <Button Content="View Sample Data" Style="{StaticResource Button.Secondary}" Command="{Binding ShowSampleDataCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Border>

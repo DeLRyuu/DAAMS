@@ -86,7 +86,7 @@ public static class DeviceService
                     heightPx = 4.0 + ((double)count / maxHour) * 44.0;
                 }
                 bool isWorkHour = (h >= 7 && h <= 18);
-                hourBars.Add(new DeviceHourBar(h, heightPx, isWorkHour));
+                hourBars.Add(new DeviceHourBar(h, heightPx, isWorkHour, count));
             }
 
             summaries.Add(new DeviceSummary

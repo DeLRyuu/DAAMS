@@ -36,11 +36,7 @@
 
             <StackPanel Grid.Column="0" Orientation="Horizontal">
                 <TextBlock Text="Security Alerts" Style="{StaticResource Text.PageTitle}" />
-                <Border Background="{StaticResource Brush.RiskMediumBg}"
-                        CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
-                        Visibility="{Binding IsShowingSampleFallback, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="SAMPLE DATA — FIRESTORE UNAVAILABLE" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.RiskMedium}" />
-                </Border>
+
             </StackPanel>
 
             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
@@ -260,7 +256,7 @@
 
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
-                <TextBlock Text="No security alerts in Firestore. That's a good sign." Style="{StaticResource Text.Secondary}"
+                <TextBlock Text="No security alerts yet" Style="{StaticResource Text.Secondary}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
 
@@ -270,10 +266,7 @@
                     <TextBlock Text="Unable to load Security Alerts" Style="{StaticResource Text.SectionHeading}" HorizontalAlignment="Center" TextAlignment="Center" />
                     <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource Text.Secondary}"
                                TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,16" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" Margin="0,0,10,0" />
-                        <Button Content="View Sample Data" Style="{StaticResource Button.Secondary}" Command="{Binding ShowSampleDataCommand}" />
-                    </StackPanel>
+                    <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" HorizontalAlignment="Center" />
                 </StackPanel>
             </Border>
         </Grid>

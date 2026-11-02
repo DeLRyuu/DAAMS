@@ -75,10 +75,6 @@ public class DevicesViewModel : DataSectionViewModelBase
         return summaries.Count;
     }
 
-    protected override void LoadSampleFallbackCore()
-    {
-    }
-
     private void Apply(List<DeviceSummary> summaries)
     {
         var sorted = summaries

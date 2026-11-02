@@ -31,55 +31,7 @@
 
             <!-- ==================== 1. SYSTEM INFORMATION ==================== -->
             <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
-                <StackPanel>
-                    <TextBlock Text="System information" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,14" />
-
-                    <StackPanel Margin="0,0,0,12">
-                        <TextBlock Text="Version" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding ApplicationVersion}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,12">
-                        <TextBlock Text="Database path" Style="{StaticResource Text.Label}" />
-                        <Grid Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0"
-                                       Text="{Binding DatabasePath}"
-                                       Style="{StaticResource Text.Mono}"
-                                       TextTrimming="CharacterEllipsis"
-                                       ToolTip="{Binding DatabasePath}"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding DatabaseStatusText}"
-                                       Style="{StaticResource Text.Secondary}"
-                                       Margin="12,0,0,0"
-                                       VerticalAlignment="Center" />
-                        </Grid>
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,12">
-                        <TextBlock Text="Sync summary" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding SyncSummaryText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,12">
-                        <TextBlock Text="Last upload attempt" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding LastUploadAttemptText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,12">
-                        <TextBlock Text="Last activity received" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding LastEventReceivedText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                    </StackPanel>
-
-                    <StackPanel>
-                        <TextBlock Text="Firestore status" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding FirestoreConnectionStatus}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                    </StackPanel>
-                </StackPanel>
+                <TextBlock Text="DAAMS Control Center 1.0" Style="{StaticResource Text.Body}" />
             </Border>
 
             <!-- ==================== 2. DISPLAY ==================== -->
@@ -104,8 +56,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Auto-refresh interval" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Background refresh interval in seconds (10 to 300, 0 = off)."
-                                       Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBox Width="64" Height="32" HorizontalContentAlignment="Right" Style="{StaticResource Input.TextBox}" Text="{Binding AutoRefreshIntervalInput, UpdateSourceTrigger=PropertyChanged}" />
@@ -120,8 +70,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Default time range" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="The range selected when the app starts."
-                                       Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <ComboBox Grid.Column="1" Width="140" VerticalAlignment="Center"
                                   Style="{StaticResource Input.ComboBox}"
@@ -138,7 +86,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Highlight Critical rows" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Tint Critical-risk rows in Activity Logs and Alerts." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding HighlightCriticalRows}" VerticalAlignment="Center" />
                     </Grid>
@@ -150,7 +97,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Expand risk factors by default" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Show the risk factors under every row in Activity Logs." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding ShowRiskFactorBreakdown}" VerticalAlignment="Center" />
                     </Grid>
@@ -169,14 +115,12 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Show a message when a new High or Critical alert arrives" Style="{StaticResource Text.Body}" />
-                            <TextBlock Text="Displays an in-app non-blocking toast notification." Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                         </StackPanel>
                         <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding NotifyOnNewAlert}" VerticalAlignment="Center" />
                     </Grid>
 
                     <StackPanel>
                         <TextBlock Text="Email alerts" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="Email alerts are sent by the Monitoring System." Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -185,8 +129,6 @@
             <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock Text="Engine defaults" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
-                    <TextBlock Text="Read-only baseline configuration enforced by the Monitoring and Risk Assessment Engine."
-                               Style="{StaticResource Text.Secondary}" Margin="0,0,0,14" />
 
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
@@ -298,7 +240,6 @@
                         <StackPanel>
                             <TextBlock Text="Other preferences" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,8" />
                             <CheckBox Style="{StaticResource Toggle.Switch}" Content="Start Control Center with Windows" IsChecked="{Binding StartWithWindows}" Margin="0,0,0,8" />
-                            <CheckBox Style="{StaticResource Toggle.Switch}" Content="Show Sample Data banner" IsChecked="{Binding ShowSampleDataBanner}" Margin="0,0,0,8" />
                             <CheckBox Style="{StaticResource Toggle.Switch}" Content="Email notifications" IsChecked="{Binding EmailNotificationsEnabled}" Margin="0,0,0,8" />
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                 <CheckBox Style="{StaticResource Toggle.Switch}" Content="High risk" IsChecked="{Binding NotifyOnHighRisk}" Margin="0,0,16,0" />

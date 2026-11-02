@@ -64,23 +64,6 @@
                     <TextBlock Text="Control Center" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                 </StackPanel>
 
-                <!-- System status footer -->
-                <Border DockPanel.Dock="Bottom" Margin="20,0,20,20"
-                        BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                            <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource Brush.StatusPositive}" />
-                            <TextBlock Text="Local DB: 2 pending sync" ToolTip="Local DB: 2 pending sync" Style="{StaticResource Text.Secondary}"
-                                       Margin="8,0,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="7" Height="7" VerticalAlignment="Center"
-                                     Fill="{Binding FirestoreState, Converter={StaticResource FirestoreStateBrush}}" />
-                            <TextBlock Text="{Binding FirestoreStatusText}" Style="{StaticResource Text.Secondary}"
-                                       Margin="8,0,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
 
                 <!-- Nav items -->
                 <StackPanel Margin="8,0">
@@ -90,7 +73,7 @@
                     <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Protected Assets"
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.ProtectedAssets}"
                                  IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.ProtectedAssets}}" />
-                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Activity Logs" Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.ActivityLogs}" IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.ActivityLogs}, Mode=OneWay}" />
+                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Activities" Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.ActivityLogs}" IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.ActivityLogs}, Mode=OneWay}" />
                     <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Devices"
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.Devices}"
                                  IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.Devices}}" />

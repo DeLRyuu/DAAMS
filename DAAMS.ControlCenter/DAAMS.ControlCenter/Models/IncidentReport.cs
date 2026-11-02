@@ -39,6 +39,10 @@ public class IncidentReport
     /// <summary>When Resolution was recorded. Mutable, null until resolved.</summary>
     public DateTime? DateResolved { get; set; }
 
+    public string DateResolvedText => DateResolved.HasValue
+        ? (DateResolved.Value < Timestamp ? "-" : DateResolved.Value.ToString("yyyy-MM-dd HH:mm"))
+        : string.Empty;
+
     public DateTime CreatedAt { get; init; }
 
     /// <summary>Mutable — bumped whenever status/notes/resolution change.</summary>

@@ -333,15 +333,15 @@
                 </Border>
 
                 <Border Style="{StaticResource Surface.Card}" Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loading}">
-                    <TextBlock Text="Loading alerts…" Style="{StaticResource Text.Secondary}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <TextBlock Text="Loading security alerts…" Style="{StaticResource Text.Secondary}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <Border Style="{StaticResource Surface.Card}" Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
-                    <TextBlock Text="No alerts require review in this time range." Style="{StaticResource Text.Secondary}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <TextBlock Text="No security alerts yet" Style="{StaticResource Text.Secondary}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <Border Style="{StaticResource Surface.Card}" Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Error}">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Unable to load Alerts" Style="{StaticResource Text.SectionHeading}" TextAlignment="Center" />
+                        <TextBlock Text="Unable to load Security Alerts" Style="{StaticResource Text.SectionHeading}" TextAlignment="Center" />
                         <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" Margin="0,8,0,12" />
                         <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" HorizontalAlignment="Center" />
                     </StackPanel>

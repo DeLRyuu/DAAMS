@@ -35,11 +35,7 @@
 
             <StackPanel Grid.Column="0" Orientation="Horizontal">
                 <TextBlock Text="Incident Reports" Style="{StaticResource Text.PageTitle}" />
-                <Border Background="{StaticResource Brush.RiskMediumBg}"
-                        CornerRadius="3" Padding="7,2" Margin="12,4,0,0" VerticalAlignment="Center"
-                        Visibility="{Binding IsShowingSampleFallback, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="SAMPLE DATA — FIRESTORE UNAVAILABLE" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.RiskMedium}" />
-                </Border>
+
             </StackPanel>
 
             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
@@ -120,7 +116,7 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="Date resolved" Binding="{Binding DateResolved, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                        <DataGridTextColumn Header="Date resolved" Binding="{Binding DateResolvedText}" Width="1.1*" />
                     </DataGrid.Columns>
 
                     <!-- Selecting a row reveals full details + the resolution workflow. -->
@@ -229,8 +225,6 @@
                                                 </Button.Foreground>
                                             </Button>
                                         </WrapPanel>
-                                        <TextBlock Text="Marking Resolved or Dismissed records today's date as Date Resolved."
-                                                   Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0" />
 
                                         <TextBlock Text="Resolution" Style="{StaticResource Text.Secondary}" Margin="0,14,0,6" />
                                         <TextBox Style="{StaticResource Input.TextBox}"
@@ -256,7 +250,7 @@
 
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
-                <TextBlock Text="No incident reports in Firestore yet." Style="{StaticResource Text.Secondary}"
+                <TextBlock Text="No incident reports yet" Style="{StaticResource Text.Secondary}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
 
@@ -268,7 +262,6 @@
                                TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,16" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" Margin="0,0,10,0" />
-                        <Button Content="View Sample Data" Style="{StaticResource Button.Secondary}" Command="{Binding ShowSampleDataCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Border>

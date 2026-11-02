@@ -134,6 +134,14 @@ public class MainViewModel : ViewModelBase
         {
             if (param is NavigationSection section)
             {
+                if (section == NavigationSection.ActivityLogs)
+                {
+                    ViewContext.Current.PendingSearch = null;
+                    if (_sections.TryGetValue(NavigationSection.ActivityLogs, out var actVm) && actVm is ActivityLogsViewModel vm)
+                    {
+                        vm.SearchText = string.Empty;
+                    }
+                }
                 CurrentSection = section;
             }
         });

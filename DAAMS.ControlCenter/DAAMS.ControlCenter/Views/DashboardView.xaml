@@ -25,12 +25,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="Dashboard" Style="{StaticResource Text.PageTitle}" />
-                <Border Background="{StaticResource Brush.RiskMediumBg}" CornerRadius="3" Padding="7,2"
-                        Margin="12,4,0,0" VerticalAlignment="Center"
-                        Visibility="{Binding IsShowingSampleFallback, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="SAMPLE DATA - LOCAL DATABASE UNAVAILABLE" Style="{StaticResource Text.Label}"
-                               Foreground="{StaticResource Brush.RiskMedium}" />
-                </Border>
+
             </StackPanel>
             <Button Grid.Column="1" Content="Refresh" Style="{StaticResource Button.Secondary}"
                     Command="{Binding RefreshCommand}" />
@@ -78,13 +73,14 @@
                                                 <TextBlock Text="{Binding Asset}" Style="{StaticResource Text.Body}"
                                                            TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis">
-                                                    <Run Text="{Binding Action, Mode=OneWay}" />
-                                                    <Run Text=" by " />
-                                                    <Run Text="{Binding User, Mode=OneWay}" />
-                                                    <Run Text=" on " />
-                                                    <Run Text="{Binding Device, Mode=OneWay}" />
-                                                    <Run Text=", " />
-                                                    <Run Text="{Binding AgeText, Mode=OneWay}" />
+                                                    <TextBlock.Text>
+                                                        <MultiBinding StringFormat="{}{0} by {1} on {2}, {3}">
+                                                            <Binding Path="Action" Mode="OneWay" />
+                                                            <Binding Path="User" Mode="OneWay" />
+                                                            <Binding Path="Device" Mode="OneWay" />
+                                                            <Binding Path="AgeText" Mode="OneWay" />
+                                                        </MultiBinding>
+                                                    </TextBlock.Text>
                                                 </TextBlock>
                                             </StackPanel>
                                             <Button Grid.Column="3" Content="Open incident" Style="{StaticResource Button.Secondary}"
@@ -244,7 +240,6 @@
                         <Border Grid.Column="0" Style="{StaticResource Surface.Card}">
                             <StackPanel>
                                 <TextBlock Text="Activity by hour" Style="{StaticResource Text.SectionHeading}" />
-                                <TextBlock Text="Blue: working hours 07:00 to 19:00. Gray: outside working hours." Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" TextWrapping="Wrap" />
                                 <TextBlock Text="Last 30 days" Style="{StaticResource Text.Secondary}" Margin="0,3,0,10"
                                            Visibility="{Binding ShowThirtyDayHourRange, Converter={StaticResource BoolToVis}}" />
                                 <ItemsControl ItemsSource="{Binding ActivityByHour}" Height="82">
@@ -365,7 +360,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <Button Content="View all activity" Command="{Binding ViewAllActivityCommand}"
+                            <Button Content="View all in Activities" Command="{Binding ViewAllActivityCommand}"
                                     HorizontalAlignment="Left" Margin="0,12,0,0"
                                     Background="Transparent" BorderThickness="0" Padding="0"
                                     Foreground="{StaticResource Brush.Accent}" Cursor="Hand" />
@@ -381,9 +376,8 @@
             </Border>
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
-                <TextBlock Text="The local database was found but contains no records yet." Style="{StaticResource Text.Secondary}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
-                           MaxWidth="380" TextWrapping="Wrap" />
+                <TextBlock Text="No activities yet" Style="{StaticResource Text.Secondary}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <Border Style="{StaticResource Surface.Card}"
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Error}">
@@ -394,7 +388,6 @@
                                TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,16" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" Margin="0,0,10,0" />
-                        <Button Content="View Sample Data" Style="{StaticResource Button.Secondary}" Command="{Binding ShowSampleDataCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Border>
