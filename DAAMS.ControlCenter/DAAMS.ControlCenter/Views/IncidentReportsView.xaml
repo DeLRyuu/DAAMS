@@ -28,24 +28,7 @@
 
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,6">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <TextBlock Text="Incident Reports" Style="{StaticResource Text.PageTitle}" />
-
-            </StackPanel>
-
-            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                <TextBlock HorizontalAlignment="Right" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0">
-                    <Run Text="{Binding OpenCount, Mode=OneWay}" />
-                    <Run Text=" of " />
-                    <Run Text="{Binding TotalCount, Mode=OneWay}" />
-                    <Run Text=" open" />
-                </TextBlock>
-            </StackPanel>
+            <TextBlock Text="Incident Reports" Style="{StaticResource Text.PageTitle}" />
         </Grid>
 
         <!-- Toolbar -->

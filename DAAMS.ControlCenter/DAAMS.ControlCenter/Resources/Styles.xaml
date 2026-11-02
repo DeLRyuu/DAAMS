@@ -258,6 +258,7 @@
     <Style x:Key="Input.ComboBox" TargetType="ComboBox">
         <Setter Property="Background" Value="{StaticResource Brush.SurfaceAlt}" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
         <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -289,7 +290,7 @@
                             <Grid>
                                 <ToggleButton Focusable="False" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Background="Transparent" BorderThickness="0">
                                     <ToggleButton.Template>
-                                        <ControlTemplate TargetType="ToggleButton"><Grid><Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Data="M0,0 L4,4 L8,0 Z" Fill="{StaticResource Brush.TextSecondary}"/></Grid></ControlTemplate>
+                                        <ControlTemplate TargetType="ToggleButton"><Grid Background="Transparent"><Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Data="M0,0 L4,4 L8,0 Z" Fill="{StaticResource Brush.TextSecondary}"/></Grid></ControlTemplate>
                                     </ToggleButton.Template>
                                 </ToggleButton>
                                 <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"

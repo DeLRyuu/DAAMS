@@ -21,21 +21,7 @@
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" Margin="0,0,0,16">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel>
-                <TextBlock Text="Alerts" Style="{StaticResource Text.PageTitle}" />
-                <TextBlock Style="{StaticResource Text.Secondary}" Margin="0,4,0,0">
-                    <TextBlock.Text>
-                        <MultiBinding StringFormat="{}{0} need review, {1} open">
-                            <Binding Path="NeedsReviewCount" Mode="OneWay" />
-                            <Binding Path="OpenCount" Mode="OneWay" />
-                        </MultiBinding>
-                    </TextBlock.Text>
-                </TextBlock>
-            </StackPanel>
+            <TextBlock Text="Alerts" Style="{StaticResource Text.PageTitle}" />
         </Grid>
 
         <Grid Grid.Row="1">

@@ -126,14 +126,20 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         get => string.IsNullOrWhiteSpace(_autoRefreshIntervalInput) ? "30" : _autoRefreshIntervalInput;
         set
         {
-            string normalized = string.IsNullOrWhiteSpace(value) ? "30" : value;
-            if (SetProperty(ref _autoRefreshIntervalInput, normalized))
+            string val = string.IsNullOrWhiteSpace(value) ? "30" : value.Trim();
+            if (_autoRefreshIntervalInput != val)
             {
+                _autoRefreshIntervalInput = val;
+                OnPropertyChanged(nameof(AutoRefreshIntervalInput));
                 ApplyAutoRefreshTimer();
                 if (!_isInitializing)
                 {
                     SaveImmediate();
                 }
+            }
+            else
+            {
+                OnPropertyChanged(nameof(AutoRefreshIntervalInput));
             }
         }
     }

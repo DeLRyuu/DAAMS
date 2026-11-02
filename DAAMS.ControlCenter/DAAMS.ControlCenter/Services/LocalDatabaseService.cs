@@ -260,7 +260,9 @@ public class LocalDatabaseService
                     SET classification = @classification,
                         sync_status = 'PENDING',
                         updated_at = @now
-                    WHERE path = @path OR path = @path COLLATE NOCASE;
+                    WHERE path = @path
+                       OR path = @path COLLATE NOCASE
+                       OR REPLACE(TRIM(path, '/\'), '/', '\') = REPLACE(TRIM(@path, '/\'), '/', '\') COLLATE NOCASE;
                 ";
                 cmd.Parameters.AddWithValue("@classification", classification);
                 cmd.Parameters.AddWithValue("@now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));

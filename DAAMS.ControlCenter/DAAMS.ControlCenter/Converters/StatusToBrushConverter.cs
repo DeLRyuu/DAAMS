@@ -23,7 +23,7 @@ public class StatusToBrushConverter : IValueConverter
         string key = value switch
         {
             ProtectionStatus.Protected => background ? "Brush.RiskLowBg" : "Brush.StatusPositive",
-            ProtectionStatus.Unprotected => background ? "Brush.SurfaceElevated" : "Brush.StatusInactive",
+            ProtectionStatus.Unprotected => background ? "Brush.SurfaceElevated" : "Brush.TextSecondary",
 
             AlertStatus.New => background ? "Brush.AccentSubtleBg" : "Brush.Accent",
             AlertStatus.Investigating => background ? "Brush.RiskMediumBg" : "Brush.StatusWarning",

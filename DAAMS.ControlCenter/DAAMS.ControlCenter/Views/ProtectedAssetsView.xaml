@@ -31,24 +31,7 @@
 
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,6">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <TextBlock Text="Protected Assets" Style="{StaticResource Text.PageTitle}" />
-
-            </StackPanel>
-
-            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                <TextBlock HorizontalAlignment="Right" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0">
-                    <Run Text="{Binding ProtectedCount, Mode=OneWay}" />
-                    <Run Text=" of " />
-                    <Run Text="{Binding TotalCount, Mode=OneWay}" />
-                    <Run Text=" protected" />
-                </TextBlock>
-            </StackPanel>
+            <TextBlock Text="Protected Assets" Style="{StaticResource Text.PageTitle}" />
         </Grid>
 
         <!-- Toolbar -->
@@ -119,7 +102,7 @@
 
                             <DataGridTextColumn Header="Type" Binding="{Binding AssetType}" Width="0.8*" />
 
-                            <DataGridTemplateColumn Header="Classification" Width="1.1*">
+                            <DataGridTemplateColumn Header="Classification" Width="1.2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Border Style="{StaticResource Badge.Base}"
@@ -132,24 +115,20 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Status" Width="0.9*">
+                            <DataGridTemplateColumn Header="Status" Width="1.1*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Border x:Name="StatusBadge" Style="{StaticResource Badge.Base}" Background="{StaticResource Brush.SurfaceAlt}">
-                                            <TextBlock x:Name="StatusText" Text="{Binding Status}" Style="{StaticResource Badge.Text}" />
+                                        <Border Style="{StaticResource Badge.Base}"
+                                                Background="{Binding Status, Converter={StaticResource StatusBrush}, ConverterParameter=Bg}">
+                                            <TextBlock Text="{Binding Status}" Style="{StaticResource Badge.Text}"
+                                                       Foreground="{Binding Status, Converter={StaticResource StatusBrush}}" />
                                         </Border>
-                                        <DataTemplate.Triggers>
-                                            <DataTrigger Binding="{Binding Status}" Value="Unprotected">
-                                                <Setter TargetName="StatusText" Property="Foreground" Value="{StaticResource Brush.TextTertiary}" />
-                                            </DataTrigger>
-                                        </DataTemplate.Triggers>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTextColumn Header="Last activity" Binding="{Binding LastActivityText}" Width="1.1*" />
-                            <DataGridTextColumn Header="Activities in range" Binding="{Binding EventsInRange}" Width="1*" />
-                            <DataGridTextColumn Header="Open incidents" Binding="{Binding OpenCases}" Width="0.9*" />
+                            <DataGridTextColumn Header="Last activity" Binding="{Binding LastActivityText}" Width="1.2*" />
+                            <DataGridTextColumn Header="Activities" Binding="{Binding EventsInRange}" Width="1*" />
 
                             <DataGridTemplateColumn Header="Highest risk" Width="1.1*">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -173,7 +152,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTextColumn Header="Protected at" Binding="{Binding ProtectedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.1*" />
+                            <DataGridTextColumn Header="Protected at" Binding="{Binding ProtectedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.2*" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </Border>
@@ -318,7 +297,7 @@
                                         <ComboBox Grid.Column="0"
                                                   Style="{StaticResource Input.ComboBox}"
                                                   ItemsSource="{Binding AvailableClassifications}"
-                                                  SelectedItem="{Binding DrawerSelectedClassification}"
+                                                  SelectedItem="{Binding DrawerSelectedClassification, Mode=TwoWay}"
                                                   IsEnabled="{Binding IsSelectedAssetProtected}" />
                                         <Button Grid.Column="2"
                                                 Content="Change"
