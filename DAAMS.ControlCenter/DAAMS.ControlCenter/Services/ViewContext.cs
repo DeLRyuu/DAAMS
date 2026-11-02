@@ -17,7 +17,7 @@ public class ViewContext : ViewModelBase
 
     public event Action? RangeChanged;
 
-    private TimeRange _range = TimeRange.Last7Days;
+    private TimeRange _range = TimeRange.All;
     public TimeRange Range
     {
         get => _range;

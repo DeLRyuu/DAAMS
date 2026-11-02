@@ -13,6 +13,7 @@
         <conv:StatusToBrushConverter x:Key="StatusBrush" />
         <conv:RiskLevelToBrushConverter x:Key="RiskBrush" />
         <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
+        <conv:StringToVisibilityConverter x:Key="StringToVis" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
@@ -41,7 +42,6 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                <Button Content="Refresh" Style="{StaticResource Button.Secondary}" Command="{Binding RefreshCommand}" HorizontalAlignment="Right" />
                 <TextBlock HorizontalAlignment="Right" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0">
                     <Run Text="{Binding ProtectedCount, Mode=OneWay}" />
                     <Run Text=" of " />
@@ -53,27 +53,9 @@
 
         <!-- Toolbar -->
         <Grid Grid.Row="1" Margin="0,16,0,14">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="200" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="170" />
-            </Grid.ColumnDefinitions>
-
-            <TextBox Grid.Column="0" Style="{StaticResource Input.TextBox}"
+            <TextBox Style="{StaticResource Input.TextBox}"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                      Tag="Search by asset name or path…" />
-
-            <ComboBox Grid.Column="2" Style="{StaticResource Input.ComboBox}"
-                      ItemsSource="{Binding ClassificationOptions}"
-                      SelectedItem="{Binding SelectedClassification}"
-                      DisplayMemberPath="Label" />
-
-            <ComboBox Grid.Column="4" Style="{StaticResource Input.ComboBox}"
-                      ItemsSource="{Binding StatusOptions}"
-                      SelectedItem="{Binding SelectedStatus}"
-                      DisplayMemberPath="Label" />
         </Grid>
 
         <TextBlock Grid.Row="2"
@@ -235,7 +217,7 @@
                             </StackPanel>
 
                             <!-- Classification & Base risk -->
-                            <TextBlock Text="Classification &amp; base risk" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+                            <TextBlock Text="Classification" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
                                 <Border Style="{StaticResource Badge.Base}"
                                         Background="{Binding SelectedAsset.Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}">
@@ -243,9 +225,6 @@
                                                Style="{StaticResource Badge.Text}"
                                                Foreground="{Binding SelectedAsset.Classification, Converter={StaticResource ClassBrush}}" />
                                 </Border>
-                                <TextBlock Text="{Binding SelectedAsset.BaseRiskText}"
-                                           Style="{StaticResource Text.Secondary}"
-                                           Margin="10,0,0,0" VerticalAlignment="Center" />
                             </StackPanel>
 
                             <!-- Protected by and Protected at -->

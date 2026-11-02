@@ -182,7 +182,7 @@ public class CasesViewModel : DataSectionViewModelBase
                           $"User: {c.User}\n" +
                           $"Device: {c.Device}\n" +
                           $"Time: {c.DetectedAt:yyyy-MM-dd HH:mm:ss}\n" +
-                          $"Risk: {c.RiskScore} ({c.RiskLevel})\n" +
+                          $"Risk: {c.RiskLevel}\n" +
                           $"Status: {c.Status}\n" +
                           $"Notes: {NotesDraft}\n" +
                           $"Assessment: Activity detected on protected asset requires investigation.";

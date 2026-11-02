@@ -90,16 +90,7 @@
                         <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding HighlightCriticalRows}" VerticalAlignment="Center" />
                     </Grid>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Expand risk factors by default" Style="{StaticResource Text.Body}" />
-                        </StackPanel>
-                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding ShowRiskFactorBreakdown}" VerticalAlignment="Center" />
-                    </Grid>
+
                 </StackPanel>
             </Border>
 
@@ -121,58 +112,6 @@
 
                     <StackPanel>
                         <TextBlock Text="Email alerts" Style="{StaticResource Text.Label}" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- ==================== 4. ENGINE DEFAULTS ==================== -->
-            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
-                <StackPanel>
-                    <TextBlock Text="Engine defaults" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,4" />
-
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Working hours" Style="{StaticResource Text.Label}" />
-                            <TextBlock Text="{Binding WorkingHoursText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Off-hours penalty" Style="{StaticResource Text.Label}" />
-                            <TextBlock Text="{Binding OffHoursPenalty}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Near-edge caution" Style="{StaticResource Text.Label}" />
-                            <TextBlock Text="{Binding NearEdgeOfHoursCaution}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Burst threshold" Style="{StaticResource Text.Label}" />
-                            <TextBlock Text="{Binding BurstThresholdReference}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                        </StackPanel>
-                    </Grid>
-
-                    <StackPanel Margin="0,0,0,12">
-                        <TextBlock Text="Classification weights" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding ClassificationWeightsText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,12">
-                        <TextBlock Text="Action weights" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding ActionWeightsText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
-                    </StackPanel>
-
-                    <StackPanel>
-                        <TextBlock Text="Risk bands" Style="{StaticResource Text.Label}" />
-                        <TextBlock Text="{Binding RiskBandsText}" Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
                     </StackPanel>
                 </StackPanel>
             </Border>

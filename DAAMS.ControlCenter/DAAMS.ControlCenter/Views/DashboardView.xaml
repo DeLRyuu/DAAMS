@@ -27,8 +27,6 @@
                 <TextBlock Text="Dashboard" Style="{StaticResource Text.PageTitle}" />
 
             </StackPanel>
-            <Button Grid.Column="1" Content="Refresh" Style="{StaticResource Button.Secondary}"
-                    Command="{Binding RefreshCommand}" />
         </Grid>
 
         <Grid Grid.Row="1">
@@ -66,7 +64,7 @@
                                             </Grid.ColumnDefinitions>
                                             <Border Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}"
                                                     CornerRadius="3" Padding="7,4" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding RiskScore}" Style="{StaticResource Text.Label}"
+                                                <TextBlock Text="{Binding RiskLevel}" Style="{StaticResource Text.Label}"
                                                            Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
                                             </Border>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center">
@@ -348,14 +346,12 @@
                                             <TextBlock Grid.Column="1" Text="{Binding Device}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="{Binding Asset}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="3" Text="{Binding Action}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
-                                            <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Border Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}"
-                                                        CornerRadius="3" Padding="5,2">
-                                                    <TextBlock Text="{Binding RiskLevel}" Style="{StaticResource Badge.Text}"
-                                                               Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
-                                                </Border>
-                                                <TextBlock Text="{Binding RiskScore}" Style="{StaticResource Text.Secondary}" Margin="6,0,0,0" />
-                                            </StackPanel>
+                                            <Border Grid.Column="4" HorizontalAlignment="Left"
+                                                    Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}"
+                                                    CornerRadius="3" Padding="5,2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding RiskLevel}" Style="{StaticResource Badge.Text}"
+                                                           Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
+                                            </Border>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

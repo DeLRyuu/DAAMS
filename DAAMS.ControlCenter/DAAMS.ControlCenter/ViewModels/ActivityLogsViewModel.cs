@@ -221,11 +221,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         _selectedClassification = ClassificationOptions[0];
         _selectedRiskLevel = RiskLevelOptions[0];
 
-        SettingsService settingsService = new();
-        bool expandRiskFactors = settingsService.Load().ShowRiskFactorBreakdown;
-        RowDetailsVisibilityMode = expandRiskFactors
-            ? DataGridRowDetailsVisibilityMode.Visible
-            : DataGridRowDetailsVisibilityMode.VisibleWhenSelected;
+        RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.VisibleWhenSelected;
 
         Activity = CollectionViewSource.GetDefaultView(_allActivity);
         Activity.Filter = FilterPredicate;

@@ -26,8 +26,6 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock Text="Devices" Style="{StaticResource Text.PageTitle}" />
-            <Button Grid.Column="1" Content="Refresh" Style="{StaticResource Button.Secondary}"
-                    Command="{Binding RefreshCommand}" />
         </Grid>
 
         <!-- Content Area: Left list (380px) and Right card (*) -->

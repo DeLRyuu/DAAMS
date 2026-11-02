@@ -26,7 +26,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="Security Alerts" Style="{StaticResource Text.PageTitle}" />
+                <TextBlock Text="Alerts" Style="{StaticResource Text.PageTitle}" />
                 <TextBlock Style="{StaticResource Text.Secondary}" Margin="0,4,0,0">
                     <TextBlock.Text>
                         <MultiBinding StringFormat="{}{0} need review, {1} open">
@@ -36,8 +36,6 @@
                     </TextBlock.Text>
                 </TextBlock>
             </StackPanel>
-            <Button Grid.Column="1" Content="Refresh" Style="{StaticResource Button.Secondary}"
-                    Command="{Binding RefreshCommand}" VerticalAlignment="Center" />
         </Grid>
 
         <Grid Grid.Row="1">
@@ -53,13 +51,9 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                    <TextBox Style="{StaticResource Input.TextBox}" Margin="0,0,0,8"
+                    <TextBox Style="{StaticResource Input.TextBox}"
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                              Tag="Search by alert, user, device, asset, or path" />
-                    <ComboBox Style="{StaticResource Input.ComboBox}" Width="Auto"
-                              ItemsSource="{Binding RiskOptions}"
-                              SelectedItem="{Binding SelectedRisk}"
-                              DisplayMemberPath="Label" />
                 </StackPanel>
 
                 <Grid Grid.Row="1">
@@ -152,29 +146,32 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Grid>
+                            <Grid Margin="0,2">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <Border Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}"
-                                        CornerRadius="3" Padding="6,3" Margin="0,0,10,0" VerticalAlignment="Top">
-                                    <TextBlock Text="{Binding RiskScore}" Style="{StaticResource Text.Label}"
+                                <Border Grid.Column="0" Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}"
+                                        CornerRadius="3" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Top">
+                                    <TextBlock Text="{Binding RiskLevel}" Style="{StaticResource Text.Label}"
                                                Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
                                 </Border>
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="{Binding Asset}" Style="{StaticResource Text.Body}"
                                                TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis">
+                                    <TextBlock Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0">
                                         <Run Text="{Binding Action, Mode=OneWay}" />
                                         <Run Text=" by " />
                                         <Run Text="{Binding User, Mode=OneWay}" />
-                                        <Run Text=" on " />
-                                        <Run Text="{Binding Device, Mode=OneWay}" />
-                                        <Run Text=", " />
-                                        <Run Text="{Binding AgeText, Mode=OneWay}" />
+                                        <Run Text=" • " />
+                                        <Run Text="{Binding DetectedAt, StringFormat='yyyy-MM-dd HH:mm', Mode=OneWay}" />
                                     </TextBlock>
                                 </StackPanel>
+                                <Border Grid.Column="2" VerticalAlignment="Top" Margin="8,0,0,0"
+                                        Style="{StaticResource Badge.Base}" Background="{StaticResource Brush.SurfaceAlt}">
+                                    <TextBlock Text="{Binding Status}" Style="{StaticResource Badge.Text}" />
+                                </Border>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -217,14 +214,16 @@
                                                    Foreground="{Binding Classification, Converter={StaticResource ClassBrush}}"
                                                    VerticalAlignment="Center" />
                                     </Border>
-                                    <TextBlock Text="{Binding RiskScore}" FontSize="28" FontWeight="SemiBold"
-                                               Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}"
-                                               VerticalAlignment="Center" />
+                                    <Border Height="22" Background="{Binding RiskLevel, Converter={StaticResource RiskBrush}, ConverterParameter=Bg}"
+                                            CornerRadius="3" Padding="8,0" Margin="0,0,12,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding RiskLevel}" Style="{StaticResource Text.Label}"
+                                                   Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
                                     <TextBlock Style="{StaticResource Text.Secondary}" VerticalAlignment="Center"
-                                               Margin="10,0,12,0">
+                                               Margin="0,0,12,0">
                                         <TextBlock.Text>
-                                            <MultiBinding StringFormat="{}{0} risk, detected {1}">
-                                                <Binding Path="RiskLevel" Mode="OneWay" />
+                                            <MultiBinding StringFormat="{}detected {0}">
                                                 <Binding Path="AgeText" Mode="OneWay" />
                                             </MultiBinding>
                                         </TextBlock.Text>
@@ -260,14 +259,17 @@
                                            Foreground="{StaticResource Brush.RiskCritical}" TextWrapping="Wrap"
                                            Visibility="{Binding DataContext.StatusError, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource StringToVis}}" />
 
+                                <StackPanel Margin="0,0,0,10" Visibility="{Binding IncidentId, Converter={StaticResource StringToVis}}">
+                                    <TextBlock Text="Incident ID" Style="{StaticResource Text.Label}" Margin="0,0,0,2" />
+                                    <TextBlock Text="{Binding IncidentId}" Style="{StaticResource Text.Mono}" />
+                                </StackPanel>
                                 <TextBlock Text="Why it was flagged" Style="{StaticResource Text.Label}" Margin="0,14,0,6" />
                                 <TextBlock Text="{Binding Reason}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" />
                                 <ItemsControl ItemsSource="{Binding RiskFactors}" Margin="0,6,0,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" Margin="0,2">
-                                                <TextBlock Text="+" Style="{StaticResource Text.Secondary}" />
-                                                <TextBlock Text="{Binding Weight}" Style="{StaticResource Text.Secondary}" Margin="0,0,8,0" />
+                                                <TextBlock Text="•" Margin="0,0,8,0" Foreground="{StaticResource Brush.Accent}" />
                                                 <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </DataTemplate>
@@ -333,15 +335,15 @@
                 </Border>
 
                 <Border Style="{StaticResource Surface.Card}" Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loading}">
-                    <TextBlock Text="Loading security alerts…" Style="{StaticResource Text.Secondary}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <TextBlock Text="Loading alerts…" Style="{StaticResource Text.Secondary}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <Border Style="{StaticResource Surface.Card}" Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Empty}">
-                    <TextBlock Text="No security alerts yet" Style="{StaticResource Text.Secondary}"
+                    <TextBlock Text="No alerts yet" Style="{StaticResource Text.Secondary}"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <Border Style="{StaticResource Surface.Card}" Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Error}">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Unable to load Security Alerts" Style="{StaticResource Text.SectionHeading}" TextAlignment="Center" />
+                        <TextBlock Text="Unable to load Alerts" Style="{StaticResource Text.SectionHeading}" TextAlignment="Center" />
                         <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" Margin="0,8,0,12" />
                         <Button Content="Retry" Style="{StaticResource Button.Primary}" Command="{Binding RefreshCommand}" HorizontalAlignment="Center" />
                     </StackPanel>

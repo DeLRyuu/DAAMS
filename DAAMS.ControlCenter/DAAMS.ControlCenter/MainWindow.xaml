@@ -81,7 +81,7 @@
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.SecurityAlerts}"
                                  IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.SecurityAlerts}}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Security Alerts" />
+                            <TextBlock Text="Alerts" />
                             <Border Background="{StaticResource Brush.Accent}"
                                     CornerRadius="8" Padding="6,1" Margin="8,0,0,0"
                                     VerticalAlignment="Center"
@@ -93,9 +93,6 @@
                             </Border>
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Incident Reports"
-                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.IncidentReports}"
-                                 IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.IncidentReports}}" />
                     <RadioButton GroupName="MainNav" Style="{StaticResource Nav.Item}" Content="Settings"
                                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:NavigationSection.Settings}"
                                  IsChecked="{Binding CurrentSection, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:NavigationSection.Settings}}" />
@@ -105,27 +102,7 @@
 
         <!-- ==================== CONTENT ==================== -->
         <Grid Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="44" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,28,0">
-                <StackPanel Orientation="Horizontal" Visibility="{Binding IsRangeBarVisible, Converter={StaticResource BoolToVisibility}}">
-                    <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="Today" Margin="0,0,4,0"
-                                 IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Today}}" />
-                    <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="7 days" Margin="0,0,4,0"
-                                 IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Last7Days}}" />
-                    <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="30 days" Margin="0,0,4,0"
-                                 IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.Last30Days}}" />
-                    <RadioButton GroupName="TimeRangeSegment" Style="{StaticResource Segment.Item}" Content="All"
-                                 IsChecked="{Binding Range, Source={x:Static svc:ViewContext.Current}, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static svc:TimeRange.All}}" />
-                </StackPanel>
-
-                <TextBlock Text="{Binding LastUpdatedText}" Style="{StaticResource Text.Secondary}" VerticalAlignment="Center" Margin="16,0,0,0" />
-            </StackPanel>
-
-            <ContentControl Grid.Row="1" Content="{Binding CurrentViewModel}" />
+            <ContentControl Content="{Binding CurrentViewModel}" />
         </Grid>
     </Grid>
 </Window>

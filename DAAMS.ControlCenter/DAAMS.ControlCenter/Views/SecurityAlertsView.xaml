@@ -40,7 +40,6 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                <Button Content="Refresh" Style="{StaticResource Button.Secondary}" Command="{Binding RefreshCommand}" HorizontalAlignment="Right" />
                 <TextBlock HorizontalAlignment="Right" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0">
                     <Run Text="{Binding NeedsAttentionCount, Mode=OneWay}" />
                     <Run Text=" of " />
@@ -117,7 +116,7 @@
                                                        Style="{StaticResource Badge.Text}"
                                                        Foreground="{Binding RiskLevel, Converter={StaticResource RiskBrush}}" />
                                         </Border>
-                                        <TextBlock Text="{Binding RiskScore}" Style="{StaticResource Text.Secondary}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                        
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
