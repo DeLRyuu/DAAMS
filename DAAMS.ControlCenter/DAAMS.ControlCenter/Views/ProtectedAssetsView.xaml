@@ -231,10 +231,7 @@
 
                             <!-- Open cases count -->
                             <TextBlock Text="Open incidents" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
-                            <TextBlock Style="{StaticResource Text.Body}" Margin="0,0,0,14">
-                                <Run Text="{Binding SelectedAsset.OpenCases, Mode=OneWay}" FontWeight="SemiBold" />
-                                <Run Text=" active open incidents" />
-                            </TextBlock>
+                            <TextBlock Text="{Binding SelectedAsset.OpenCases, StringFormat='{}{0} active open incidents', Mode=OneWay}" Style="{StaticResource Text.Body}" Margin="0,0,0,14" />
 
                             <!-- Last 5 events (time, action, risk badge) -->
                             <TextBlock Text="Last 5 activities" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
@@ -248,7 +245,7 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Timestamp, StringFormat='MM-dd HH:mm'}"
+                                                <TextBlock Grid.Column="0" Text="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}"
                                                            Style="{StaticResource Text.Secondary}" Margin="0,0,10,0" VerticalAlignment="Center" />
                                                 <TextBlock Grid.Column="1" Text="{Binding Action}"
                                                            Style="{StaticResource Text.Body}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,8,0" />

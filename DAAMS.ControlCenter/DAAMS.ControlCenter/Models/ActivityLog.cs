@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ControlCenter.Models;
 
@@ -49,6 +50,25 @@ public class ActivityLog
     public bool HasRepeats => RepeatCount > 1;
     public string RepeatCountDisplay => RepeatCount > 1 ? $" ×{RepeatCount}" : string.Empty;
     public List<DateTime> MergedTimestamps { get; set; } = new();
+    public bool HasDistinctMergedTimestamps =>
+        HasRepeats &&
+        MergedTimestamps != null &&
+        MergedTimestamps.Distinct().Count() > 1;
+
+    public string AgeText
+    {
+        get
+        {
+            var date = Timestamp.Date;
+            var today = DateTime.Today;
+            if (date == today) return $"today at {Timestamp:HH:mm}";
+            if (date == today.AddDays(-1)) return $"yesterday at {Timestamp:HH:mm}";
+            int days = (today - date).Days;
+            if (days > 1) return $"{days} days ago";
+            return $"{Timestamp:yyyy-MM-dd HH:mm}";
+        }
+    }
+
     public string? MatchedAlertId { get; set; }
     public bool HasMatchingCase => !string.IsNullOrEmpty(MatchedAlertId);
 }

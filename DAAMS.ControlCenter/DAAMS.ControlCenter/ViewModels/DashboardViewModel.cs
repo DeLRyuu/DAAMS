@@ -288,7 +288,7 @@ public class DashboardViewModel : ViewModelBase, IDataSection
             ActivityByHour.Add(new DashboardHourBar
             {
                 Hour = hour,
-                Label = hour % 6 == 0 ? hour.ToString("00") : string.Empty,
+                Label = hour % 6 == 0 ? $"{hour:D2}:00" : string.Empty,
                 Count = hourCounts[hour],
                 HourTooltip = $"{hour:D2}:00 to {hour:D2}:59, {hourCounts[hour]} {(hourCounts[hour] == 1 ? "activity" : "activities")}",
                 HeightPx = maxHourCount == 0 ? 4 : Math.Max(4, hourCounts[hour] * 48d / maxHourCount),

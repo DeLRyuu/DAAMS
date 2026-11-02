@@ -370,14 +370,22 @@ public class FirestoreService
                 case IDictionary<string, object> map:
                     string description = map.TryGetValue("description", out object? d) ? d?.ToString() ?? string.Empty : string.Empty;
                     int weight = map.TryGetValue("weight", out object? w) && w is not null ? Convert.ToInt32(w) : 0;
-                    if (!string.IsNullOrWhiteSpace(description))
+                    if (description.Contains("has no configured risk weight", StringComparison.OrdinalIgnoreCase))
+                    {
+                        factors.Add(new RiskFactor { Description = "Create: no risk points", Weight = 0 });
+                    }
+                    else if (weight != 0 && !string.IsNullOrWhiteSpace(description))
                     {
                         factors.Add(new RiskFactor { Description = description, Weight = weight });
                     }
                     break;
 
                 case string s when !string.IsNullOrWhiteSpace(s):
-                    factors.Add(ParseRiskFactorText(s));
+                    var parsed = ParseRiskFactorText(s);
+                    if (parsed != null)
+                    {
+                        factors.Add(parsed);
+                    }
                     break;
             }
         }
@@ -388,13 +396,23 @@ public class FirestoreService
     private static readonly Regex RiskFactorTextPattern = new(@"^(?<description>.*?)\s*\(\+?(?<weight>-?\d+)\)\s*$", RegexOptions.Compiled);
 
     /// <summary>Parses "Confidential asset (+35)" into Description="Confidential asset", Weight=35. Falls back to Weight=0 if the text doesn't match that shape.</summary>
-    private static RiskFactor ParseRiskFactorText(string text)
+    private static RiskFactor? ParseRiskFactorText(string text)
     {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+
+        if (text.Contains("has no configured risk weight", StringComparison.OrdinalIgnoreCase))
+        {
+            return new RiskFactor { Description = "Create: no risk points", Weight = 0 };
+        }
+
         Match match = RiskFactorTextPattern.Match(text);
         if (match.Success && int.TryParse(match.Groups["weight"].Value, out int weight))
         {
+            if (weight == 0) return null;
             return new RiskFactor { Description = match.Groups["description"].Value, Weight = weight };
         }
+
+        if (text.EndsWith("(+0)") || text.EndsWith("(0)")) return null;
 
         return new RiskFactor { Description = text, Weight = 0 };
     }

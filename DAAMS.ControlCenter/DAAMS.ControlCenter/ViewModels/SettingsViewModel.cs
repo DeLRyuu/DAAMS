@@ -744,4 +744,36 @@ public class SettingsViewModel : ViewModelBase, IDataSection
             ValidationMessage = "Unable to save settings. Check that the application has permission to write to your user data folder.";
         }
     }
+
+    public string EmailAlertsSummaryText
+    {
+        get
+        {
+            var enabledStr = Environment.GetEnvironmentVariable("DAAMS_EMAIL_ENABLED")?.Trim();
+            bool isEnabled = string.Equals(enabledStr, "true", StringComparison.OrdinalIgnoreCase);
+            var recipient = Environment.GetEnvironmentVariable("DAAMS_NOTIFICATION_EMAIL")?.Trim() ?? string.Empty;
+
+            if (!isEnabled)
+            {
+                return "Off";
+            }
+
+            if (string.IsNullOrEmpty(recipient))
+            {
+                return "On (recipient not configured)";
+            }
+
+            return $"On ({MaskEmail(recipient)})";
+        }
+    }
+
+    private static string MaskEmail(string email)
+    {
+        int atIndex = email.IndexOf('@');
+        if (atIndex <= 0) return email;
+        string user = email.Substring(0, atIndex);
+        string domain = email.Substring(atIndex + 1);
+        string maskedUser = user.Length > 0 ? user[0] + "***" : "***";
+        return $"{maskedUser}@{domain}";
+    }
 }

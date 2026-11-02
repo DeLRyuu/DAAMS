@@ -70,16 +70,7 @@
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Asset}" Style="{StaticResource Text.Body}"
                                                            TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis">
-                                                    <TextBlock.Text>
-                                                        <MultiBinding StringFormat="{}{0} by {1} on {2}, {3}">
-                                                            <Binding Path="Action" Mode="OneWay" />
-                                                            <Binding Path="User" Mode="OneWay" />
-                                                            <Binding Path="Device" Mode="OneWay" />
-                                                            <Binding Path="AgeText" Mode="OneWay" />
-                                                        </MultiBinding>
-                                                    </TextBlock.Text>
-                                                </TextBlock>
+                                                <TextBlock Text="{Binding SummaryText, Mode=OneWay}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
                                             <Button Grid.Column="3" Content="Open incident" Style="{StaticResource Button.Secondary}"
                                                     Command="{Binding DataContext.OpenCaseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -342,7 +333,7 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Timestamp, StringFormat='MM-dd HH:mm:ss'}" Style="{StaticResource Text.Secondary}" />
+                                            <TextBlock Text="{Binding AgeText, Mode=OneWay}" Style="{StaticResource Text.Secondary}" />
                                             <TextBlock Grid.Column="1" Text="{Binding Device}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="{Binding Asset}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="3" Text="{Binding Action}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />

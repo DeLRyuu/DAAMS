@@ -284,10 +284,10 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="1" Text="06" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="2" Text="12" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
-                                        <TextBlock Grid.Column="3" Text="18" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="0" Text="00:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="06:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="2" Text="12:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="3" Text="18:00" Style="{StaticResource Text.Secondary}" FontSize="10" HorizontalAlignment="Left" />
                                     </Grid>
                                 </StackPanel>
                             </Border>

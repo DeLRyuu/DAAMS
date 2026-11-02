@@ -1028,7 +1028,8 @@ public class LocalDatabaseService
                 {
                     if (el.ValueKind == JsonValueKind.String)
                     {
-                        factors.Add(ParseRiskFactorText(el.GetString() ?? string.Empty));
+                        var parsed = ParseRiskFactorText(el.GetString() ?? string.Empty);
+                        if (parsed != null) factors.Add(parsed);
                     }
                 }
             }
@@ -1040,13 +1041,18 @@ public class LocalDatabaseService
         return factors;
     }
 
-    private static RiskFactor ParseRiskFactorText(string text)
+    private static RiskFactor? ParseRiskFactorText(string text)
     {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (text.Contains("has no configured risk weight", StringComparison.OrdinalIgnoreCase))
+            return new RiskFactor { Description = "Create: no risk points", Weight = 0 };
         Match match = RiskFactorTextPattern.Match(text);
         if (match.Success && int.TryParse(match.Groups["weight"].Value, out int weight))
         {
+            if (weight == 0) return null;
             return new RiskFactor { Description = match.Groups["description"].Value, Weight = weight };
         }
+        if (text.EndsWith("(+0)") || text.EndsWith("(0)")) return null;
         return new RiskFactor { Description = text, Weight = 0 };
     }
 

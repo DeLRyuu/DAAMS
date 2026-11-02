@@ -188,7 +188,7 @@
                                     </ItemsControl>
 
                                     <!-- Collapsed Repeats: list all merged timestamps -->
-                                    <StackPanel Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVis}}" Margin="0,10,0,0">
+                                    <StackPanel Visibility="{Binding HasDistinctMergedTimestamps, Converter={StaticResource BoolToVis}}" Margin="0,10,0,0">
                                         <TextBlock Text="Merged timestamps" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
                                         <ItemsControl ItemsSource="{Binding MergedTimestamps}">
                                             <ItemsControl.ItemTemplate>

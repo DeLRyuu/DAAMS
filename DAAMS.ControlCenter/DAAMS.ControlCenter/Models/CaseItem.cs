@@ -69,7 +69,7 @@ public class CaseItem : ViewModelBase
         {
             if (DateResolved == null) return string.Empty;
             if (DateResolved.Value < DetectedAt) return "-";
-            return DateResolved.Value.ToString("yyyy-MM-dd HH:mm:ss");
+            return DateResolved.Value.ToString("yyyy-MM-dd HH:mm");
         }
     }
 
@@ -116,6 +116,45 @@ public class CaseItem : ViewModelBase
                 return $"{days} days ago";
             }
             return $"{DetectedAt:yyyy-MM-dd HH:mm}";
+        }
+    }
+
+    public string ActionUserDeviceText
+    {
+        get
+        {
+            var action = Action.ToString();
+            var hasUser = !string.IsNullOrWhiteSpace(User);
+            var hasDevice = !string.IsNullOrWhiteSpace(Device);
+
+            if (hasUser && hasDevice) return $"{action} by {User} on {Device}";
+            if (hasUser) return $"{action} by {User}";
+            if (hasDevice) return $"{action} on {Device}";
+            return action;
+        }
+    }
+
+    public string SummaryText
+    {
+        get
+        {
+            var primary = ActionUserDeviceText;
+            if (!string.IsNullOrWhiteSpace(AgeText))
+                return $"{primary}, {AgeText}";
+            return primary;
+        }
+    }
+
+    public string SubtitleText
+    {
+        get
+        {
+            var action = Action.ToString();
+            var hasUser = !string.IsNullOrWhiteSpace(User);
+            var time = AgeText;
+
+            if (hasUser) return $"{action} by {User} • {time}";
+            return $"{action} • {time}";
         }
     }
 }

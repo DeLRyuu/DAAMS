@@ -99,13 +99,7 @@
                                         <TextBlock Text="Incident details" Style="{StaticResource Text.Label}" Margin="0,0,0,8" />
 
                                         <StackPanel Visibility="{Binding RelatedAlertId, Converter={StaticResource StringToVis}}" Margin="0,0,0,10">
-                                            <TextBlock Style="{StaticResource Text.Mono}">
-                                                <Run Text="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm', Mode=OneWay}" />
-                                                <Run Text=" — Alert " />
-                                                <Run Text="{Binding RelatedAlertId, Mode=OneWay}" />
-                                                <Run Text=" — Incident " />
-                                                <Run Text="{Binding IncidentId, Mode=OneWay}" />
-                                            </TextBlock>
+                                            <TextBlock Text="{Binding SubtitleText, Mode=OneWay}" Style="{StaticResource Text.Mono}" />
                                         </StackPanel>
 
                                         <Grid Margin="0,0,0,10">

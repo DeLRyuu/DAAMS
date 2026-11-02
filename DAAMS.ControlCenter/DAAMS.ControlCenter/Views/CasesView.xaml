@@ -80,10 +80,12 @@
                                                     </Expander.IsExpanded>
                                                     <Expander.Header>
                                                         <TextBlock Style="{StaticResource Text.Label}" Margin="2,8,0,8">
-                                                            <Run Text="{Binding Name, Mode=OneWay}" />
-                                                            <Run Text=" (" />
-                                                            <Run Text="{Binding ItemCount, Mode=OneWay}" />
-                                                            <Run Text=")" />
+                                                            <TextBlock.Text>
+                                                                <MultiBinding StringFormat="{}{0} ({1})">
+                                                                    <Binding Path="Name" Mode="OneWay" />
+                                                                    <Binding Path="ItemCount" Mode="OneWay" />
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
                                                         </TextBlock>
                                                     </Expander.Header>
                                                     <ItemsPresenter />
@@ -146,13 +148,7 @@
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="{Binding Asset}" Style="{StaticResource Text.Body}"
                                                TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0">
-                                        <Run Text="{Binding Action, Mode=OneWay}" />
-                                        <Run Text=" by " />
-                                        <Run Text="{Binding User, Mode=OneWay}" />
-                                        <Run Text=" • " />
-                                        <Run Text="{Binding DetectedAt, StringFormat='yyyy-MM-dd HH:mm', Mode=OneWay}" />
-                                    </TextBlock>
+                                    <TextBlock Text="{Binding SubtitleText, Mode=OneWay}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                                 </StackPanel>
                                 <Border Grid.Column="2" VerticalAlignment="Top" Margin="8,0,0,0"
                                         Style="{StaticResource Badge.Base}" Background="{StaticResource Brush.SurfaceAlt}">
@@ -183,15 +179,7 @@
                             <StackPanel DataContext="{Binding SelectedCase}">
                                 <TextBlock Text="{Binding Asset}" Style="{StaticResource Text.PageTitle}"
                                            TextWrapping="Wrap" />
-                                <TextBlock Style="{StaticResource Text.Secondary}" Margin="0,4,0,12">
-                                    <TextBlock.Text>
-                                        <MultiBinding StringFormat="{}{0} by {1} on {2}">
-                                            <Binding Path="Action" Mode="OneWay" />
-                                            <Binding Path="User" Mode="OneWay" />
-                                            <Binding Path="Device" Mode="OneWay" />
-                                        </MultiBinding>
-                                    </TextBlock.Text>
-                                </TextBlock>
+                                <TextBlock Text="{Binding ActionUserDeviceText, Mode=OneWay}" Style="{StaticResource Text.Secondary}" Margin="0,4,0,12" />
 
                                 <WrapPanel Margin="0,0,0,12">
                                     <Border Height="22" Background="{Binding Classification, Converter={StaticResource ClassBrush}, ConverterParameter=Bg}"
@@ -279,15 +267,9 @@
                                             Command="{Binding DataContext.CopySummaryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                                 </WrapPanel>
 
-                                <TextBlock Style="{StaticResource Text.Secondary}" Margin="0,8,0,0">
-                                    <Run Text="Detected " />
-                                    <Run Text="{Binding DetectedAt, StringFormat='yyyy-MM-dd HH:mm:ss', Mode=OneWay}" />
-                                </TextBlock>
-                                <TextBlock Style="{StaticResource Text.Secondary}" Margin="0,3,0,0">
-                                    <Run Text="Last updated " />
-                                    <Run Text="{Binding UpdatedAt, StringFormat='yyyy-MM-dd HH:mm:ss', Mode=OneWay}" />
-                                </TextBlock>
-                                <TextBlock Margin="0,3,0,0">
+                                <TextBlock Text="{Binding DetectedAt, StringFormat='Detected {0:yyyy-MM-dd HH:mm}', Mode=OneWay}" Style="{StaticResource Text.Secondary}" Margin="0,8,0,0" />
+                                <TextBlock Text="{Binding UpdatedAt, StringFormat='Last updated {0:yyyy-MM-dd HH:mm}', Mode=OneWay}" Style="{StaticResource Text.Secondary}" Margin="0,3,0,0" />
+                                <TextBlock Margin="0,3,0,0" Text="{Binding DateResolvedText, StringFormat='Resolved {0}', Mode=OneWay}">
                                     <TextBlock.Style>
                                         <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource Text.Secondary}">
                                             <Setter Property="Visibility" Value="Visible" />
@@ -298,8 +280,6 @@
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
-                                    <Run Text="Resolved " />
-                                    <Run Text="{Binding DateResolvedText, Mode=OneWay}" />
                                 </TextBlock>
 
                             </StackPanel>

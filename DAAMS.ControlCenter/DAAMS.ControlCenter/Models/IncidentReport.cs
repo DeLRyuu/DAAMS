@@ -43,6 +43,8 @@ public class IncidentReport
         ? (DateResolved.Value < Timestamp ? "-" : DateResolved.Value.ToString("yyyy-MM-dd HH:mm"))
         : string.Empty;
 
+    public string SubtitleText => $"{Timestamp:yyyy-MM-dd HH:mm} — Alert {RelatedAlertId} — Incident {IncidentId}";
+
     public DateTime CreatedAt { get; init; }
 
     /// <summary>Mutable — bumped whenever status/notes/resolution change.</summary>
