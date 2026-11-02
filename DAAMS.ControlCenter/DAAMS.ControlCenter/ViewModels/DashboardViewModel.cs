@@ -130,6 +130,10 @@ public class DashboardViewModel : ViewModelBase, IDataSection
             {
                 _navigateWith(NavigationSection.Devices, device.Name);
             }
+            else if (param is string deviceName && !string.IsNullOrWhiteSpace(deviceName))
+            {
+                _navigateWith(NavigationSection.Devices, deviceName);
+            }
         });
         ViewAllActivityCommand = new RelayCommand(_ => _navigateWith(NavigationSection.ActivityLogs, string.Empty));
         ViewContext.Current.RangeChanged += () => _ = RefreshAsync();
@@ -256,8 +260,10 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         OnPropertyChanged(nameof(RiskCriticalPercent));
 
         var deviceSummaries = DeviceService.Build(collapsedActivity, cases);
-        var deviceNamesInRange = rangedActivity
+        var activeActivity = rangedActivity.Count > 0 ? rangedActivity : collapsedActivity;
+        var deviceNamesInRange = activeActivity
             .Select(entry => entry.Device)
+            .Where(d => !string.IsNullOrWhiteSpace(d))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         DevicesReportingActivity = deviceNamesInRange.Count;

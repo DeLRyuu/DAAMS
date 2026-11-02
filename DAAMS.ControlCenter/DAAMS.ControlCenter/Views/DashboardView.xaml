@@ -72,7 +72,7 @@
                                                            TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding SummaryText, Mode=OneWay}" Style="{StaticResource Text.Secondary}" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
-                                            <Button Grid.Column="3" Content="Open incident" Style="{StaticResource Button.Secondary}"
+                                            <Button Grid.Column="3" Content="Open alert" Style="{StaticResource Button.Secondary}"
                                                     Command="{Binding DataContext.OpenCaseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}" VerticalAlignment="Center" Margin="12,0,0,0" />
                                         </Grid>
@@ -122,17 +122,17 @@
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
                             <TextBlock Text="{Binding TotalActivityLogs, Mode=OneWay}" Style="{StaticResource Text.Metric}" />
-                            <TextBlock Text="{Binding RangeLabel, Mode=OneWay, StringFormat='Activities ({0})'}" Style="{StaticResource Text.Secondary}" />
+                            <TextBlock Text="Activities" Style="{StaticResource Text.Secondary}" />
                         </StackPanel>
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
                             <TextBlock Text="{Binding OpenCases}" Style="{StaticResource Text.Metric}" />
-                            <TextBlock Text="Open incidents" Style="{StaticResource Text.Secondary}" />
+                            <TextBlock Text="Open alerts" Style="{StaticResource Text.Secondary}" />
                         </StackPanel>
                         <Border Width="1" Height="32" Margin="20,0" Background="{StaticResource Brush.BorderSubtle}" />
                         <StackPanel>
                             <TextBlock Text="{Binding DevicesReportingActivity}" Style="{StaticResource Text.Metric}" />
-                            <TextBlock Text="{Binding RangeLabel, Mode=OneWay, StringFormat='Devices reporting activity ({0})'}" Style="{StaticResource Text.Secondary}" />
+                            <TextBlock Text="Devices reporting activity" Style="{StaticResource Text.Secondary}" />
                         </StackPanel>
                     </StackPanel>
 
@@ -266,24 +266,25 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="2">
-                            <Border.Style>
-                                <Style TargetType="{x:Type Border}" BasedOn="{StaticResource Surface.Card}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding DevicesNeedingAttention.Count}" Value="0">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
+                        <Border Grid.Column="2" Style="{StaticResource Surface.Card}">
                             <StackPanel>
                                 <TextBlock Text="Devices needing attention" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,8" />
                                 <ItemsControl ItemsSource="{Binding DevicesNeedingAttention}">
+                                    <ItemsControl.Style>
+                                        <Style TargetType="{x:Type ItemsControl}">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DevicesNeedingAttention.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ItemsControl.Style>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Button Command="{Binding DataContext.OpenDeviceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}" Background="Transparent" BorderThickness="0"
-                                                    Padding="6" HorizontalContentAlignment="Stretch">
+                                                    Padding="6" HorizontalContentAlignment="Stretch" Cursor="Hand">
                                                 <Grid Margin="0,4">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
@@ -294,13 +295,32 @@
                                                         <TextBlock Text="{Binding LastActivityText, StringFormat='Last activity {0}'}"
                                                                    Style="{StaticResource Text.Secondary}" />
                                                     </StackPanel>
-                                                    <TextBlock Grid.Column="1" Text="{Binding OpenCases, StringFormat='{}{0} open incidents'}"
+                                                    <TextBlock Grid.Column="1" Text="{Binding OpenCases, StringFormat='{}{0} open alerts'}"
                                                                Style="{StaticResource Text.Secondary}" VerticalAlignment="Center" />
                                                 </Grid>
                                             </Button>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+
+                                <StackPanel Margin="0,8,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="{x:Type StackPanel}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DevicesNeedingAttention.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                                 Fill="{StaticResource Brush.StatusPositive}" />
+                                        <TextBlock Text="No devices need attention" Style="{StaticResource Text.Body}"
+                                                   Margin="10,0,0,0" />
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </Grid>
