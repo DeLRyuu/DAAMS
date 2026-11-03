@@ -208,7 +208,7 @@ class FileIndex:
                 add_path(path)
         return list(discovered.values())
 
-    def add_or_update(self, path: str) -> None:
+    def add_or_update(self, path: str, hash: Optional[str] = None) -> None:
         with self._lock:
             metadata = _file_metadata(path)
             if metadata is None:
@@ -219,11 +219,14 @@ class FileIndex:
                 self.truncated = True
                 return
             previous = self._entries.get(key)
-            cached_hash = None
-            if previous and (
+            if hash is not None:
+                cached_hash = hash
+            elif previous and (
                 previous.size, previous.mtime_ns, previous.file_id
             ) == (size, mtime_ns, file_id):
                 cached_hash = previous.hash
+            else:
+                cached_hash = None
             self._entries[key] = IndexEntry(
                 path, size, mtime_ns, file_id, cached_hash
             )
@@ -253,8 +256,9 @@ class FileIndex:
 
     def rename(self, src: str, dest: str) -> None:
         with self._lock:
-            if self._entries.pop(_key(src), None) is not None:
-                self.add_or_update(dest)
+            old_entry = self._entries.pop(_key(src), None)
+            if old_entry is not None:
+                self.add_or_update(dest, hash=old_entry.hash)
             elif os.path.isfile(dest):
                 self.add_or_update(dest)
 
@@ -478,8 +482,7 @@ class EventAggregator:
 
     def _resolve(self, p):
         if p.kind == "modify":
-            self._index.add_or_update(p.path)
-            return (p.path, "Modify", None, None, p.path)
+            return self._resolve_modify(p)
 
         if p.kind == "rename":
             same_dir = _key(os.path.dirname(p.src)) == _key(os.path.dirname(p.path))
@@ -492,6 +495,37 @@ class EventAggregator:
             return (p.path, "Delete", None, p.path, None)
 
         return self._resolve_create(p)
+
+    def _resolve_modify(self, p):
+        path = p.path
+        metadata = _file_metadata(path)
+        if metadata is None:
+            self._index.remove(path)
+            return None
+
+        size, mtime_ns, file_id = metadata
+        old_entry = self._index.get(path)
+
+        if old_entry is None:
+            digest = hash_file(path, self._hash_max_bytes) if size <= self._hash_max_bytes else None
+            self._index.add_or_update(path, hash=digest)
+            return (path, "Modify", None, None, path)
+
+        if size > self._hash_max_bytes or old_entry.size > self._hash_max_bytes:
+            if size == old_entry.size and mtime_ns == old_entry.mtime_ns:
+                return None
+            self._index.add_or_update(path)
+            return (path, "Modify", None, None, path)
+
+        current_hash = hash_file(path, self._hash_max_bytes)
+        last_known_hash = old_entry.hash
+
+        if last_known_hash is not None and current_hash is not None and current_hash == last_known_hash:
+            self._index.add_or_update(path, hash=current_hash)
+            return None
+
+        self._index.add_or_update(path, hash=current_hash)
+        return (path, "Modify", None, None, path)
 
     def _resolve_create(self, p):
         path = p.path
@@ -630,5 +664,6 @@ class EventAggregator:
         if p.neighbor:
             logger.debug("Dropped unrelated neighbour event: %s", path)
             return None
-        self._index.add_or_update(path)
+        create_hash = new_hash() if size <= self._hash_max_bytes else None
+        self._index.add_or_update(path, hash=create_hash)
         return (path, "Create", None, None, path)

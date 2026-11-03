@@ -413,3 +413,52 @@ def test_emit_failure_does_not_stop_other_records(env):
     agg2.on_modified(a); agg2.on_modified(b)
     settle(clock, agg2)
     assert sorted(seen) == sorted([a, b])
+
+
+def test_metadata_only_event_gives_no_modify(env):
+    root, clock, records, index, agg = env
+    f = write(root / "doc.txt", "same content")
+    index.build(str(root))
+    index.hash_for(f)
+    stat = os.stat(f)
+    os.utime(f, ns=(stat.st_mtime_ns + 10_000_000, stat.st_mtime_ns + 10_000_000))
+    agg.on_modified(f)
+    settle(clock, agg)
+    assert records == []
+
+
+def test_changed_content_gives_modify(env):
+    root, clock, records, index, agg = env
+    f = write(root / "doc.txt", "initial content")
+    index.build(str(root))
+    index.hash_for(f)
+    write(f, "new modified content")
+    agg.on_modified(f)
+    settle(clock, agg)
+    assert actions(records) == ["Modify"]
+    assert records == [(f, "Modify", None)]
+
+
+def test_large_file_metadata_only_gives_no_modify(env):
+    root, clock, records, index, agg = env
+    big = write(root / "big.bin", "x" * 100)
+    index = FileIndex(hash_max_bytes=10)
+    index.build(str(root))
+    agg = EventAggregator(lambda a, b, c: records.append((a, b, c)), index,
+                          hash_max_bytes=10, clock=clock)
+    agg.on_modified(big)
+    settle(clock, agg)
+    assert records == []
+
+
+def test_large_file_changed_content_gives_modify(env):
+    root, clock, records, index, agg = env
+    big = write(root / "big.bin", "x" * 100)
+    index = FileIndex(hash_max_bytes=10)
+    index.build(str(root))
+    agg = EventAggregator(lambda a, b, c: records.append((a, b, c)), index,
+                          hash_max_bytes=10, clock=clock)
+    write(big, "y" * 150)
+    agg.on_modified(big)
+    settle(clock, agg)
+    assert actions(records) == ["Modify"]
