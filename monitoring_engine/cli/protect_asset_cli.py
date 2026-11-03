@@ -108,12 +108,96 @@ _log("imports finished")
 
 CLASSIFICATIONS = ("Public", "Sensitive", "Private", "Confidential")
 
+import tempfile
+import time
+from typing import Optional
+
 CLASSIFICATION_DESCRIPTIONS = {
     "Public": "Can generally be accessed by anyone",
     "Sensitive": "Important information with limited access",
     "Private": "Restricted or personal information",
     "Confidential": "Highly sensitive, strictest protection",
 }
+
+
+def get_queue_file() -> str:
+    return os.environ.get("DAAMS_BATCH_QUEUE_FILE") or os.path.join(tempfile.gettempdir(), "daams_protect_queue.txt")
+
+
+def get_lock_file() -> str:
+    return os.environ.get("DAAMS_BATCH_LOCK_FILE") or os.path.join(tempfile.gettempdir(), "daams_protect.lock")
+
+
+def get_wait_seconds() -> float:
+    try:
+        return float(os.environ.get("DAAMS_BATCH_WAIT_SECONDS", "1.0"))
+    except (ValueError, TypeError):
+        return 1.0
+
+
+def append_to_queue(path: str, queue_file: str = None) -> None:
+    q_file = queue_file or get_queue_file()
+    try:
+        norm = os.path.abspath(path)
+        with open(q_file, "a", encoding="utf-8") as f:
+            f.write(norm + "\n")
+    except OSError as e:
+        _log(f"append_to_queue error: {e}")
+
+
+def try_acquire_lock(lock_file: str = None) -> Optional[int]:
+    l_file = lock_file or get_lock_file()
+    if os.path.exists(l_file):
+        try:
+            if time.time() - os.path.getmtime(l_file) > 15.0:
+                os.remove(l_file)
+        except OSError:
+            pass
+
+    try:
+        fd = os.open(l_file, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+        return fd
+    except (FileExistsError, OSError):
+        return None
+
+
+def release_lock(fd: Optional[int], lock_file: str = None) -> None:
+    l_file = lock_file or get_lock_file()
+    if fd is not None:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+    try:
+        if os.path.exists(l_file):
+            os.remove(l_file)
+    except OSError:
+        pass
+
+
+def read_and_clear_queue(queue_file: str = None) -> list:
+    q_file = queue_file or get_queue_file()
+    if not os.path.exists(q_file):
+        return []
+    paths = []
+    try:
+        with open(q_file, "r", encoding="utf-8") as f:
+            for line in f:
+                p = line.strip()
+                if p and p not in paths:
+                    paths.append(p)
+    except OSError as e:
+        _log(f"read_and_clear_queue read error: {e}")
+
+    try:
+        os.remove(q_file)
+    except OSError:
+        try:
+            with open(q_file, "w", encoding="utf-8") as f:
+                pass
+        except OSError:
+            pass
+    return paths
 
 
 def check_already_protected(path: str, assets: list = None) -> tuple:
@@ -135,7 +219,6 @@ def check_already_protected(path: str, assets: list = None) -> tuple:
             _log(f"check_already_protected error: {e}")
             assets = []
 
-    # Only consider records that are actively protected
     protected = [a for a in assets if a.get("status", "protected") == "protected"]
     covering = find_covering_asset(path, protected)
     if not covering:
@@ -150,16 +233,9 @@ def check_already_protected(path: str, assets: list = None) -> tuple:
     return "folder", covering
 
 
-def main():
-    if len(sys.argv) < 2:
-        glass_ui.show_message("error", "No path provided", "No file or folder path was provided.")
-        sys.exit(1)
-
-    path = sys.argv[1]
+def protect_single_asset(path: str) -> None:
     asset_type = "folder" if os.path.isdir(path) else "file"
 
-    # Check for duplicate protection or covering folder FIRST, before asking for a PIN --
-    # if nothing is actually going to change, there's no action to gate.
     status_kind, covering = check_already_protected(path)
     if status_kind == "self":
         classification = covering.get("classification", "Protected")
@@ -184,19 +260,13 @@ def main():
     _log("asking for PIN")
     if not pin_auth.confirm_with_pin(action_phrase):
         _log("PIN not confirmed (wrong or cancelled)")
-        return  # Wrong PIN or cancelled -- confirm_with_pin already showed why.
+        return
     _log("PIN confirmed")
 
-    sublabels = {
-        "Public": "Can generally be accessed by anyone",
-        "Sensitive": "Important information with limited access",
-        "Private": "Restricted or personal information",
-        "Confidential": "Highly sensitive, strictest protection",
-    }
-    classification = glass_ui.ask_classification(path, asset_type, CLASSIFICATIONS, sublabels)
+    classification = glass_ui.ask_classification(path, asset_type, CLASSIFICATIONS, CLASSIFICATION_DESCRIPTIONS)
     _log(f"classification chosen: {classification}")
     if not classification:
-        return  # Cancelled
+        return
 
     ok, msg = glass_ui.run_with_loading(
         "Protecting... please wait.",
@@ -211,6 +281,107 @@ def main():
         glass_ui.show_message("success", "Protected", msg)
     else:
         glass_ui.show_message("error", "Could not protect", msg)
+
+
+def protect_batch_assets(paths: list) -> None:
+    _log(f"Batch protect starting with {len(paths)} items")
+    choices = glass_ui.ask_batch_classification(paths)
+    _log(f"ask_batch_classification returned: {choices}")
+    if not choices:
+        return
+
+    action_phrase = f"protect {len(paths)} assets"
+    _log("asking for PIN once for batch")
+    if not pin_auth.confirm_with_pin(action_phrase):
+        _log("PIN not confirmed for batch")
+        return
+    _log("PIN confirmed for batch")
+
+    def _execute_batch():
+        protected_count = 0
+        skipped = []
+        try:
+            existing_assets = ar.get_all_assets(only_protected=True)
+        except Exception as e:
+            _log(f"get_all_assets error: {e}")
+            existing_assets = []
+
+        for p in paths:
+            cls = choices.get(p, "Public")
+            status_kind, covering = check_already_protected(p, assets=existing_assets)
+            name = ntpath.basename(ntpath.normpath(p)) or p
+
+            if status_kind == "self":
+                cov_cls = covering.get("classification", "Protected") if covering else "Protected"
+                skipped.append(f"{name} (already protected as {cov_cls})")
+                continue
+            elif status_kind == "folder":
+                cov_name = covering.get("asset_name") or ntpath.basename(ntpath.normpath(covering.get("path", "")))
+                cov_cls = covering.get("classification", "Protected") if covering else "Protected"
+                skipped.append(f"{name} (covered by {cov_name})")
+                continue
+
+            try:
+                ok, msg = ar.protect_asset(p, cls, protected_by=getpass.getuser())
+                if ok:
+                    protected_count += 1
+                    existing_assets.append({
+                        "path": p,
+                        "asset_type": "folder" if os.path.isdir(p) else "file",
+                        "classification": cls,
+                        "status": "protected",
+                    })
+                else:
+                    skipped.append(f"{name} ({msg})")
+            except Exception as e:
+                skipped.append(f"{name} ({e})")
+
+        return protected_count, skipped
+
+    protected_count, skipped = glass_ui.run_with_loading(
+        f"Protecting {len(paths)} assets... please wait.",
+        _execute_batch,
+    )
+
+    summary = f"{protected_count} protected, {len(skipped)} skipped"
+    detail = "\n".join(f"? {item}" for item in skipped) if skipped else None
+    kind = "success" if protected_count > 0 and not skipped else "info" if protected_count > 0 else "warning"
+    glass_ui.show_message(kind, "Batch protection", summary, detail=detail)
+
+
+def main():
+    if len(sys.argv) < 2:
+        glass_ui.show_message("error", "No path provided", "No file or folder path was provided.")
+        sys.exit(1)
+
+    initial_paths = sys.argv[1:]
+    queue_file = get_queue_file()
+    lock_file = get_lock_file()
+    wait_sec = get_wait_seconds()
+
+    for p in initial_paths:
+        append_to_queue(p, queue_file)
+
+    lock_fd = try_acquire_lock(lock_file)
+    if lock_fd is None:
+        _log(f"Follower instance exiting silently for {initial_paths}")
+        sys.exit(0)
+
+    try:
+        _log(f"Coordinator instance acquired lock, waiting {wait_sec}s for batch...")
+        if wait_sec > 0:
+            time.sleep(wait_sec)
+        paths = read_and_clear_queue(queue_file)
+    finally:
+        release_lock(lock_fd, lock_file)
+
+    if not paths:
+        paths = initial_paths
+
+    if len(paths) == 1:
+        protect_single_asset(paths[0])
+    else:
+        protect_batch_assets(paths)
 
 
 if __name__ == "__main__":

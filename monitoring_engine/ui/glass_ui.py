@@ -72,6 +72,8 @@ RISK_COLORS = {
     "High": ("#E0762F", "#2c1c10"),
     "Critical": ("#E0453F", "#2c1414"),
 }
+CLASSIFICATIONS = ("Public", "Sensitive", "Private", "Confidential")
+
 CLASSIFICATION_COLORS = {
     "Public": ("#6B7A99", "#171d29"),
     "Sensitive": ("#4C8DFF", "#101c33"),
@@ -542,6 +544,46 @@ class GlassWindow:
         self.canvas.tag_bind(tag, "<Leave>", hide)
         self.canvas.tag_bind(tag, "<ButtonPress>", hide)
 
+    def _bind_widget_tooltip(self, widget, text: str) -> None:
+        tip_state = {"tw": None}
+
+        def show(e=None):
+            if tip_state["tw"] or self._closed or not text:
+                return
+            try:
+                x = self.root.winfo_pointerx() + 10
+                y = self.root.winfo_pointery() + 10
+                tw = tk.Toplevel(self.root)
+                tw.wm_overrideredirect(True)
+                tw.wm_geometry(f"+{x}+{y}")
+                tw.attributes("-topmost", True)
+                lbl = tk.Label(
+                    tw, text=text, justify="left",
+                    background="#1A212B", foreground="#E6EAF0",
+                    relief="solid", borderwidth=1,
+                    font=self.fonts["mono"], padx=8, pady=4,
+                )
+                lbl.pack()
+                tip_state["tw"] = tw
+                self._tooltips.append(tw)
+            except Exception:
+                pass
+
+        def hide(e=None):
+            tw = tip_state.get("tw")
+            if tw:
+                try:
+                    if tw in self._tooltips:
+                        self._tooltips.remove(tw)
+                    tw.destroy()
+                except Exception:
+                    pass
+                tip_state["tw"] = None
+
+        widget.bind("<Enter>", show)
+        widget.bind("<Leave>", hide)
+        widget.bind("<ButtonPress>", hide)
+
     def code_block(self, text: str, max_lines: int = 3, truncate: str = "middle") -> None:
         """Mono text on an inset glass chip -- used for paths, IDs and error details."""
         font = self.fonts["mono"]
@@ -670,6 +712,176 @@ class GlassWindow:
                                     anchor="nw", font=self.fonts["small"], fill=TEXT_DIM, state="disabled")
         self._bind_button(image_item, imgs, lambda: self.close(item["key"]))
 
+    def batch_selector(self, paths: list, classifications=None, sublabels: dict = None, initial_all: str = "Public"):
+        if classifications is None:
+            classifications = ("Public", "Sensitive", "Private", "Confidential")
+        if sublabels is None:
+            sublabels = DEFAULT_CLASSIFICATION_DESCRIPTIONS
+
+        choices = {p: initial_all for p in paths}
+        set_all_state = {"current": initial_all}
+        row_updaters = []
+
+        row_h = 42
+        n_items = len(paths)
+        scroll_needed = n_items > 5
+        list_h = 230 if scroll_needed else max(44, n_items * row_h + 8)
+
+        top_h = 76
+        total_h = top_h + list_h + 10
+        y0 = self._reserve(total_h, gap=12)
+        box = (self.x0, y0, self.x1, y0 + total_h)
+
+        def bake(img):
+            chip = _shape(img.crop(box), 12, fill=SURFACE_ALT[0], fill_alpha=0.60,
+                          border=(255, 255, 255), border_alpha=0.08)
+            img.paste(chip, box[:2])
+
+        self._bakes.append(bake)
+
+        def draw():
+            import ntpath
+            bg_hex = _hex(SURFACE_ALT[0])
+            container = tk.Frame(self.root, bg=bg_hex, bd=0, highlightthickness=0)
+            self.canvas.create_window(self.x0, y0, window=container, anchor="nw",
+                                      width=self.cw, height=total_h)
+
+            # 1. "Set all to" header frame
+            top_frame = tk.Frame(container, bg=bg_hex, padx=12, pady=8)
+            top_frame.pack(fill="x")
+
+            row_top = tk.Frame(top_frame, bg=bg_hex)
+            row_top.pack(fill="x")
+
+            lbl_all = tk.Label(row_top, text="SET ALL TO:", font=self.fonts["eyebrow"],
+                               fg=TEXT_DIM, bg=bg_hex)
+            lbl_all.pack(side="left", padx=(0, 10))
+
+            top_buttons = {}
+            desc_lbl = tk.Label(top_frame, text=sublabels.get(initial_all, ""),
+                                font=self.fonts["small"], fg=TEXT_DIM, bg=bg_hex,
+                                anchor="w", justify="left")
+
+            def refresh_top_buttons():
+                for c_name, b in top_buttons.items():
+                    active = (c_name == set_all_state["current"])
+                    fg_col, bg_col = CLASSIFICATION_COLORS.get(c_name, (TEXT_DIM, "#171d29"))
+                    if active:
+                        b.configure(bg=bg_col, fg=fg_col, font=self.fonts["btn"], relief="solid", bd=1)
+                    else:
+                        b.configure(bg="#1A222C", fg=TEXT_DIM, font=self.fonts["small"], relief="flat", bd=0)
+                desc_lbl.configure(text=sublabels.get(set_all_state["current"], ""))
+
+            def on_set_all_click(c_name):
+                set_all_state["current"] = c_name
+                refresh_top_buttons()
+                for p in paths:
+                    choices[p] = c_name
+                for updater in row_updaters:
+                    updater()
+
+            for c_name in classifications:
+                btn = tk.Label(row_top, text=c_name, cursor="hand2", padx=8, pady=3,
+                               font=self.fonts["small"])
+                btn.pack(side="left", padx=3)
+                btn.bind("<Button-1>", lambda e, c=c_name: on_set_all_click(c))
+                self._bind_widget_tooltip(btn, f"{c_name}: {sublabels.get(c_name, '')}")
+                top_buttons[c_name] = btn
+
+            desc_lbl.pack(fill="x", pady=(4, 0))
+            refresh_top_buttons()
+
+            # 2. Divider line
+            divider = tk.Frame(container, height=1, bg="#2A3544")
+            divider.pack(fill="x", padx=10, pady=2)
+
+            # 3. Scrollable list of items
+            list_container = tk.Frame(container, bg=bg_hex, bd=0, highlightthickness=0)
+            list_container.pack(fill="both", expand=True, padx=8, pady=4)
+
+            scroll_canvas = tk.Canvas(list_container, bg=bg_hex, bd=0, highlightthickness=0, height=list_h)
+            inner_frame = tk.Frame(scroll_canvas, bg=bg_hex, bd=0, highlightthickness=0)
+
+            inner_w = self.cw - (34 if scroll_needed else 16)
+            scroll_canvas.create_window((0, 0), window=inner_frame, anchor="nw", width=inner_w)
+
+            def on_inner_configure(e):
+                scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
+
+            inner_frame.bind("<Configure>", on_inner_configure)
+
+            if scroll_needed:
+                scrollbar = tk.Scrollbar(list_container, orient="vertical", command=scroll_canvas.yview,
+                                         bg="#171D26", troughcolor=bg_hex, relief="flat", bd=0,
+                                         activebackground=ACCENT, highlightthickness=0)
+                scrollbar.pack(side="right", fill="y")
+                scroll_canvas.configure(yscrollcommand=scrollbar.set)
+
+            scroll_canvas.pack(side="left", fill="both", expand=True)
+
+            def on_mousewheel(e):
+                if scroll_needed:
+                    scroll_canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+
+            scroll_canvas.bind("<MouseWheel>", on_mousewheel)
+            inner_frame.bind("<MouseWheel>", on_mousewheel)
+
+            for idx, p in enumerate(paths):
+                row_bg = "#17202B" if idx % 2 == 0 else "#131A23"
+                row_frame = tk.Frame(inner_frame, bg=row_bg, padx=8, pady=4)
+                row_frame.pack(fill="x", pady=2)
+                row_frame.bind("<MouseWheel>", on_mousewheel)
+
+                item_name = ntpath.basename(ntpath.normpath(p)) or p
+                name_lbl = tk.Label(row_frame, text=item_name, anchor="w", justify="left",
+                                    wraplength=210, font=self.fonts["small"], fg=TEXT, bg=row_bg)
+                name_lbl.pack(side="left", fill="x", expand=True)
+                name_lbl.bind("<MouseWheel>", on_mousewheel)
+                self._bind_widget_tooltip(name_lbl, p)
+
+                btn_frame = tk.Frame(row_frame, bg=row_bg)
+                btn_frame.pack(side="right")
+                btn_frame.bind("<MouseWheel>", on_mousewheel)
+
+                row_btns = {}
+
+                def make_row_updater(p_path=p, btns=row_btns):
+                    def update_row():
+                        cur = choices[p_path]
+                        for c_name, b in btns.items():
+                            active = (c_name == cur)
+                            fg_col, bg_col = CLASSIFICATION_COLORS.get(c_name, (TEXT_DIM, "#171d29"))
+                            if active:
+                                b.configure(bg=bg_col, fg=fg_col, font=self.fonts["btn"], relief="solid", bd=1)
+                            else:
+                                b.configure(bg="#1A222C", fg=TEXT_DIM, font=self.fonts["small"], relief="flat", bd=0)
+                    return update_row
+
+                updater = make_row_updater()
+                row_updaters.append(updater)
+
+                def on_item_click(p_path, c_name, upd=updater):
+                    choices[p_path] = c_name
+                    upd()
+
+                for c_name in classifications:
+                    b = tk.Label(btn_frame, text=c_name, cursor="hand2", padx=6, pady=2,
+                                 font=self.fonts["small"])
+                    b.pack(side="left", padx=2)
+                    b.bind("<Button-1>", lambda e, path_val=p, c=c_name, u=updater: on_item_click(path_val, c, u))
+                    b.bind("<MouseWheel>", on_mousewheel)
+                    self._bind_widget_tooltip(b, f"{c_name}: {sublabels.get(c_name, '')}")
+                    row_btns[c_name] = b
+
+                updater()
+
+        self._draws.append(draw)
+
+        def get_result():
+            return dict(choices)
+
+        return get_result
+
     def progress(self) -> None:
         y0 = self._reserve(22)
         ty = y0 + 8
@@ -930,6 +1142,25 @@ def ask_classification(path: str, asset_type: str, classifications, sublabels: d
     win.text("Choose a classification:", "dim")
     win.options(items)
     win.buttons([("Cancel", "secondary", None)], gap_before=16)
+    return win.show()
+
+
+def ask_batch_classification(paths: list, classifications=None, sublabels: dict = None):
+    """
+    Batch classification picker for multiple files/folders.
+    Shows one dialog with a row per item, a 'Set all to' selector at the top,
+    and returns a dict mapping {path: chosen_classification}, or None if cancelled.
+    """
+    if not paths:
+        return {}
+    classifications = CLASSIFICATIONS if classifications is None else classifications
+    sublabels = DEFAULT_CLASSIFICATION_DESCRIPTIONS if sublabels is None else sublabels
+
+    win = GlassWindow(width=620)
+    win.header("DAAMS ? Protect assets", f"Protect {len(paths)} assets", icon="shield")
+    win.text("Choose a classification for each item, or set all items at once:", "dim")
+    get_choices = win.batch_selector(paths, classifications, sublabels)
+    win.buttons([("Cancel", "secondary", None), ("Protect", "primary", get_choices)], gap_before=16)
     return win.show()
 
 
