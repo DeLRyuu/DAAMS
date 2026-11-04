@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using ControlCenter.Models;
 using ControlCenter.Services;
@@ -400,6 +402,64 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     public ICommand SaveSmtpSettingsCommand { get; }
 
     // ============================================================
+    // Data Maintenance
+    // ============================================================
+    private bool _isMaintenanceBusy;
+    public bool IsMaintenanceBusy
+    {
+        get => _isMaintenanceBusy;
+        set
+        {
+            if (SetProperty(ref _isMaintenanceBusy, value))
+            {
+                OnPropertyChanged(nameof(CanRunMaintenance));
+            }
+        }
+    }
+
+    public bool CanRunMaintenance => !IsMaintenanceBusy;
+
+    private string? _maintenanceStatusText;
+    public string? MaintenanceStatusText
+    {
+        get => _maintenanceStatusText;
+        set => SetProperty(ref _maintenanceStatusText, value);
+    }
+
+    private string? _maintenanceMessage;
+    public string? MaintenanceMessage
+    {
+        get => _maintenanceMessage;
+        set => SetProperty(ref _maintenanceMessage, value);
+    }
+
+    private Brush _maintenanceMessageBrush = Brushes.Gray;
+    public Brush MaintenanceMessageBrush
+    {
+        get => _maintenanceMessageBrush;
+        set => SetProperty(ref _maintenanceMessageBrush, value);
+    }
+
+    public ICommand CleanLocalDataCommand { get; }
+    public ICommand CleanCloudDataCommand { get; }
+
+    private bool _cleanLocalAll;
+    public bool CleanLocalAll
+    {
+        get => _cleanLocalAll;
+        set => SetProperty(ref _cleanLocalAll, value);
+    }
+
+    private bool _cleanCloudAll;
+    public bool CleanCloudAll
+    {
+        get => _cleanCloudAll;
+        set => SetProperty(ref _cleanCloudAll, value);
+    }
+
+    public event Func<Task>? DataResetCompleted;
+
+    // ============================================================
     // Admin PIN Management (Phase 9f)
     // ============================================================
     private string? _pinValidationMessage;
@@ -633,6 +693,8 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         _notificationEmailInput = _savedNotificationEmail;
 
         SaveSmtpSettingsCommand = new RelayCommand(param => SaveSmtpSettings(param as System.Windows.Controls.PasswordBox));
+        CleanLocalDataCommand = RelayCommand.FromAsync(_ => CleanLocalDataAsync(), canExecute: _ => CanRunMaintenance);
+        CleanCloudDataCommand = RelayCommand.FromAsync(_ => CleanCloudDataAsync(), canExecute: _ => CanRunMaintenance);
         var (smtpSender, smtpPwProt, smtpEnabled) = SettingsService.LoadSmtpSettings(_dbService?.DatabasePath);
         _savedSmtpSenderEmail = smtpSender;
         _savedSmtpPasswordProtected = smtpPwProt;
@@ -1226,6 +1288,237 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         {
             PinValidationMessage = message;
             return false;
+        }
+    }
+    // ============================================================
+    // Data Maintenance Execution (Local & Cloud)
+    // ============================================================
+    private async Task CleanLocalDataAsync()
+    {
+        if (IsMaintenanceBusy) return;
+
+        bool isAll = CleanLocalAll;
+
+        // 3.a Existing PIN prompt, unchanged
+        if (!ConfirmAdminPin(isAll ? "Enter admin PIN to clean local data (--all)." : "Enter admin PIN to clean local test data."))
+            return;
+
+        // 3.b If engine (main.py) is running, block with "Stop monitoring first." Do not kill it.
+        if (DataMaintenanceService.IsEngineRunning())
+        {
+            MessageBox.Show("Stop monitoring first.", "DAAMS Control Center", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MaintenanceMessage = "Stop monitoring first.";
+            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+            return;
+        }
+
+        // 3.c & 3.e Confirmation dialog stating exactly what will be deleted
+        var confirmDialog = new Views.CleanDataConfirmationWindow(isCloud: false, isAll: isAll)
+        {
+            Owner = Application.Current?.MainWindow
+        };
+        if (confirmDialog.ShowDialog() != true)
+            return;
+
+        // 4. Execution
+        IsMaintenanceBusy = true;
+        MaintenanceStatusText = "Working...";
+        MaintenanceMessage = null;
+
+        try
+        {
+            var result = await DataMaintenanceService.RunScriptAsync("reset_test_data.py", isAll ? "--all" : null, "RESET");
+
+            if (result.ExitCode == 0)
+            {
+                string summary = string.IsNullOrWhiteSpace(result.Output) ? "Local data cleaned successfully." : result.Output.Trim();
+                if (isAll)
+                {
+                    MaintenanceMessage = "Protected assets cleared and PIN reset to default.";
+                }
+                else
+                {
+                    MaintenanceMessage = "Local data cleanup completed.";
+                }
+                MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.StatusPositive") as Brush ?? Brushes.LightGreen;
+
+                if (DataResetCompleted != null)
+                {
+                    await DataResetCompleted.Invoke();
+                }
+
+                var resultDialog = new Views.CleanDataResultWindow(
+                    isAll ? "Clean Local Data (--all)" : "Clean Local Data",
+                    isAll ? "Protected assets cleared and PIN reset to default." : "Completed successfully",
+                    summary,
+                    isSuccess: true)
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                resultDialog.ShowDialog();
+            }
+            else
+            {
+                string error = !string.IsNullOrWhiteSpace(result.Error) ? result.Error.Trim() : result.Output.Trim();
+                MaintenanceMessage = "Local data cleanup failed.";
+                MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+
+                var resultDialog = new Views.CleanDataResultWindow(
+                    isAll ? "Clean Local Data (--all)" : "Clean Local Data",
+                    "Execution failed",
+                    error,
+                    isSuccess: false)
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                resultDialog.ShowDialog();
+            }
+        }
+        catch (Exception ex)
+        {
+            MaintenanceMessage = $"Error running cleanup: {ex.Message}";
+            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+        }
+        finally
+        {
+            CleanLocalAll = false;
+            CleanCloudAll = false;
+            IsMaintenanceBusy = false;
+            MaintenanceStatusText = null;
+        }
+    }
+
+    private async Task CleanCloudDataAsync()
+    {
+        if (IsMaintenanceBusy) return;
+
+        bool isAll = CleanCloudAll;
+
+        // 3.a Existing PIN prompt, unchanged
+        if (!ConfirmAdminPin(isAll ? "Enter admin PIN to clean cloud data (--all)." : "Enter admin PIN to clean cloud test data."))
+            return;
+
+        // 3.b If engine (main.py) is running, block with "Stop monitoring first." Do not kill it.
+        if (DataMaintenanceService.IsEngineRunning())
+        {
+            MessageBox.Show("Stop monitoring first.", "DAAMS Control Center", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MaintenanceMessage = "Stop monitoring first.";
+            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+            return;
+        }
+
+        // 3.d Cloud only: first run reset_firestore.py --dry-run (add --all when the checkbox is checked so the counts match)
+        IsMaintenanceBusy = true;
+        MaintenanceStatusText = "Working...";
+        MaintenanceMessage = null;
+
+        MaintenanceScriptResult dryRunResult;
+        try
+        {
+            dryRunResult = await DataMaintenanceService.RunScriptAsync("reset_firestore.py", isAll ? "--dry-run --all" : "--dry-run", null);
+        }
+        catch (Exception ex)
+        {
+            IsMaintenanceBusy = false;
+            MaintenanceStatusText = null;
+            MaintenanceMessage = $"Error running dry run: {ex.Message}";
+            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+            return;
+        }
+        finally
+        {
+            IsMaintenanceBusy = false;
+            MaintenanceStatusText = null;
+        }
+
+        // On Firestore credential or internet failure, show the script's own message and do not retry.
+        if (dryRunResult.ExitCode != 0)
+        {
+            string error = !string.IsNullOrWhiteSpace(dryRunResult.Error) ? dryRunResult.Error.Trim() : dryRunResult.Output.Trim();
+            MaintenanceMessage = "Failed to connect to Firestore.";
+            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+
+            var errorDialog = new Views.CleanDataResultWindow("Clean Cloud Data", "Connection / Credential Check Failed", error, isSuccess: false)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+            errorDialog.ShowDialog();
+            return;
+        }
+
+        // 3.c & 3.d Confirmation dialog showing dry-run output; final button disabled until user types DELETE CLOUD DATA
+        var confirmDialog = new Views.CleanDataConfirmationWindow(isCloud: true, isAll: isAll, dryRunOutput: dryRunResult.Output.Trim())
+        {
+            Owner = Application.Current?.MainWindow
+        };
+        if (confirmDialog.ShowDialog() != true)
+            return;
+
+        // 4. Execution
+        IsMaintenanceBusy = true;
+        MaintenanceStatusText = "Working...";
+        MaintenanceMessage = null;
+
+        try
+        {
+            var result = await DataMaintenanceService.RunScriptAsync("reset_firestore.py", isAll ? "--all" : null, "DELETE CLOUD DATA");
+
+            if (result.ExitCode == 0)
+            {
+                string summary = string.IsNullOrWhiteSpace(result.Output) ? "Cloud data cleaned successfully." : result.Output.Trim();
+                if (isAll)
+                {
+                    MaintenanceMessage = "Protected assets cleared and PIN reset to default.";
+                }
+                else
+                {
+                    MaintenanceMessage = "Cloud data cleanup completed.";
+                }
+                MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.StatusPositive") as Brush ?? Brushes.LightGreen;
+
+                if (DataResetCompleted != null)
+                {
+                    await DataResetCompleted.Invoke();
+                }
+
+                var resultDialog = new Views.CleanDataResultWindow(
+                    isAll ? "Clean Cloud Data (--all)" : "Clean Cloud Data",
+                    isAll ? "Protected assets cleared and PIN reset to default." : "Completed successfully",
+                    summary,
+                    isSuccess: true)
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                resultDialog.ShowDialog();
+            }
+            else
+            {
+                string error = !string.IsNullOrWhiteSpace(result.Error) ? result.Error.Trim() : result.Output.Trim();
+                MaintenanceMessage = "Cloud data cleanup failed.";
+                MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+
+                var resultDialog = new Views.CleanDataResultWindow(
+                    isAll ? "Clean Cloud Data (--all)" : "Clean Cloud Data",
+                    "Execution failed",
+                    error,
+                    isSuccess: false)
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                resultDialog.ShowDialog();
+            }
+        }
+        catch (Exception ex)
+        {
+            MaintenanceMessage = $"Error running cleanup: {ex.Message}";
+            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+        }
+        finally
+        {
+            CleanLocalAll = false;
+            CleanCloudAll = false;
+            IsMaintenanceBusy = false;
+            MaintenanceStatusText = null;
         }
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -123,6 +123,20 @@ public class MainViewModel : ViewModelBase
             [NavigationSection.SecurityAlerts] = CasesViewModel,
             [NavigationSection.IncidentReports] = IncidentReportsViewModel,
             [NavigationSection.Settings] = _settingsViewModel,
+        };
+
+        _settingsViewModel.DataResetCompleted += async () =>
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            foreach (var section in _sections.Values)
+            {
+                if (section is IDataSection dataSection)
+                {
+                    await dataSection.RefreshAsync();
+                }
+            }
+            await _settingsViewModel.RefreshAsync();
+            await RefreshSyncStatusAsync();
         };
 
         _currentSection = NavigationSection.Dashboard;

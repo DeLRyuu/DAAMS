@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
@@ -571,11 +571,11 @@ public class SettingsService
                 using var reader = cmd.ExecuteReader();
                 if (reader.Read())
                 {
-                    string h = reader.GetString(0);
+                    string h = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
                     string s = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-                    if (!string.IsNullOrEmpty(h))
+                    if (!string.IsNullOrWhiteSpace(h))
                     {
-                        return (h, s);
+                        return (h.Trim(), s);
                     }
                 }
             }

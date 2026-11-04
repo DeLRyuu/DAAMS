@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -314,34 +314,7 @@ public class LocalDatabaseService
 
     public async Task<bool> VerifyPinAsync(string pin)
     {
-        return await Task.Run(() =>
-        {
-            try
-            {
-                using var conn = CreateConnection();
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = "SELECT pin_hash, salt FROM security_settings WHERE key = 'pin_config' LIMIT 1;";
-                using var reader = cmd.ExecuteReader();
-                if (!reader.Read())
-                {
-                    return false;
-                }
-
-                string pinHash = reader.GetString(0);
-                string salt = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-
-                using var sha256 = SHA256.Create();
-                byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(salt + pin));
-                string computedHash = Convert.ToHexString(bytes).ToLowerInvariant();
-
-                return string.Equals(pinHash, computedHash, StringComparison.OrdinalIgnoreCase);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[LocalDatabaseService] VerifyPinAsync error: {ex}");
-                return false;
-            }
-        });
+        return await Task.Run(() => SettingsService.VerifyPin(pin, _databasePath));
     }
 
     // =========================================================================

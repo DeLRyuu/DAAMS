@@ -1,4 +1,4 @@
-<UserControl x:Class="ControlCenter.Views.SettingsView"
+﻿<UserControl x:Class="ControlCenter.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -378,6 +378,105 @@
                         <TextBlock Grid.Column="1" Text="{Binding EmailAlertsSummaryText}" Style="{StaticResource Text.Secondary}" VerticalAlignment="Center" />
                     </Grid>
 
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== 8. DATA MAINTENANCE ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Data Maintenance" Style="{StaticResource Text.SectionHeading}" />
+                            <TextBlock Text="Clean test data and reset history for demonstration or fresh test runs" Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding MaintenanceStatusText}" Style="{StaticResource Text.Secondary}"
+                                   Foreground="{StaticResource Brush.Accent}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding MaintenanceStatusText, Converter={StaticResource StringToVis}}" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Clean Local Data" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Clears local activity logs, security alerts, and incident reports."
+                                       Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="This computer only, backup is made."
+                                       Style="{StaticResource Text.Secondary}" FontStyle="Italic" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="Removes every protected asset and resets the PIN to default."
+                                       Foreground="{StaticResource Brush.RiskCritical}"
+                                       FontWeight="SemiBold"
+                                       Style="{StaticResource Text.Secondary}"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding CleanLocalAll, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Button Content="Clean Local Data" Style="{StaticResource Button.Secondary}"
+                                    Command="{Binding CleanLocalDataCommand}"
+                                    IsEnabled="{Binding CanRunMaintenance}"
+                                    HorizontalAlignment="Right" />
+                            <CheckBox Margin="0,8,0,0"
+                                      IsChecked="{Binding CleanLocalAll, Mode=TwoWay}"
+                                      IsEnabled="{Binding CanRunMaintenance}"
+                                      HorizontalAlignment="Right">
+                                <TextBlock Text="Also delete protected assets and PIN settings (--all)"
+                                           Foreground="{StaticResource Brush.RiskCritical}"
+                                           FontSize="{StaticResource FontSize.Small}"
+                                           VerticalAlignment="Center" />
+                            </CheckBox>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Clean Cloud Data" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Deletes test records from Firebase Firestore."
+                                       Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="Permanent, no backup."
+                                       Style="{StaticResource Text.Secondary}" FontStyle="Italic" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="Removes every protected asset and resets the PIN to default."
+                                       Foreground="{StaticResource Brush.RiskCritical}"
+                                       FontWeight="SemiBold"
+                                       Style="{StaticResource Text.Secondary}"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding CleanCloudAll, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Button Content="Clean Cloud Data" Style="{StaticResource Button.Secondary}"
+                                    Command="{Binding CleanCloudDataCommand}"
+                                    IsEnabled="{Binding CanRunMaintenance}"
+                                    HorizontalAlignment="Right" />
+                            <CheckBox Margin="0,8,0,0"
+                                      IsChecked="{Binding CleanCloudAll, Mode=TwoWay}"
+                                      IsEnabled="{Binding CanRunMaintenance}"
+                                      HorizontalAlignment="Right">
+                                <TextBlock Text="Also delete protected assets and PIN settings (--all)"
+                                           Foreground="{StaticResource Brush.RiskCritical}"
+                                           FontSize="{StaticResource FontSize.Small}"
+                                           VerticalAlignment="Center" />
+                            </CheckBox>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="{Binding MaintenanceMessage}"
+                               Foreground="{Binding MaintenanceMessageBrush}"
+                               Style="{StaticResource Text.Secondary}"
+                               Margin="0,4,0,0"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding MaintenanceMessage, Converter={StaticResource StringToVis}}" />
                 </StackPanel>
             </Border>
 
