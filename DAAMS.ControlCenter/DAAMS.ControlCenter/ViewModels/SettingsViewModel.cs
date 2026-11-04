@@ -279,7 +279,125 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
     public ICommand SaveWorkHoursCommand { get; }
 
+    // ============================================================
+    // Email Alerts (Shared Admin Settings)
+    // ============================================================
+    private string _notificationEmailInput = string.Empty;
+    public string NotificationEmailInput
+    {
+        get => _notificationEmailInput;
+        set
+        {
+            if (SetProperty(ref _notificationEmailInput, value))
+            {
+                EmailValidationMessage = null;
+            }
+        }
+    }
+
+    private string _savedNotificationEmail = string.Empty;
+
+    public string EmailAlertsStatusLine
+    {
+        get
+        {
+            var enabledStr = Environment.GetEnvironmentVariable("DAAMS_EMAIL_ENABLED")?.Trim();
+            bool isEnabled = string.Equals(enabledStr, "true", StringComparison.OrdinalIgnoreCase);
+            var recipient = _savedNotificationEmail;
+
+            string status = isEnabled ? "On" : "Off";
+            if (!string.IsNullOrEmpty(recipient))
+            {
+                return $"Email alerts: {status} ({MaskEmail(recipient)})";
+            }
+            return $"Email alerts: {status}";
+        }
+    }
+
+    private string? _emailValidationMessage;
+    public string? EmailValidationMessage
+    {
+        get => _emailValidationMessage;
+        private set => SetProperty(ref _emailValidationMessage, value);
+    }
+
+    private string? _emailSavedStatusText;
+    public string? EmailSavedStatusText
+    {
+        get => _emailSavedStatusText;
+        private set => SetProperty(ref _emailSavedStatusText, value);
+    }
+
+    private DispatcherTimer? _emailSavedIndicatorTimer;
+
+    public ICommand SaveNotificationEmailCommand { get; }
+
     public Func<bool>? ConfirmPinCallback { get; set; }
+
+    // ============================================================
+    // SMTP Configuration (Encrypted DPAPI)
+    // ============================================================
+    private string _smtpSenderEmailInput = string.Empty;
+    public string SmtpSenderEmailInput
+    {
+        get => _smtpSenderEmailInput;
+        set
+        {
+            if (SetProperty(ref _smtpSenderEmailInput, value))
+            {
+                SmtpValidationMessage = null;
+            }
+        }
+    }
+
+    private bool _smtpEnabled;
+    public bool SmtpEnabled
+    {
+        get => _smtpEnabled;
+        set
+        {
+            if (SetProperty(ref _smtpEnabled, value))
+            {
+                SmtpValidationMessage = null;
+                OnPropertyChanged(nameof(SmtpStatusLine));
+            }
+        }
+    }
+
+    private string _savedSmtpSenderEmail = string.Empty;
+    private string _savedSmtpPasswordProtected = string.Empty;
+    private bool _savedSmtpEnabled;
+
+    public string SmtpStatusLine
+    {
+        get
+        {
+            string state = _savedSmtpEnabled ? "Enabled" : "Disabled";
+            if (!string.IsNullOrWhiteSpace(_savedSmtpSenderEmail))
+            {
+                return $"SMTP: {state} ({_savedSmtpSenderEmail})";
+            }
+            return $"SMTP: {state}";
+        }
+    }
+
+    private string? _smtpValidationMessage;
+    public string? SmtpValidationMessage
+    {
+        get => _smtpValidationMessage;
+        private set => SetProperty(ref _smtpValidationMessage, value);
+    }
+
+    private string? _smtpSavedStatusText;
+    public string? SmtpSavedStatusText
+    {
+        get => _smtpSavedStatusText;
+        private set => SetProperty(ref _smtpSavedStatusText, value);
+    }
+
+    private DispatcherTimer? _smtpSavedIndicatorTimer;
+
+    public ICommand SaveSmtpSettingsCommand { get; }
 
     // ============================================================
     // 4. Engine Defaults (Read-only reference)
@@ -491,6 +609,17 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         CancelResetCommand = new RelayCommand(_ => IsConfirmingReset = false);
         CancelChangesCommand = new RelayCommand(_ => CancelChanges());
         SaveWorkHoursCommand = new RelayCommand(_ => SaveWorkHours());
+        SaveNotificationEmailCommand = new RelayCommand(_ => SaveNotificationEmail());
+        _savedNotificationEmail = SettingsService.LoadNotificationEmail(_dbService?.DatabasePath);
+        _notificationEmailInput = _savedNotificationEmail;
+
+        SaveSmtpSettingsCommand = new RelayCommand(param => SaveSmtpSettings(param as System.Windows.Controls.PasswordBox));
+        var (smtpSender, smtpPwProt, smtpEnabled) = SettingsService.LoadSmtpSettings(_dbService?.DatabasePath);
+        _savedSmtpSenderEmail = smtpSender;
+        _savedSmtpPasswordProtected = smtpPwProt;
+        _savedSmtpEnabled = smtpEnabled;
+        _smtpSenderEmailInput = smtpSender;
+        _smtpEnabled = smtpEnabled;
 
         var (initialStart, initialEnd) = SettingsService.LoadWorkHours(_dbService?.DatabasePath);
         _currentWorkStartHour = initialStart;
@@ -805,7 +934,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         {
             var enabledStr = Environment.GetEnvironmentVariable("DAAMS_EMAIL_ENABLED")?.Trim();
             bool isEnabled = string.Equals(enabledStr, "true", StringComparison.OrdinalIgnoreCase);
-            var recipient = Environment.GetEnvironmentVariable("DAAMS_NOTIFICATION_EMAIL")?.Trim() ?? string.Empty;
+            var recipient = _savedNotificationEmail;
 
             if (!isEnabled)
             {
@@ -844,7 +973,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         _workHoursSavedIndicatorTimer.Start();
     }
 
-    private bool ConfirmAdminPin()
+    private bool ConfirmAdminPin(string description = "Enter admin PIN to proceed.")
     {
         if (ConfirmPinCallback != null)
         {
@@ -854,7 +983,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         try
         {
             var db = _dbService ?? new LocalDatabaseService();
-            var prompt = new Views.PinPromptWindow(db, "Enter admin PIN to update work hours.")
+            var prompt = new Views.PinPromptWindow(db, description)
             {
                 Owner = System.Windows.Application.Current?.MainWindow
             };
@@ -907,6 +1036,131 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         else
         {
             WorkHoursValidationMessage = "Unable to save work hours. Check folder permissions.";
+        }
+    }
+
+    private void TriggerEmailSavedIndicator()
+    {
+        EmailSavedStatusText = "Saved";
+        _emailSavedIndicatorTimer?.Stop();
+        _emailSavedIndicatorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _emailSavedIndicatorTimer.Tick += (_, _) =>
+        {
+            _emailSavedIndicatorTimer?.Stop();
+            EmailSavedStatusText = null;
+        };
+        _emailSavedIndicatorTimer.Start();
+    }
+
+    public void SaveNotificationEmail()
+    {
+        EmailSavedStatusText = null;
+        string email = NotificationEmailInput?.Trim() ?? string.Empty;
+
+        if (!SettingsService.IsValidEmail(email))
+        {
+            EmailValidationMessage = "Enter a valid email address (e.g. name@domain.com, max 254 characters).";
+            return;
+        }
+
+        EmailValidationMessage = null;
+
+        if (!ConfirmAdminPin())
+        {
+            return;
+        }
+
+        bool success = SettingsService.SaveNotificationEmail(email, _dbService?.DatabasePath);
+        if (success)
+        {
+            _savedNotificationEmail = email;
+            NotificationEmailInput = email;
+            OnPropertyChanged(nameof(EmailAlertsStatusLine));
+            OnPropertyChanged(nameof(EmailAlertsSummaryText));
+            TriggerEmailSavedIndicator();
+        }
+        else
+        {
+            EmailValidationMessage = "Unable to save email settings. Check folder permissions.";
+        }
+    }
+
+    public void SyncSmtpPasswordBox(System.Windows.Controls.PasswordBox? box)
+    {
+        if (box != null && !string.IsNullOrEmpty(_savedSmtpPasswordProtected))
+        {
+            string? decrypted = SettingsService.DecryptPassword(_savedSmtpPasswordProtected);
+            if (!string.IsNullOrEmpty(decrypted))
+            {
+                box.Password = decrypted;
+            }
+        }
+    }
+
+    private void TriggerSmtpSavedIndicator()
+    {
+        SmtpSavedStatusText = "Saved";
+        _smtpSavedIndicatorTimer?.Stop();
+        _smtpSavedIndicatorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _smtpSavedIndicatorTimer.Tick += (_, _) =>
+        {
+            _smtpSavedIndicatorTimer?.Stop();
+            SmtpSavedStatusText = null;
+        };
+        _smtpSavedIndicatorTimer.Start();
+    }
+
+    public void SaveSmtpSettings(System.Windows.Controls.PasswordBox? passwordBox)
+    {
+        SmtpSavedStatusText = null;
+        string sender = SmtpSenderEmailInput?.Trim() ?? string.Empty;
+        string newPassword = passwordBox?.Password ?? string.Empty;
+
+        if (SmtpEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(sender) || !SettingsService.IsValidEmail(sender))
+            {
+                SmtpValidationMessage = "Enter a valid sender email address (e.g. name@domain.com).";
+                return;
+            }
+
+            if (string.IsNullOrEmpty(newPassword) && string.IsNullOrEmpty(_savedSmtpPasswordProtected))
+            {
+                SmtpValidationMessage = "App password is required when SMTP is enabled.";
+                return;
+            }
+        }
+        else if (!string.IsNullOrEmpty(sender) && !SettingsService.IsValidEmail(sender))
+        {
+            SmtpValidationMessage = "Enter a valid sender email address (e.g. name@domain.com).";
+            return;
+        }
+
+        SmtpValidationMessage = null;
+
+        if (!ConfirmAdminPin("Enter admin PIN to update SMTP settings."))
+        {
+            return;
+        }
+
+        string protectedBytes = _savedSmtpPasswordProtected;
+        if (!string.IsNullOrEmpty(newPassword))
+        {
+            protectedBytes = SettingsService.EncryptPassword(newPassword);
+        }
+
+        bool success = SettingsService.SaveSmtpSettings(sender, protectedBytes, SmtpEnabled, _dbService?.DatabasePath);
+        if (success)
+        {
+            _savedSmtpSenderEmail = sender;
+            _savedSmtpPasswordProtected = protectedBytes;
+            _savedSmtpEnabled = SmtpEnabled;
+            OnPropertyChanged(nameof(SmtpStatusLine));
+            TriggerSmtpSavedIndicator();
+        }
+        else
+        {
+            SmtpValidationMessage = "Unable to save SMTP settings. Check folder permissions.";
         }
     }
 }

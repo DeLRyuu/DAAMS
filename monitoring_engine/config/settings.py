@@ -364,6 +364,264 @@ SMTP_PASSWORD = os.environ.get("DAAMS_SMTP_PASSWORD", "")
 # Where security alert / incident notifications are sent.
 NOTIFICATION_EMAIL = os.environ.get("DAAMS_NOTIFICATION_EMAIL", "")
 
+_notification_email_cache = None
+_notification_email_cache_time = 0.0
+_NOTIFICATION_EMAIL_CACHE_TTL = 5.0
+
+
+def clear_notification_email_cache() -> None:
+    global _notification_email_cache, _notification_email_cache_time
+    _notification_email_cache = None
+    _notification_email_cache_time = 0.0
+
+
+def is_valid_notification_email(email: str) -> bool:
+    if not email or not isinstance(email, str):
+        return False
+    trimmed = email.strip()
+    if not trimmed or len(trimmed) > 254:
+        return False
+    if " " in trimmed or "\t" in trimmed or "," in trimmed or ";" in trimmed:
+        return False
+    parts = trimmed.split("@")
+    if len(parts) != 2:
+        return False
+    user, domain = parts
+    if not user or not domain:
+        return False
+    if "." not in domain or domain.startswith(".") or domain.endswith("."):
+        return False
+    return True
+
+
+def get_notification_email(force_refresh: bool = False) -> str:
+    global _notification_email_cache, _notification_email_cache_time
+
+    now = time.monotonic()
+    if (
+        not force_refresh
+        and _notification_email_cache is not None
+        and (now - _notification_email_cache_time) < _NOTIFICATION_EMAIL_CACHE_TTL
+    ):
+        return _notification_email_cache
+
+    fallback = os.environ.get("DAAMS_NOTIFICATION_EMAIL", "").strip()
+    settings_path = get_admin_settings_path()
+    file_email = None
+
+    if os.path.isfile(settings_path):
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                val = data.get("notification_email")
+                if isinstance(val, str):
+                    file_email = val.strip()
+        except Exception:
+            pass
+
+    resolved = file_email if file_email is not None else fallback
+    _notification_email_cache = resolved
+    _notification_email_cache_time = now
+    return _notification_email_cache
+
+
+def save_notification_email(email: str, path: str | None = None) -> bool:
+    """
+    Atomically writes notification_email to admin_settings.json,
+    preserving all other keys in the file.
+    """
+    if not is_valid_notification_email(email):
+        return False
+
+    target_path = path or get_admin_settings_path()
+    target_dir = os.path.dirname(target_path)
+    if target_dir and not os.path.isdir(target_dir):
+        os.makedirs(target_dir, exist_ok=True)
+
+    data = {}
+    if os.path.isfile(target_path):
+        try:
+            with open(target_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+        except Exception:
+            data = {}
+
+    data["notification_email"] = email.strip()
+
+    temp_fd, temp_path = tempfile.mkstemp(
+        dir=target_dir if target_dir else ".",
+        prefix="admin_settings_",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(temp_path, target_path)
+        clear_notification_email_cache()
+        return True
+    except Exception:
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except OSError:
+            pass
+        return False
+
+
+# ---------------------------------------------------------------------------
+# ENCRYPTED SMTP CREDENTIALS (Phase 9e) -- see email_notifier.py
+# ---------------------------------------------------------------------------
+_smtp_config_cache = None
+_smtp_config_cache_time = 0.0
+_SMTP_CONFIG_CACHE_TTL = 5.0
+
+
+def clear_smtp_config_cache() -> None:
+    global _smtp_config_cache, _smtp_config_cache_time
+    _smtp_config_cache = None
+    _smtp_config_cache_time = 0.0
+
+
+def get_smtp_settings_path() -> str:
+    env_path = os.environ.get("DAAMS_SMTP_SETTINGS_PATH")
+    if env_path and env_path.strip():
+        return os.path.normpath(env_path.strip())
+    env_db = os.environ.get("DAAMS_DATABASE_PATH")
+    if env_db and env_db.strip():
+        data_dir = os.path.dirname(os.path.abspath(env_db.strip()))
+    else:
+        data_dir = DATA_DIR
+    return os.path.normpath(os.path.join(data_dir, "smtp_settings.json"))
+
+
+def _decrypt_dpapi_password(password_protected: str) -> str | None:
+    if not password_protected or not isinstance(password_protected, str):
+        return None
+    try:
+        import base64
+        import win32crypt
+        raw_bytes = base64.b64decode(password_protected.strip())
+        _desc, plain_bytes = win32crypt.CryptUnprotectData(raw_bytes, None, None, None, 0)
+        return plain_bytes.decode("utf-8")
+    except Exception:
+        return None
+
+
+def get_smtp_config(force_refresh: bool = False) -> tuple[str, str, bool]:
+    """
+    Reads SMTP credentials from data/smtp_settings.json, decrypting the
+    app password using Windows DPAPI (win32crypt.CryptUnprotectData).
+    Cached ~5 seconds.
+
+    Returns (sender_email, password, enabled).
+    Falls back to environment variables (DAAMS_SMTP_USERNAME,
+    DAAMS_SMTP_PASSWORD, DAAMS_EMAIL_ENABLED) if the file is missing,
+    corrupted, or decryption fails.
+    Never prints or logs the decrypted password.
+    """
+    global _smtp_config_cache, _smtp_config_cache_time
+
+    now = time.monotonic()
+    if (
+        not force_refresh
+        and _smtp_config_cache is not None
+        and (now - _smtp_config_cache_time) < _SMTP_CONFIG_CACHE_TTL
+    ):
+        return _smtp_config_cache
+
+    fallback_sender = os.environ.get("DAAMS_SMTP_USERNAME", "").strip()
+    fallback_password = os.environ.get("DAAMS_SMTP_PASSWORD", "")
+    fallback_enabled = os.environ.get("DAAMS_EMAIL_ENABLED", "false").strip().lower() == "true"
+
+    settings_path = get_smtp_settings_path()
+    resolved = None
+
+    if os.path.isfile(settings_path):
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                sender = data.get("sender_email")
+                pw_prot = data.get("password_protected")
+                enabled = data.get("enabled")
+
+                decrypted_pw = None
+                decrypt_failed = False
+                if pw_prot:
+                    decrypted_pw = _decrypt_dpapi_password(pw_prot)
+                    if decrypted_pw is None:
+                        decrypt_failed = True
+
+                if not decrypt_failed:
+                    sender_str = str(sender).strip() if sender is not None else ""
+                    pw_str = decrypted_pw if decrypted_pw is not None else ""
+                    enabled_bool = bool(enabled) if enabled is not None else False
+                    resolved = (sender_str, pw_str, enabled_bool)
+        except Exception:
+            resolved = None
+
+    if resolved is None:
+        resolved = (fallback_sender, fallback_password, fallback_enabled)
+
+    _smtp_config_cache = resolved
+    _smtp_config_cache_time = now
+    return _smtp_config_cache
+
+
+def save_smtp_config(
+    sender_email: str,
+    password: str,
+    enabled: bool,
+    path: str | None = None,
+) -> bool:
+    """
+    Encrypts password with DPAPI (win32crypt.CryptProtectData) and atomically
+    writes {"sender_email", "password_protected", "enabled"} to smtp_settings.json.
+    Never prints or writes the plaintext password to disk, logs, or console.
+    """
+    target_path = path or get_smtp_settings_path()
+    target_dir = os.path.dirname(target_path)
+    if target_dir and not os.path.isdir(target_dir):
+        os.makedirs(target_dir, exist_ok=True)
+
+    try:
+        import base64
+        import win32crypt
+        if password:
+            encrypted_bytes = win32crypt.CryptProtectData(
+                password.encode("utf-8"),
+            )
+            pw_prot = base64.b64encode(encrypted_bytes).decode("ascii")
+        else:
+            pw_prot = ""
+
+        data = {
+            "sender_email": sender_email.strip(),
+            "password_protected": pw_prot,
+            "enabled": bool(enabled),
+        }
+
+        temp_fd, temp_path = tempfile.mkstemp(
+            dir=target_dir if target_dir else ".",
+            prefix="smtp_settings_",
+            suffix=".tmp",
+        )
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(temp_path, target_path)
+        clear_smtp_config_cache()
+        return True
+    except Exception:
+        try:
+            if "temp_path" in locals() and os.path.exists(temp_path):
+                os.remove(temp_path)
+        except OSError:
+            pass
+        return False
+
 # ---------------------------------------------------------------------------
 # EVENT COALESCING AND COPY/MOVE INFERENCE -- see event_aggregator.py
 # ---------------------------------------------------------------------------

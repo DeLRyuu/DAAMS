@@ -136,7 +136,131 @@
                 </StackPanel>
             </Border>
 
-            <!-- ==================== 4. NOTIFICATIONS ==================== -->
+            <!-- ==================== 4. EMAIL ALERTS ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Email alerts" Style="{StaticResource Text.SectionHeading}" />
+                            <TextBlock Text="{Binding EmailAlertsStatusLine}" Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding EmailSavedStatusText}" Style="{StaticResource Text.Secondary}"
+                                   Foreground="{StaticResource Brush.StatusPositive}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding EmailSavedStatusText, Converter={StaticResource StringToVis}}" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Recipient email" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Address where alert notifications are sent" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1" Width="220" Height="32" Style="{StaticResource Input.TextBox}"
+                                 Text="{Binding NotificationEmailInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding EmailValidationMessage}"
+                               Foreground="{StaticResource Brush.RiskCritical}"
+                               Style="{StaticResource Text.Secondary}"
+                               Margin="0,0,0,10"
+                               Visibility="{Binding EmailValidationMessage, Converter={StaticResource StringToVis}}" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                        <Button Content="Save" Style="{StaticResource Button.Primary}"
+                                Command="{Binding SaveNotificationEmailCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== 5. SMTP CONFIGURATION ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="SMTP configuration" Style="{StaticResource Text.SectionHeading}" />
+                            <TextBlock Text="{Binding SmtpStatusLine}" Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding SmtpSavedStatusText}" Style="{StaticResource Text.Secondary}"
+                                   Foreground="{StaticResource Brush.StatusPositive}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding SmtpSavedStatusText, Converter={StaticResource StringToVis}}" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Sender email" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Email address used to send alert notifications" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1" Width="220" Height="32" Style="{StaticResource Input.TextBox}"
+                                 Text="{Binding SmtpSenderEmailInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="App password" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Application password (stored encrypted on this device)" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <PasswordBox x:Name="SmtpPasswordBox" Grid.Column="1" Width="220" Height="32"
+                                     Background="{StaticResource Brush.SurfaceAlt}"
+                                     Foreground="{StaticResource Brush.TextPrimary}"
+                                     BorderBrush="{StaticResource Brush.Border}"
+                                     BorderThickness="1"
+                                     Padding="8,4"
+                                     FontSize="12"
+                                     VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Enabled" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Enable sending alert emails via SMTP (smtp.gmail.com:587)" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}"
+                                  IsChecked="{Binding SmtpEnabled, Mode=TwoWay}"
+                                  VerticalAlignment="Center" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding SmtpValidationMessage}"
+                               Foreground="{StaticResource Brush.RiskCritical}"
+                               Style="{StaticResource Text.Secondary}"
+                               Margin="0,0,0,10"
+                               Visibility="{Binding SmtpValidationMessage, Converter={StaticResource StringToVis}}" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                        <Button Content="Save" Style="{StaticResource Button.Primary}"
+                                Command="{Binding SaveSmtpSettingsCommand}"
+                                CommandParameter="{Binding ElementName=SmtpPasswordBox}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== 6. NOTIFICATIONS ==================== -->
             <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock Text="Notifications" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,14" />

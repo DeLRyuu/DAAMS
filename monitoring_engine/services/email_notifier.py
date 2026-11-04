@@ -38,6 +38,8 @@ from email.message import EmailMessage
 from config.settings import (
     EMAIL_ENABLED,
     NOTIFICATION_EMAIL,
+    get_notification_email,
+    get_smtp_config,
     SMTP_HOST,
     SMTP_PASSWORD,
     SMTP_PORT,
@@ -45,7 +47,7 @@ from config.settings import (
 )
 
 
-def _build_email(alert: dict, incident: dict) -> EmailMessage:
+def _build_email(alert: dict, incident: dict, recipient: str = None, sender: str = None) -> EmailMessage:
     asset_label = alert.get("asset") or "Protected Asset"
     risk_level = alert.get("risk_level", "Unknown")
     subject = f"[DAAMS] {risk_level}-Risk Security Alert — {asset_label}"
@@ -82,8 +84,8 @@ def _build_email(alert: dict, incident: dict) -> EmailMessage:
 
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = SMTP_USERNAME or "daams@localhost"
-    message["To"] = NOTIFICATION_EMAIL
+    message["From"] = sender or SMTP_USERNAME or "daams@localhost"
+    message["To"] = recipient or get_notification_email() or NOTIFICATION_EMAIL
     message.set_content(body)
     return message
 
@@ -96,11 +98,15 @@ def send_alert_email(alert: dict, incident: dict = None) -> bool:
     Returns True if the email was sent successfully, False otherwise
     (disabled, not fully configured, or a send failure). NEVER raises.
     """
-    if not EMAIL_ENABLED:
-        print("[EMAIL] Notifications disabled (DAAMS_EMAIL_ENABLED is not 'true'); skipping.")
+    sender_email, password, enabled = get_smtp_config()
+    if not enabled:
+        print("[EMAIL] Notifications disabled; skipping.")
         return False
 
-    if not SMTP_HOST or not NOTIFICATION_EMAIL:
+    recipient = get_notification_email()
+    host = SMTP_HOST or "smtp.gmail.com"
+    port = SMTP_PORT if SMTP_HOST else 587
+    if not host or not recipient or not sender_email:
         print(
             "[EMAIL WARNING] Email is enabled but SMTP_HOST and/or "
             "NOTIFICATION_EMAIL are not configured; skipping. "
@@ -111,21 +117,21 @@ def send_alert_email(alert: dict, incident: dict = None) -> bool:
     alert_id = alert.get("alert_id", "unknown")
 
     try:
-        message = _build_email(alert, incident or {})
+        message = _build_email(alert, incident or {}, recipient=recipient, sender=sender_email)
         print(f"[EMAIL] Attempting to send notification for {alert_id}...")
 
         if SMTP_PORT == 465:
             # Implicit TLS from the first byte (e.g. many providers' port 465).
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as server:
-                if SMTP_USERNAME and SMTP_PASSWORD:
-                    server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            with smtplib.SMTP_SSL(host, port, timeout=10) as server:
+                if sender_email and password:
+                    server.login(sender_email, password)
                 server.send_message(message)
         else:
             # STARTTLS (e.g. port 587) -- the common default for most providers.
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            with smtplib.SMTP(host, port, timeout=10) as server:
                 server.starttls()
-                if SMTP_USERNAME and SMTP_PASSWORD:
-                    server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                if sender_email and password:
+                    server.login(sender_email, password)
                 server.send_message(message)
 
         print(f"[EMAIL] Notification sent for {alert_id}.")

@@ -12,3 +12,6 @@ data/
 *.db
 *.db-shm
 *.db-wal
+
+data/smtp_settings.json
+data/admin_settings.json
