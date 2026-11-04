@@ -111,7 +111,6 @@ public class DashboardViewModel : ViewModelBase, IDataSection
     public ICommand OpenCaseCommand { get; }
     public ICommand OpenDeviceCommand { get; }
     public ICommand ViewAllActivityCommand { get; }
-    public ICommand ViewAllCasesCommand { get; }
 
     public DashboardViewModel(LocalDatabaseService db, Action<NavigationSection, string> navigateWith)
     {
@@ -137,7 +136,6 @@ public class DashboardViewModel : ViewModelBase, IDataSection
             }
         });
         ViewAllActivityCommand = new RelayCommand(_ => _navigateWith(NavigationSection.ActivityLogs, string.Empty));
-        ViewAllCasesCommand = new RelayCommand(_ => _navigateWith(NavigationSection.SecurityAlerts, string.Empty));
         ViewContext.Current.RangeChanged += () => _ = RefreshAsync();
     }
 

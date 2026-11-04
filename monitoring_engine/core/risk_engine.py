@@ -52,6 +52,7 @@ from config.settings import (
     ACTION_WEIGHTS,
     WORK_HOURS_START,
     WORK_HOURS_END,
+    get_work_hours,
     AFTER_HOURS_RISK_POINTS,
     ENABLE_NEAR_BOUNDARY_RISK,
     NEAR_BOUNDARY_MINUTES,
@@ -100,7 +101,7 @@ def _action_risk(action):
 
 def _time_risk(timestamp_str):
     """
-    Returns (points, factor_label_or_None) based on config.WORK_HOURS_START
+    Returns (points, factor_label_or_None) based on get_work_hours()
     / WORK_HOURS_END and the optional near-boundary rule. An invalid or
     unparseable timestamp safely contributes 0 (no time-based risk
     applied) rather than guessing.
@@ -121,12 +122,26 @@ def _time_risk(timestamp_str):
             return 0, "Could not parse activity timestamp; time-based risk skipped"
         hour_decimal = dt.hour + dt.minute / 60
 
-    if not (WORK_HOURS_START <= hour_decimal < WORK_HOURS_END):
+    work_start, work_end = get_work_hours()
+    if work_start < work_end:
+        is_working_hours = work_start <= hour_decimal < work_end
+        minutes_from_start = (hour_decimal - work_start) * 60
+        minutes_from_end = (work_end - hour_decimal) * 60
+    else:
+        is_working_hours = hour_decimal >= work_start or hour_decimal < work_end
+        if hour_decimal >= work_start:
+            minutes_from_start = (hour_decimal - work_start) * 60
+            minutes_from_end = (work_end + 24 - hour_decimal) * 60
+        else:
+            minutes_from_start = (hour_decimal + 24 - work_start) * 60
+            minutes_from_end = (work_end - hour_decimal) * 60
+
+    if not is_working_hours:
         return AFTER_HOURS_RISK_POINTS, f"Outside normal working hours (+{AFTER_HOURS_RISK_POINTS})"
 
     if ENABLE_NEAR_BOUNDARY_RISK:
-        minutes_from_start = (hour_decimal - WORK_HOURS_START) * 60
-        minutes_from_end = (WORK_HOURS_END - hour_decimal) * 60
+
+
         if minutes_from_start <= NEAR_BOUNDARY_MINUTES or minutes_from_end <= NEAR_BOUNDARY_MINUTES:
             return (
                 NEAR_BOUNDARY_RISK_POINTS,

@@ -103,7 +103,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         new TimeRangeOption(TimeRange.All, "All")
     };
 
-    private bool _autoRefreshEnabled;
+    private bool _autoRefreshEnabled = true;
     public bool AutoRefreshEnabled
     {
         get => _autoRefreshEnabled;
@@ -123,23 +123,16 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     private string _autoRefreshIntervalInput = "30";
     public string AutoRefreshIntervalInput
     {
-        get => string.IsNullOrWhiteSpace(_autoRefreshIntervalInput) ? "30" : _autoRefreshIntervalInput;
+        get => _autoRefreshIntervalInput;
         set
         {
-            string val = string.IsNullOrWhiteSpace(value) ? "30" : value.Trim();
-            if (_autoRefreshIntervalInput != val)
+            if (SetProperty(ref _autoRefreshIntervalInput, value))
             {
-                _autoRefreshIntervalInput = val;
-                OnPropertyChanged(nameof(AutoRefreshIntervalInput));
                 ApplyAutoRefreshTimer();
                 if (!_isInitializing)
                 {
                     SaveImmediate();
                 }
-            }
-            else
-            {
-                OnPropertyChanged(nameof(AutoRefreshIntervalInput));
             }
         }
     }
@@ -177,7 +170,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     }
 
     // ============================================================
-    // 3. Notifications
+    // 3. Notifications (Real, Saved immediately)
     // ============================================================
     private bool _notifyOnNewAlert = true;
     public bool NotifyOnNewAlert
@@ -233,6 +226,60 @@ public class SettingsViewModel : ViewModelBase, IDataSection
             }
         }
     }
+
+    // ============================================================
+    // Work Hours (Shared Admin Settings)
+    // ============================================================
+    private int _currentWorkStartHour = 7;
+    private int _currentWorkEndHour = 19;
+
+    public string CurrentWorkHoursText => $"Current: {_currentWorkStartHour:D2}:00 to {_currentWorkEndHour:D2}:00";
+
+    private string _workStartHourInput = string.Empty;
+    public string WorkStartHourInput
+    {
+        get => _workStartHourInput;
+        set
+        {
+            if (SetProperty(ref _workStartHourInput, value))
+            {
+                WorkHoursValidationMessage = null;
+            }
+        }
+    }
+
+    private string _workEndHourInput = string.Empty;
+    public string WorkEndHourInput
+    {
+        get => _workEndHourInput;
+        set
+        {
+            if (SetProperty(ref _workEndHourInput, value))
+            {
+                WorkHoursValidationMessage = null;
+            }
+        }
+    }
+
+    private string? _workHoursValidationMessage;
+    public string? WorkHoursValidationMessage
+    {
+        get => _workHoursValidationMessage;
+        private set => SetProperty(ref _workHoursValidationMessage, value);
+    }
+
+    private string? _workHoursSavedStatusText;
+    public string? WorkHoursSavedStatusText
+    {
+        get => _workHoursSavedStatusText;
+        private set => SetProperty(ref _workHoursSavedStatusText, value);
+    }
+
+    private DispatcherTimer? _workHoursSavedIndicatorTimer;
+
+    public ICommand SaveWorkHoursCommand { get; }
+
+    public Func<bool>? ConfirmPinCallback { get; set; }
 
     // ============================================================
     // 4. Engine Defaults (Read-only reference)
@@ -443,6 +490,13 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         ConfirmResetCommand = new RelayCommand(_ => ResetToDefaults());
         CancelResetCommand = new RelayCommand(_ => IsConfirmingReset = false);
         CancelChangesCommand = new RelayCommand(_ => CancelChanges());
+        SaveWorkHoursCommand = new RelayCommand(_ => SaveWorkHours());
+
+        var (initialStart, initialEnd) = SettingsService.LoadWorkHours(_dbService?.DatabasePath);
+        _currentWorkStartHour = initialStart;
+        _currentWorkEndHour = initialEnd;
+        _workStartHourInput = string.Empty;
+        _workEndHourInput = string.Empty;
 
         _isInitializing = true;
         try
@@ -775,5 +829,84 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         string domain = email.Substring(atIndex + 1);
         string maskedUser = user.Length > 0 ? user[0] + "***" : "***";
         return $"{maskedUser}@{domain}";
+    }
+
+    private void TriggerWorkHoursSavedIndicator()
+    {
+        WorkHoursSavedStatusText = "Saved";
+        _workHoursSavedIndicatorTimer?.Stop();
+        _workHoursSavedIndicatorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _workHoursSavedIndicatorTimer.Tick += (_, _) =>
+        {
+            _workHoursSavedIndicatorTimer?.Stop();
+            WorkHoursSavedStatusText = null;
+        };
+        _workHoursSavedIndicatorTimer.Start();
+    }
+
+    private bool ConfirmAdminPin()
+    {
+        if (ConfirmPinCallback != null)
+        {
+            return ConfirmPinCallback();
+        }
+
+        try
+        {
+            var db = _dbService ?? new LocalDatabaseService();
+            var prompt = new Views.PinPromptWindow(db, "Enter admin PIN to update work hours.")
+            {
+                Owner = System.Windows.Application.Current?.MainWindow
+            };
+            return prompt.ShowDialog() == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public void SaveWorkHours()
+    {
+        WorkHoursSavedStatusText = null;
+        if (!int.TryParse(WorkStartHourInput?.Trim(), out int start) || start < 0 || start > 24)
+        {
+            WorkHoursValidationMessage = "Start hour must be between 0 and 24.";
+            return;
+        }
+
+        if (!int.TryParse(WorkEndHourInput?.Trim(), out int end) || end < 0 || end > 24)
+        {
+            WorkHoursValidationMessage = "End hour must be between 0 and 24.";
+            return;
+        }
+
+        if (start == end)
+        {
+            WorkHoursValidationMessage = "End hour must differ from start hour.";
+            return;
+        }
+
+        WorkHoursValidationMessage = null;
+
+        if (!ConfirmAdminPin())
+        {
+            return;
+        }
+
+        bool success = SettingsService.SaveWorkHours(start, end, _dbService?.DatabasePath);
+        if (success)
+        {
+            _currentWorkStartHour = start;
+            _currentWorkEndHour = end;
+            OnPropertyChanged(nameof(CurrentWorkHoursText));
+            WorkStartHourInput = string.Empty;
+            WorkEndHourInput = string.Empty;
+            TriggerWorkHoursSavedIndicator();
+        }
+        else
+        {
+            WorkHoursValidationMessage = "Unable to save work hours. Check folder permissions.";
+        }
     }
 }

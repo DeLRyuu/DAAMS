@@ -63,8 +63,6 @@
                         </StackPanel>
                     </Grid>
 
-
-
                     <Grid Style="{StaticResource SettingRow}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -76,11 +74,69 @@
                         <CheckBox Grid.Column="1" Style="{StaticResource Toggle.Switch}" IsChecked="{Binding HighlightCriticalRows}" VerticalAlignment="Center" />
                     </Grid>
 
-
                 </StackPanel>
             </Border>
 
-            <!-- ==================== 3. NOTIFICATIONS ==================== -->
+            <!-- ==================== 3. WORK HOURS ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Work hours" Style="{StaticResource Text.SectionHeading}" />
+                            <TextBlock Text="{Binding CurrentWorkHoursText}" Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding WorkHoursSavedStatusText}" Style="{StaticResource Text.Secondary}"
+                                   Foreground="{StaticResource Brush.StatusPositive}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding WorkHoursSavedStatusText, Converter={StaticResource StringToVis}}" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Start hour (0–24)" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Beginning of normal working hours (inclusive)" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1" Width="70" Height="32" Style="{StaticResource Input.TextBox}"
+                                 Text="{Binding WorkStartHourInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="End hour (0–24)" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="End of normal working hours (exclusive)" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1" Width="70" Height="32" Style="{StaticResource Input.TextBox}"
+                                 Text="{Binding WorkEndHourInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding WorkHoursValidationMessage}"
+                               Foreground="{StaticResource Brush.RiskCritical}"
+                               Style="{StaticResource Text.Secondary}"
+                               Margin="0,0,0,10"
+                               Visibility="{Binding WorkHoursValidationMessage, Converter={StaticResource StringToVis}}" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                        <Button Content="Save" Style="{StaticResource Button.Primary}"
+                                Command="{Binding SaveWorkHoursCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== 4. NOTIFICATIONS ==================== -->
             <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock Text="Notifications" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,14" />
@@ -107,10 +163,8 @@
                         <TextBlock Grid.Column="1" Text="{Binding EmailAlertsSummaryText}" Style="{StaticResource Text.Secondary}" VerticalAlignment="Center" />
                     </Grid>
 
-
                 </StackPanel>
             </Border>
-
 
             </StackPanel>
         </ScrollViewer>

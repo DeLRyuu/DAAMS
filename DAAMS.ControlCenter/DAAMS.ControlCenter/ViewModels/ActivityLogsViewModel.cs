@@ -221,7 +221,7 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
         _selectedClassification = ClassificationOptions[0];
         _selectedRiskLevel = RiskLevelOptions[0];
 
-        RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.VisibleWhenSelected;
+        RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.Collapsed;
 
         Activity = CollectionViewSource.GetDefaultView(_allActivity);
         Activity.Filter = FilterPredicate;

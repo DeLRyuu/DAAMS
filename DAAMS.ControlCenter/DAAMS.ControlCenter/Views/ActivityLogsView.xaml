@@ -44,10 +44,10 @@
                      Tag="Search user, device, asset or action" />
 
             <Button Grid.Column="2" Content="Reset" Style="{StaticResource Button.Secondary}"
-                    Command="{Binding ResetFiltersCommand}" />
+                     Command="{Binding ResetFiltersCommand}" />
 
             <Button Grid.Column="4" Content="Export CSV" Style="{StaticResource Button.Secondary}"
-                    Command="{Binding ExportCsvCommand}" />
+                     Command="{Binding ExportCsvCommand}" />
         </Grid>
 
         <!-- Content area: exactly one of these four is visible at a time -->
@@ -57,7 +57,12 @@
                     Visibility="{Binding LoadState, Converter={StaticResource LoadStateVis}, ConverterParameter=Loaded}">
                 <DataGrid ItemsSource="{Binding Activity}" Style="{StaticResource Grid.Data}"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                          RowDetailsVisibilityMode="{Binding RowDetailsVisibilityMode}">
+                          RowDetailsVisibilityMode="Collapsed">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnRowPreviewMouseLeftButtonDown" />
+                        </Style>
+                    </DataGrid.RowStyle>
                     <DataGrid.GroupStyle>
                         <GroupStyle>
                             <GroupStyle.Panel>

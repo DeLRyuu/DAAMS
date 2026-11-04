@@ -231,7 +231,7 @@
                                        IsHitTestVisible="False"
                                        x:Name="Placeholder"
                                        Visibility="Collapsed" />
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" />
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="False" />
                         </Grid>
                     </Border>
                         <Border x:Name="FocusRing"

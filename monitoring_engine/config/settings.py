@@ -16,7 +16,10 @@ something, right-click it in File Explorer and choose
 DAAMS -> Protect This File/Folder.
 """
 
+import json
 import os
+import tempfile
+import time
 
 ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ENGINE_DIR, "data")
@@ -158,6 +161,128 @@ def _parse_work_hour(env_var: str, default: int) -> int:
 # Normal working hours, 24-hour clock. WORK_HOURS_START is inclusive,
 # WORK_HOURS_END is exclusive (so 19 means "up to but not including 7:00 PM").
 # Configurable via DAAMS_WORK_START and DAAMS_WORK_END (0-24, defaults: 7, 19).
+_work_hours_cache = None
+_work_hours_cache_time = 0.0
+_WORK_HOURS_CACHE_TTL = 5.0
+
+
+def get_admin_settings_path() -> str:
+    env_path = os.environ.get("DAAMS_ADMIN_SETTINGS_PATH")
+    if env_path and env_path.strip():
+        return os.path.normpath(env_path.strip())
+    env_db = os.environ.get("DAAMS_DATABASE_PATH")
+    if env_db and env_db.strip():
+        data_dir = os.path.dirname(os.path.abspath(env_db.strip()))
+    else:
+        data_dir = DATA_DIR
+    return os.path.normpath(os.path.join(data_dir, "admin_settings.json"))
+
+
+def clear_work_hours_cache() -> None:
+    global _work_hours_cache, _work_hours_cache_time
+    _work_hours_cache = None
+    _work_hours_cache_time = 0.0
+
+
+def get_work_hours(force_refresh: bool = False) -> tuple[int, int]:
+    global _work_hours_cache, _work_hours_cache_time
+
+    now = time.monotonic()
+    if not force_refresh and _work_hours_cache is not None and (now - _work_hours_cache_time) < _WORK_HOURS_CACHE_TTL:
+        return _work_hours_cache
+
+    fallback_start = _parse_work_hour("DAAMS_WORK_START", 7)
+    fallback_end = _parse_work_hour("DAAMS_WORK_END", 19)
+
+    settings_path = get_admin_settings_path()
+    file_start = None
+    file_end = None
+
+    if os.path.isfile(settings_path):
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                ws = data.get("work_start")
+                we = data.get("work_end")
+                if ws is not None and not isinstance(ws, bool):
+                    try:
+                        ws_int = int(ws)
+                        if 0 <= ws_int <= 24:
+                            file_start = ws_int
+                    except (ValueError, TypeError):
+                        pass
+                if we is not None and not isinstance(we, bool):
+                    try:
+                        we_int = int(we)
+                        if 0 <= we_int <= 24:
+                            file_end = we_int
+                    except (ValueError, TypeError):
+                        pass
+        except Exception:
+            pass
+
+    start = file_start if file_start is not None else fallback_start
+    end = file_end if file_end is not None else fallback_end
+
+    if start == end:
+        start = fallback_start
+        end = fallback_end
+        if start == end:
+            start, end = 7, 19
+
+    _work_hours_cache = (start, end)
+    _work_hours_cache_time = now
+    return _work_hours_cache
+
+
+def save_work_hours(start: int, end: int, path: str | None = None) -> bool:
+    """
+    Atomically writes work_start and work_end to admin_settings.json,
+    preserving all other keys in the file.
+    """
+    if not (0 <= start <= 24 and 0 <= end <= 24 and start != end):
+        return False
+
+    target_path = path or get_admin_settings_path()
+    target_dir = os.path.dirname(target_path)
+    if target_dir and not os.path.isdir(target_dir):
+        os.makedirs(target_dir, exist_ok=True)
+
+    data = {}
+    if os.path.isfile(target_path):
+        try:
+            with open(target_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+        except Exception:
+            data = {}
+
+    data["work_start"] = start
+    data["work_end"] = end
+
+    temp_fd, temp_path = tempfile.mkstemp(
+        dir=target_dir if target_dir else ".",
+        prefix="admin_settings_",
+        suffix=".tmp"
+    )
+    try:
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(temp_path, target_path)
+        clear_work_hours_cache()
+        return True
+    except Exception:
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except OSError:
+            pass
+        return False
+    return _work_hours_cache
+
+
 WORK_HOURS_START = _parse_work_hour("DAAMS_WORK_START", 7)
 WORK_HOURS_END = _parse_work_hour("DAAMS_WORK_END", 19)
 AFTER_HOURS_RISK_POINTS = 25
