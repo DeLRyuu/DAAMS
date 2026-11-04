@@ -16,7 +16,6 @@ Enforces the offline-first architecture:
 """
 
 import threading
-import time
 from typing import Optional, Tuple
 
 from core import database
@@ -29,7 +28,6 @@ _sync_thread: Optional[threading.Thread] = None
 _stop_event = threading.Event()
 _trigger_event = threading.Event()
 _sync_lock = threading.Lock()
-_last_offline_warning_time = 0.0
 
 
 def sync_batch() -> Tuple[int, int]:
@@ -38,8 +36,6 @@ def sync_batch() -> Tuple[int, int]:
     Returns (synced_count, failed_count).
     Thread-safe; does nothing if another sync is currently executing.
     """
-    global _last_offline_warning_time
-
     if not _sync_lock.acquire(blocking=False):
         return 0, 0
 
@@ -48,16 +44,9 @@ def sync_batch() -> Tuple[int, int]:
 
     try:
         # Check connectivity first
-        reachable, reason = firestore_logger.is_firestore_reachable()
+        reachable, _ = firestore_logger.is_firestore_reachable()
         if not reachable:
-            now = time.time()
-            if now - _last_offline_warning_time > 60:
-                print(f"[SYNC] Cloud sync paused (offline or unreachable: {reason}). Operating offline.")
-                _last_offline_warning_time = now
             return 0, 0
-
-        # Reset warning timer on successful connectivity
-        _last_offline_warning_time = 0.0
 
         # 1. Sync Security Settings (PIN)
         settings_pending = database.get_pending_sync_records("security_settings")
@@ -155,4 +144,3 @@ def stop_sync_service(timeout: float = 3.0):
 def trigger_sync():
     """Wake up the sync worker immediately to upload newly saved records."""
     _trigger_event.set()
-

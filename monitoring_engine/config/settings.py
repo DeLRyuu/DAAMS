@@ -18,12 +18,25 @@ DAAMS -> Protect This File/Folder.
 
 import json
 import os
+import sys
 import tempfile
 import time
 
 ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(ENGINE_DIR, "data")
-LOGS_DIR = os.path.join(ENGINE_DIR, "logs")
+_DAAMS_HOME = os.environ.get("DAAMS_HOME")
+if not _DAAMS_HOME:
+    if getattr(sys, "frozen", False):
+        _LOCALAPPDATA = os.environ.get(
+            "LOCALAPPDATA",
+            os.path.join(os.path.expanduser("~"), "AppData", "Local"),
+        )
+        _DAAMS_HOME = os.path.join(_LOCALAPPDATA, "DAAMS")
+    else:
+        _DAAMS_HOME = ENGINE_DIR
+DATA_DIR = os.path.join(_DAAMS_HOME, "data")
+LOGS_DIR = os.path.join(_DAAMS_HOME, "logs")
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
 
 # ---------------------------------------------------------------------------
 # PROTECTED ASSET SAFETY RULES (used by asset_registry.py and monitor.py)

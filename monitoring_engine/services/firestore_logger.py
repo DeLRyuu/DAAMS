@@ -22,8 +22,8 @@ from typing import Optional, Tuple
 
 from config.settings import (
     ENABLE_FIRESTORE,
+    ENGINE_DIR,
     FIRESTORE_COLLECTION,
-    FIRESTORE_CREDENTIALS_PATH,
     INCIDENT_REPORTS_COLLECTION,
     PROTECTED_ASSETS_COLLECTION,
     SECURITY_ALERTS_COLLECTION,
@@ -33,7 +33,62 @@ from config.settings import (
 _firestore_client = None
 _firestore_app = None
 _init_lock = threading.Lock()
-_warned_missing_creds = False
+_firestore_status = None
+
+
+def _resolve_credentials_path() -> Tuple[str, bool]:
+    candidates = []
+    configured_path = os.environ.get("DAAMS_FIREBASE_CREDENTIALS")
+    if configured_path and configured_path.strip():
+        candidates.append(configured_path.strip())
+
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidates.append(os.path.join(local_app_data, "DAAMS", "serviceAccountKey.json"))
+    candidates.append(os.path.join(ENGINE_DIR, "serviceAccountKey.json"))
+
+    seen = set()
+    unique_candidates = []
+    for candidate in candidates:
+        normalized = os.path.normcase(os.path.abspath(candidate))
+        if normalized not in seen:
+            seen.add(normalized)
+            unique_candidates.append(candidate)
+
+    for candidate in unique_candidates:
+        if os.path.isfile(candidate):
+            return candidate, True
+    return unique_candidates[0], False
+
+
+def _set_firestore_status(status: str, message: str) -> None:
+    global _firestore_status
+    if status != _firestore_status:
+        print(message)
+        _firestore_status = status
+
+
+def _is_authorization_error(error: Exception) -> bool:
+    details = f"{type(error).__name__} {error}".lower()
+    return any(term in details for term in ("unauthorized", "permissiondenied", "permission denied", "unauthenticated", "403", "401"))
+
+
+def _record_firestore_error(error: Exception) -> None:
+    if _is_authorization_error(error):
+        _set_firestore_status(
+            "unauthorized",
+            "Firestore key is invalid or access is unauthorized; records remain pending or failed.",
+        )
+    else:
+        _set_firestore_status(
+            "unavailable",
+            "Firestore unavailable; records remain pending or failed.",
+        )
+
+
+def _record_firestore_success() -> None:
+    if _firestore_status != "connected":
+        _set_firestore_status("connected", "Firestore connection restored.")
 
 
 def _asset_doc_id(path: str) -> str:
@@ -47,7 +102,7 @@ def get_firestore_client() -> Optional[object]:
     Return active Firestore client or attempt initialization.
     Thread-safe and retryable if previously offline.
     """
-    global _firestore_client, _firestore_app, _warned_missing_creds
+    global _firestore_client, _firestore_app
 
     if not ENABLE_FIRESTORE:
         return None
@@ -59,13 +114,12 @@ def get_firestore_client() -> Optional[object]:
         if _firestore_client is not None:
             return _firestore_client
 
-        if not os.path.exists(FIRESTORE_CREDENTIALS_PATH):
-            if not _warned_missing_creds:
-                print(
-                    f"[FIRESTORE WARNING] Credentials file not found at '{FIRESTORE_CREDENTIALS_PATH}'.\n"
-                    f"Firestore uploads will remain offline; local SQLite operations continue normally."
-                )
-                _warned_missing_creds = True
+        credentials_path, credentials_exist = _resolve_credentials_path()
+        if not credentials_exist:
+            _set_firestore_status(
+                "missing",
+                f"Firestore key not found; running offline. Put serviceAccountKey.json in {credentials_path}",
+            )
             return None
 
         try:
@@ -77,20 +131,23 @@ def get_firestore_client() -> Optional[object]:
                 try:
                     _firestore_app = firebase_admin.get_app()
                 except ValueError:
-                    cred = credentials.Certificate(FIRESTORE_CREDENTIALS_PATH)
+                    cred = credentials.Certificate(credentials_path)
                     _firestore_app = firebase_admin.initialize_app(cred)
 
             _firestore_client = firestore.client()
-            print("[FIRESTORE] Connected to Firebase Firestore.")
+            _set_firestore_status("connected", "Firestore connected.")
             return _firestore_client
         except ImportError:
-            if not _warned_missing_creds:
-                print("[FIRESTORE WARNING] 'firebase-admin' package is not installed.")
-                _warned_missing_creds = True
+            _set_firestore_status(
+                "unavailable",
+                "Firestore unavailable because firebase-admin is not installed; records remain pending.",
+            )
             return None
-        except Exception as e:
-            # Network issue, DNS error, or offline
-            # Do not permanently disable; allow retry later
+        except Exception:
+            _set_firestore_status(
+                "invalid_key",
+                "Firestore key could not be initialized; records remain pending.",
+            )
             return None
 
 
@@ -100,15 +157,28 @@ def is_firestore_reachable() -> Tuple[bool, str]:
     if client is None:
         if not ENABLE_FIRESTORE:
             return False, "Firestore disabled in configuration."
-        if not os.path.exists(FIRESTORE_CREDENTIALS_PATH):
+        _, credentials_exist = _resolve_credentials_path()
+        if not credentials_exist:
             return False, "Firestore credentials file not found."
         return False, "Firestore client unavailable (offline or connection error)."
 
     try:
         # Lightweight probe query
         client.collection(PROTECTED_ASSETS_COLLECTION).limit(1).get()
+        if _firestore_status == "offline":
+            _set_firestore_status("connected", "Firestore connection restored.")
         return True, "Connected"
     except Exception as e:
+        if _is_authorization_error(e):
+            _set_firestore_status(
+                "unauthorized",
+                "Firestore key is invalid or access is unauthorized; records remain pending or failed.",
+            )
+        else:
+            _set_firestore_status(
+                "offline",
+                "Firestore unavailable; running offline and keeping records local.",
+            )
         return False, str(e)
 
 
@@ -133,9 +203,10 @@ def upload_protected_asset(record: dict) -> bool:
             "status": record.get("status"),
         }
         client.collection(PROTECTED_ASSETS_COLLECTION).document(doc_id).set(payload, merge=True)
+        _record_firestore_success()
         return True
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Failed to sync protected asset: {e}")
+        _record_firestore_error(e)
         return False
 
 
@@ -157,9 +228,10 @@ def upload_security_settings(record: dict) -> bool:
             "is_default": bool(record.get("is_default")),
         }
         client.collection(SECURITY_SETTINGS_COLLECTION).document("pin_config").set(payload, merge=True)
+        _record_firestore_success()
         return True
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Failed to sync PIN settings: {e}")
+        _record_firestore_error(e)
         return False
 
 
@@ -191,9 +263,10 @@ def upload_security_alert(alert: dict) -> bool:
             "investigation_status": alert.get("investigation_status", "Not Started"),
         }
         client.collection(SECURITY_ALERTS_COLLECTION).document(alert_id).set(payload, merge=True)
+        _record_firestore_success()
         return True
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Failed to upload security alert: {e}")
+        _record_firestore_error(e)
         return False
 
 
@@ -229,9 +302,10 @@ def upload_incident_report(incident: dict) -> bool:
             "updated_at": incident.get("updated_at") or incident.get("timestamp"),
         }
         client.collection(INCIDENT_REPORTS_COLLECTION).document(incident_id).set(payload, merge=True)
+        _record_firestore_success()
         return True
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Failed to upload incident report: {e}")
+        _record_firestore_error(e)
         return False
 
 
@@ -264,7 +338,8 @@ def upload_activity(record: dict) -> bool:
             client.collection(FIRESTORE_COLLECTION).document(activity_id).set(payload, merge=True)
         else:
             client.collection(FIRESTORE_COLLECTION).add(payload)
+        _record_firestore_success()
         return True
     except Exception as e:
-        print(f"[FIRESTORE WARNING] Failed to upload activity to Firestore: {e}")
+        _record_firestore_error(e)
         return False
