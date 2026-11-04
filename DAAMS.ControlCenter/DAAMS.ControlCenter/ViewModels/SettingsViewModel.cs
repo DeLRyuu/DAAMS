@@ -400,6 +400,25 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     public ICommand SaveSmtpSettingsCommand { get; }
 
     // ============================================================
+    // Admin PIN Management (Phase 9f)
+    // ============================================================
+    private string? _pinValidationMessage;
+    public string? PinValidationMessage
+    {
+        get => _pinValidationMessage;
+        private set => SetProperty(ref _pinValidationMessage, value);
+    }
+
+    private string? _pinSuccessMessage;
+    public string? PinSuccessMessage
+    {
+        get => _pinSuccessMessage;
+        private set => SetProperty(ref _pinSuccessMessage, value);
+    }
+
+    private DispatcherTimer? _pinSuccessIndicatorTimer;
+
+    // ============================================================
     // 4. Engine Defaults (Read-only reference)
     // ============================================================
     public string WorkingHoursText => EngineDefaults.WorkingHoursText;
@@ -1161,6 +1180,52 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         else
         {
             SmtpValidationMessage = "Unable to save SMTP settings. Check folder permissions.";
+        }
+    }
+
+    private void TriggerPinSuccessIndicator(string message)
+    {
+        PinSuccessMessage = message;
+        _pinSuccessIndicatorTimer?.Stop();
+        _pinSuccessIndicatorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _pinSuccessIndicatorTimer.Tick += (_, _) =>
+        {
+            _pinSuccessIndicatorTimer?.Stop();
+            PinSuccessMessage = null;
+        };
+        _pinSuccessIndicatorTimer.Start();
+    }
+
+    public async Task<bool> ChangePinAsync(string currentPin, string newPin, string confirmPin)
+    {
+        PinValidationMessage = null;
+        PinSuccessMessage = null;
+
+        if (string.IsNullOrEmpty(currentPin))
+        {
+            PinValidationMessage = "Enter your current PIN.";
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(newPin))
+        {
+            PinValidationMessage = "Enter a new PIN.";
+            return false;
+        }
+
+        var (success, message) = await Task.Run(() =>
+            SettingsService.SaveNewPin(currentPin, newPin, confirmPin, _dbService?.DatabasePath));
+
+        if (success)
+        {
+            PinValidationMessage = null;
+            TriggerPinSuccessIndicator("PIN changed successfully.");
+            return true;
+        }
+        else
+        {
+            PinValidationMessage = message;
+            return false;
         }
     }
 }

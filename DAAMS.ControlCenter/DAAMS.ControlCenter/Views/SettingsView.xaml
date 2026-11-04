@@ -260,7 +260,98 @@
                 </StackPanel>
             </Border>
 
-            <!-- ==================== 6. NOTIFICATIONS ==================== -->
+            <!-- ==================== 6. ADMIN PIN ==================== -->
+            <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Admin PIN" Style="{StaticResource Text.SectionHeading}" />
+                            <TextBlock Text="Change the PIN used to confirm administrative security actions" Style="{StaticResource Text.Secondary}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding PinSuccessMessage}" Style="{StaticResource Text.Secondary}"
+                                   Foreground="{StaticResource Brush.StatusPositive}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding PinSuccessMessage, Converter={StaticResource StringToVis}}" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Current PIN" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Enter your existing admin PIN" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <PasswordBox x:Name="CurrentPinBox" Grid.Column="1" Width="220" Height="32"
+                                     MaxLength="8"
+                                     Background="{StaticResource Brush.SurfaceAlt}"
+                                     Foreground="{StaticResource Brush.TextPrimary}"
+                                     BorderBrush="{StaticResource Brush.Border}"
+                                     BorderThickness="1"
+                                     Padding="8,4"
+                                     FontSize="12"
+                                     VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="New PIN" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Enter a new 4–8 digit PIN (numbers only)" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <PasswordBox x:Name="NewPinBox" Grid.Column="1" Width="220" Height="32"
+                                     MaxLength="8"
+                                     Background="{StaticResource Brush.SurfaceAlt}"
+                                     Foreground="{StaticResource Brush.TextPrimary}"
+                                     BorderBrush="{StaticResource Brush.Border}"
+                                     BorderThickness="1"
+                                     Padding="8,4"
+                                     FontSize="12"
+                                     VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Confirm new PIN" Style="{StaticResource Text.Body}" />
+                            <TextBlock Text="Re-enter the new PIN to confirm" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <PasswordBox x:Name="ConfirmPinBox" Grid.Column="1" Width="220" Height="32"
+                                     MaxLength="8"
+                                     Background="{StaticResource Brush.SurfaceAlt}"
+                                     Foreground="{StaticResource Brush.TextPrimary}"
+                                     BorderBrush="{StaticResource Brush.Border}"
+                                     BorderThickness="1"
+                                     Padding="8,4"
+                                     FontSize="12"
+                                     VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding PinValidationMessage}"
+                               Foreground="{StaticResource Brush.RiskCritical}"
+                               Style="{StaticResource Text.Secondary}"
+                               Margin="0,0,0,10"
+                               Visibility="{Binding PinValidationMessage, Converter={StaticResource StringToVis}}" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                        <Button Content="Save" Style="{StaticResource Button.Primary}"
+                                Click="SavePinButton_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== 7. NOTIFICATIONS ==================== -->
             <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock Text="Notifications" Style="{StaticResource Text.SectionHeading}" Margin="0,0,0,14" />

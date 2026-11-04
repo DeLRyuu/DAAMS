@@ -3,7 +3,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using ControlCenter.Models;
+using Microsoft.Data.Sqlite;
 
 namespace ControlCenter.Services;
 
@@ -516,6 +520,236 @@ public class SettingsService
         {
             Debug.WriteLine($"[SettingsService] Failed to save smtp_settings.json: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the canonical path to the security_settings.json file in the database directory.
+    /// </summary>
+    public static string ResolveSecuritySettingsPath(string? dbPath = null)
+    {
+        string? envPath = Environment.GetEnvironmentVariable("DAAMS_SECURITY_SETTINGS_PATH");
+        if (!string.IsNullOrWhiteSpace(envPath))
+        {
+            return Path.GetFullPath(envPath.Trim());
+        }
+
+        string effectiveDbPath = !string.IsNullOrWhiteSpace(dbPath)
+            ? dbPath
+            : LocalDatabaseService.ResolveDatabasePath();
+
+        string? dir = Path.GetDirectoryName(Path.GetFullPath(effectiveDbPath));
+        if (string.IsNullOrEmpty(dir))
+        {
+            dir = AppContext.BaseDirectory;
+        }
+
+        return Path.Combine(dir, "security_settings.json");
+    }
+
+    /// <summary>
+    /// Loads the stored PIN hash and salt from SQLite or security_settings.json.
+    /// Never logs or exposes the hash or salt.
+    /// </summary>
+    public static (string PinHash, string Salt)? LoadSecuritySettings(string? dbPath = null)
+    {
+        // 1. Try SQLite
+        try
+        {
+            string effectiveDb = !string.IsNullOrWhiteSpace(dbPath) ? dbPath : LocalDatabaseService.ResolveDatabasePath();
+            if (File.Exists(effectiveDb))
+            {
+                using var conn = new SqliteConnection(new SqliteConnectionStringBuilder
+                {
+                    DataSource = effectiveDb,
+                    Mode = SqliteOpenMode.ReadOnly,
+                    DefaultTimeout = 5
+                }.ToString());
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT pin_hash, salt FROM security_settings WHERE key = 'pin_config' LIMIT 1;";
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    string h = reader.GetString(0);
+                    string s = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+                    if (!string.IsNullOrEmpty(h))
+                    {
+                        return (h, s);
+                    }
+                }
+            }
+        }
+        catch { }
+
+        // 2. Try JSON file fallback
+        try
+        {
+            string jsonPath = ResolveSecuritySettingsPath(dbPath);
+            if (File.Exists(jsonPath))
+            {
+                string json = File.ReadAllText(jsonPath);
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    string h = doc.RootElement.TryGetProperty("pin_hash", out var hProp) ? hProp.GetString() ?? "" : "";
+                    string s = doc.RootElement.TryGetProperty("salt", out var sProp) ? sProp.GetString() ?? "" : "";
+                    if (!string.IsNullOrEmpty(h))
+                    {
+                        return (h, s);
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Verifies candidate PIN against stored hash/salt matching pin_auth.py: SHA256(salt + candidate).
+    /// Never logs or prints candidate PIN, hash, or salt.
+    /// </summary>
+    public static bool VerifyPin(string candidatePin, string? dbPath = null)
+    {
+        if (string.IsNullOrEmpty(candidatePin)) return false;
+
+        var stored = LoadSecuritySettings(dbPath);
+        if (!stored.HasValue)
+        {
+            return candidatePin == "1234";
+        }
+
+        string pinHash = stored.Value.PinHash;
+        string salt = stored.Value.Salt;
+
+        using var sha256 = SHA256.Create();
+        byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(salt + candidatePin));
+        string computedHash = Convert.ToHexString(bytes).ToLowerInvariant();
+
+        return string.Equals(pinHash, computedHash, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Validates current PIN, new PIN format/match, and updates both SQLite and security_settings.json.
+    /// Never logs or prints candidate PIN, new PIN, or hash.
+    /// </summary>
+    public static (bool Success, string Message) SaveNewPin(
+        string currentPin,
+        string newPin,
+        string confirmPin,
+        string? dbPath = null)
+    {
+        if (!VerifyPin(currentPin, dbPath))
+        {
+            return (false, "Incorrect current PIN");
+        }
+
+        if (newPin != confirmPin)
+        {
+            return (false, "PINs do not match");
+        }
+
+        if (string.IsNullOrEmpty(newPin) || !newPin.All(char.IsDigit))
+        {
+            return (false, "PIN must contain digits only.");
+        }
+
+        if (newPin.Length < 4 || newPin.Length > 8)
+        {
+            return (false, "PIN must be 4-8 digits long.");
+        }
+
+        try
+        {
+            byte[] saltBytes = RandomNumberGenerator.GetBytes(16);
+            string salt = Convert.ToHexString(saltBytes).ToLowerInvariant();
+
+            using var sha256 = SHA256.Create();
+            byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(salt + newPin));
+            string pinHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+
+            string nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            string username = Environment.UserName;
+
+            // 1. Atomically write to security_settings.json
+            string jsonPath = ResolveSecuritySettingsPath(dbPath);
+            string? dir = Path.GetDirectoryName(jsonPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            var jsonObj = new JsonObject
+            {
+                ["pin_hash"] = pinHash,
+                ["salt"] = salt,
+                ["updated_at"] = nowStr,
+                ["updated_by"] = username,
+                ["is_default"] = false
+            };
+
+            string tempFile = Path.Combine(dir ?? ".", $"security_settings_{Guid.NewGuid():N}.tmp");
+            try
+            {
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                File.WriteAllText(tempFile, jsonObj.ToJsonString(options));
+                File.Move(tempFile, jsonPath, overwrite: true);
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(tempFile))
+                    {
+                        File.Delete(tempFile);
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Upsert into SQLite security_settings table
+            string effectiveDb = !string.IsNullOrWhiteSpace(dbPath) ? dbPath : LocalDatabaseService.ResolveDatabasePath();
+            if (File.Exists(effectiveDb))
+            {
+                try
+                {
+                    using var conn = new SqliteConnection(new SqliteConnectionStringBuilder
+                    {
+                        DataSource = effectiveDb,
+                        Mode = SqliteOpenMode.ReadWrite,
+                        DefaultTimeout = 5
+                    }.ToString());
+                    conn.Open();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        INSERT INTO security_settings (key, pin_hash, salt, updated_at, updated_by, is_default, sync_status)
+                        VALUES ('pin_config', @hash, @salt, @updated_at, @updated_by, 0, 'PENDING')
+                        ON CONFLICT(key) DO UPDATE SET
+                            pin_hash = excluded.pin_hash,
+                            salt = excluded.salt,
+                            updated_at = excluded.updated_at,
+                            updated_by = excluded.updated_by,
+                            is_default = 0,
+                            sync_status = 'PENDING';";
+                    cmd.Parameters.AddWithValue("@hash", pinHash);
+                    cmd.Parameters.AddWithValue("@salt", salt);
+                    cmd.Parameters.AddWithValue("@updated_at", nowStr);
+                    cmd.Parameters.AddWithValue("@updated_by", username);
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Exception dbEx)
+                {
+                    Debug.WriteLine($"[SettingsService] SQLite upsert warning: {dbEx.Message}");
+                }
+            }
+
+            return (true, "PIN changed successfully.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SettingsService] SaveNewPin error: {ex.Message}");
+            return (false, "Failed to save the new PIN. Check folder permissions.");
         }
     }
 }

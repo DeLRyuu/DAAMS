@@ -17,4 +17,18 @@ public partial class SettingsView : UserControl
             vm.SyncSmtpPasswordBox(SmtpPasswordBox);
         }
     }
+
+    private async void SavePinButton_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (DataContext is ViewModels.SettingsViewModel vm)
+        {
+            bool success = await vm.ChangePinAsync(CurrentPinBox.Password, NewPinBox.Password, ConfirmPinBox.Password);
+            if (success)
+            {
+                CurrentPinBox.Password = string.Empty;
+                NewPinBox.Password = string.Empty;
+                ConfirmPinBox.Password = string.Empty;
+            }
+        }
+    }
 }
