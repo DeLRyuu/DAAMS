@@ -2,6 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using ControlCenter.Services;
+using ControlCenter.Views;
 
 namespace ControlCenter;
 
@@ -26,5 +28,14 @@ public partial class MainWindow : Window
         int on = 1;
         if (DwmSetWindowAttribute(hwnd, 20, ref on, sizeof(int)) != 0)
             DwmSetWindowAttribute(hwnd, 19, ref on, sizeof(int));
+    }
+
+    private void LogoutButton_Click(object sender, RoutedEventArgs e)
+    {
+        ViewContext.Current.Reset();
+        var loginWindow = new LoginWindow();
+        Application.Current.MainWindow = loginWindow;
+        loginWindow.Show();
+        Close();
     }
 }

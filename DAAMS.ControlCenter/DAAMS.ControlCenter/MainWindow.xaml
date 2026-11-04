@@ -64,6 +64,15 @@
                     <TextBlock Text="Control Center" Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" />
                 </StackPanel>
 
+                <!-- Log out at bottom -->
+                <Border DockPanel.Dock="Bottom" Padding="12,16"
+                        BorderBrush="{StaticResource Brush.BorderSubtle}" BorderThickness="0,1,0,0">
+                    <Button x:Name="LogoutButton"
+                            Content="Log out"
+                            Style="{StaticResource Button.Secondary}"
+                            Height="34"
+                            Click="LogoutButton_Click" />
+                </Border>
 
                 <!-- Nav items -->
                 <StackPanel Margin="8,0">

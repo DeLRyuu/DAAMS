@@ -1,0 +1,67 @@
+<Window x:Class="ControlCenter.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DAAMS Control Center - Login"
+        Width="400"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{StaticResource Brush.Background}"
+        FontFamily="{StaticResource Font.Primary}">
+
+    <Border Padding="32,28">
+        <StackPanel>
+            <!-- DAAMS Title -->
+            <TextBlock Text="DAAMS"
+                       Style="{StaticResource Text.Display}"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,4" />
+            <TextBlock Text="Control Center"
+                       Style="{StaticResource Text.Secondary}"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,24" />
+
+            <!-- Username Box -->
+            <TextBlock Text="Username"
+                       Style="{StaticResource Text.Label}"
+                       Margin="0,0,0,6" />
+            <TextBox x:Name="UsernameTextBox"
+                     Style="{StaticResource Input.TextBox}"
+                     Height="36"
+                     Margin="0,0,0,16" />
+
+            <!-- Password Box -->
+            <TextBlock Text="Password"
+                       Style="{StaticResource Text.Label}"
+                       Margin="0,0,0,6" />
+            <PasswordBox x:Name="PasswordBox"
+                         Height="36"
+                         Padding="10,7"
+                         FontSize="{StaticResource FontSize.Body}"
+                         Background="{StaticResource Brush.SurfaceAlt}"
+                         Foreground="{StaticResource Brush.TextPrimary}"
+                         CaretBrush="{StaticResource Brush.TextPrimary}"
+                         BorderBrush="{StaticResource Brush.Border}"
+                         BorderThickness="1"
+                         FocusVisualStyle="{x:Null}"
+                         Margin="0,0,0,12" />
+
+            <!-- Hidden Error Area -->
+            <TextBlock x:Name="ErrorTextBlock"
+                       Text="Incorrect username or password"
+                       Foreground="{StaticResource Brush.RiskCritical}"
+                       Style="{StaticResource Text.Secondary}"
+                       Visibility="Collapsed"
+                       Margin="0,0,0,12" />
+
+            <!-- Login Button -->
+            <Button x:Name="LoginButton"
+                    Content="Login"
+                    IsDefault="True"
+                    Style="{StaticResource Button.Primary}"
+                    Height="36"
+                    Margin="0,8,0,0"
+                    Click="LoginButton_Click" />
+        </StackPanel>
+    </Border>
+</Window>

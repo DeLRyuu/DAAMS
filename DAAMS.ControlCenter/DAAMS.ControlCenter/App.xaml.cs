@@ -16,4 +16,12 @@ public partial class App : Application
             e.Handled = true;
         };
     }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        var loginWindow = new Views.LoginWindow();
+        loginWindow.Show();
+    }
 }

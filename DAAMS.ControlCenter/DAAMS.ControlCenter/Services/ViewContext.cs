@@ -72,4 +72,17 @@ public class ViewContext : ViewModelBase
         PendingSearch = null;
         return search;
     }
+
+    public void Reset()
+    {
+        _range = TimeRange.All;
+        _lastUpdated = null;
+        _pendingSearch = null;
+        RangeChanged = null;
+        OnPropertyChanged(nameof(Range));
+        OnPropertyChanged(nameof(From));
+        OnPropertyChanged(nameof(LastUpdated));
+        OnPropertyChanged(nameof(LastUpdatedText));
+        OnPropertyChanged(nameof(PendingSearch));
+    }
 }
