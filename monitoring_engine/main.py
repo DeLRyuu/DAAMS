@@ -17,6 +17,23 @@ Configuration (Phase 4):
 
 import os
 import sys
+import traceback
+
+# --- No-console build guard -------------------------------------------------
+# When packaged with PyInstaller --noconsole, sys.stdout / sys.stderr are None,
+# so any print() or stream call could crash. Redirect them to a log file.
+if getattr(sys, "frozen", False):
+    _log_dir = os.path.join(os.environ.get("LOCALAPPDATA", "."), "DAAMS", "logs")
+    os.makedirs(_log_dir, exist_ok=True)
+    _console_log = open(
+        os.path.join(_log_dir, "engine_console.log"),
+        "a", buffering=1, encoding="utf-8",
+    )
+    if sys.stdout is None:
+        sys.stdout = _console_log
+    if sys.stderr is None:
+        sys.stderr = _console_log
+# ---------------------------------------------------------------------------
 
 _ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 if _ENGINE_DIR not in sys.path:
@@ -32,6 +49,7 @@ def main():
         # Catch-all so unexpected errors are visible and explainable
         # during testing/defense, instead of a raw traceback only.
         print(f"[UNEXPECTED ERROR] {e}")
+        traceback.print_exc()  # full trace goes to engine_console.log when hidden
         sys.exit(1)
 
 

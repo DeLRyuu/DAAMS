@@ -7,11 +7,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <RootNamespace>ControlCenter</RootNamespace>
+    <ApplicationIcon>daams.ico</ApplicationIcon>
+    <Product>DAAMS Control Center</Product>
+    <AssemblyTitle>DAAMS Control Center</AssemblyTitle>
+    <Description>DAAMS Control Center</Description>
+    <Company>DAAMS Capstone Team</Company>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Google.Cloud.Firestore" Version="4.4.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="daams.ico" />
   </ItemGroup>
 
   <ItemGroup>

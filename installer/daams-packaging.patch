@@ -1,0 +1,65 @@
+diff --git a/.gitignore b/.gitignore
+index edb4008..471d8dc 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -40,4 +40,9 @@ daams-activity-*.csv
+ 
+ # OS
+ .DS_Store
+-Thumbs.db
+\ No newline at end of file
++Thumbs.db
++
++# Installer build output
++installer/build/
++installer/output/
++installer/_tmp/
+diff --git a/monitoring_engine/cli/protect_asset_cli.py b/monitoring_engine/cli/protect_asset_cli.py
+index 31bf342..cb40ba0 100644
+--- a/monitoring_engine/cli/protect_asset_cli.py
++++ b/monitoring_engine/cli/protect_asset_cli.py
+@@ -51,6 +51,12 @@ from datetime import datetime
+ # ---------------------------------------------------------------------------
+ _ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ _LOG = os.path.join(_ENGINE_DIR, "logs", "daams_cli_debug.log")
++if getattr(sys, "frozen", False):
++    # Installed build: the program folder is read-only, so log next to the engine's other logs.
++    _LOG = os.path.join(
++        os.environ.get("DAAMS_HOME") or os.path.join(os.environ.get("LOCALAPPDATA", ""), "DAAMS"),
++        "logs", "daams_cli_debug.log",
++    )
+ if _ENGINE_DIR not in sys.path:
+     sys.path.insert(0, _ENGINE_DIR)
+ 
+diff --git a/monitoring_engine/cli/remove_protection_cli.py b/monitoring_engine/cli/remove_protection_cli.py
+index fe02011..26bad4a 100644
+--- a/monitoring_engine/cli/remove_protection_cli.py
++++ b/monitoring_engine/cli/remove_protection_cli.py
+@@ -16,6 +16,12 @@ from datetime import datetime
+ 
+ _ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ _LOG = os.path.join(_ENGINE_DIR, "logs", "daams_cli_debug.log")
++if getattr(sys, "frozen", False):
++    # Installed build: the program folder is read-only, so log next to the engine's other logs.
++    _LOG = os.path.join(
++        os.environ.get("DAAMS_HOME") or os.path.join(os.environ.get("LOCALAPPDATA", ""), "DAAMS"),
++        "logs", "daams_cli_debug.log",
++    )
+ if _ENGINE_DIR not in sys.path:
+     sys.path.insert(0, _ENGINE_DIR)
+ 
+diff --git a/monitoring_engine/core/open_audit_watcher.py b/monitoring_engine/core/open_audit_watcher.py
+index f89b1fb..1ee9b25 100644
+--- a/monitoring_engine/core/open_audit_watcher.py
++++ b/monitoring_engine/core/open_audit_watcher.py
+@@ -26,6 +26,10 @@ IGNORED_PROCESSES = {
+     "msmpeng.exe",
+     "python.exe",
+     "pythonw.exe",
++    # Installed (PyInstaller) builds: the engine reads protected files itself to infer
++    # Copy/Move, and the right-click helper touches them too. Never log those as user Opens.
++    "daamsengine.exe",
++    "daamsprotect.exe",
+ }
+ 
+ EVENT_XML_NS = {"e": "http://schemas.microsoft.com/win/2004/08/events/event"}

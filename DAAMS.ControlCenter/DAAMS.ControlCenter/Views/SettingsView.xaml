@@ -421,7 +421,7 @@
                                        Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" TextWrapping="Wrap" />
                             <TextBlock Text="This computer only, backup is made."
                                        Style="{StaticResource Text.Secondary}" FontStyle="Italic" Margin="0,2,0,0" TextWrapping="Wrap" />
-                            <TextBlock Text="Requires DAAMS Engine on this PC."
+                            <TextBlock Text="Requires DAAMS Monitoring Engine on this PC."
                                        Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" TextWrapping="Wrap"
                                        Visibility="{Binding RequiresEngineForLocalCleanup, Converter={StaticResource BoolToVis}}" />
                             <TextBlock Text="Removes every protected asset and resets the PIN to default."

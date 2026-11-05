@@ -41,3 +41,8 @@ daams-activity-*.csv
 # OS
 .DS_Store
 Thumbs.db
+
+# Installer build output
+installer/build/
+installer/output/
+installer/_tmp/

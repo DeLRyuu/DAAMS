@@ -16,6 +16,12 @@ from datetime import datetime
 
 _ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOG = os.path.join(_ENGINE_DIR, "logs", "daams_cli_debug.log")
+if getattr(sys, "frozen", False):
+    # Installed build: the program folder is read-only, so log next to the engine's other logs.
+    _LOG = os.path.join(
+        os.environ.get("DAAMS_HOME") or os.path.join(os.environ.get("LOCALAPPDATA", ""), "DAAMS"),
+        "logs", "daams_cli_debug.log",
+    )
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 

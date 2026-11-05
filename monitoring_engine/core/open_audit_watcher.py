@@ -26,6 +26,10 @@ IGNORED_PROCESSES = {
     "msmpeng.exe",
     "python.exe",
     "pythonw.exe",
+    # Installed (PyInstaller) builds: the engine reads protected files itself to infer
+    # Copy/Move, and the right-click helper touches them too. Never log those as user Opens.
+    "daamsengine.exe",
+    "daamsprotect.exe",
 }
 
 EVENT_XML_NS = {"e": "http://schemas.microsoft.com/win/2004/08/events/event"}
