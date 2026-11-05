@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import threading
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -395,3 +396,102 @@ def test_disk_scan_detects_missed_move_modify_and_create_with_fake_clock(tmp_pat
     assert any(record[0] == f"{old_path} -> {destination}" for record in records)
     assert any(record[0] == modified_path for record in records)
     assert any(record[0] == created_path for record in records)
+
+
+def test_console_close_handler_requests_keyboard_interrupt_shutdown(monkeypatch):
+    registered = threading.Event()
+    callbacks = []
+    callback_results = []
+    flushes = []
+    heartbeats = []
+    unregistered = []
+
+    class FakeKernel32:
+        def SetConsoleCtrlHandler(self, callback, add):
+            if add:
+                callbacks.append(callback)
+                registered.set()
+            else:
+                unregistered.append(callback)
+            return 1
+
+    class FakeObserver:
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def join(self):
+            pass
+
+    class FakeTicker:
+        def register(self, _aggregator):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def join(self):
+            pass
+
+    class FakeClipboardWatcher:
+        def __init__(self, **_kwargs):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def join(self):
+            pass
+
+    class FakeAggregator:
+        def __init__(self, **_kwargs):
+            pass
+
+        def flush(self, force=False):
+            flushes.append(force)
+
+    monkeypatch.setattr(
+        monitor.ctypes,
+        "WINFUNCTYPE",
+        lambda *_args: lambda callback: callback,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        monitor.ctypes,
+        "windll",
+        SimpleNamespace(kernel32=FakeKernel32()),
+        raising=False,
+    )
+    monkeypatch.setattr(monitor.database, "initialize_database", lambda: None)
+    monkeypatch.setattr(monitor, "Observer", FakeObserver)
+    monkeypatch.setattr(monitor, "_Ticker", FakeTicker)
+    monkeypatch.setattr(monitor, "ClipboardWatcher", FakeClipboardWatcher)
+    monkeypatch.setattr(monitor, "EventAggregator", FakeAggregator)
+    monkeypatch.setattr(monitor, "ENABLE_OPEN_DETECTION", False)
+    monkeypatch.setattr(monitor, "get_all_assets", lambda **_kwargs: [])
+    monkeypatch.setattr(monitor.sync_service, "start_sync_service", lambda: None)
+    monkeypatch.setattr(monitor.sync_service, "stop_sync_service", lambda: None)
+    monkeypatch.setattr(monitor, "_save_heartbeat", heartbeats.append)
+
+    def send_close_event():
+        assert registered.wait(timeout=5)
+        callback_results.append(callbacks[0](monitor.CTRL_CLOSE_EVENT))
+
+    closer = threading.Thread(target=send_close_event)
+    closer.start()
+    monitor.start_monitoring()
+    closer.join(timeout=5)
+
+    assert not closer.is_alive()
+    assert callback_results == [True]
+    assert unregistered == callbacks
+    assert True in flushes
+    assert heartbeats[-1] == "stopped"

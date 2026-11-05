@@ -36,6 +36,7 @@ copying a protected file outside the active watch roots, and Open/read
 access, are invisible to Watchdog.
 """
 
+import ctypes
 import logging
 import os
 import sys
@@ -73,6 +74,50 @@ from services import sync_service
 from services.activity_logger import record_activity
 
 FLUSH_INTERVAL_SECONDS = 0.25
+
+
+CTRL_CLOSE_EVENT = 2
+CTRL_LOGOFF_EVENT = 5
+CTRL_SHUTDOWN_EVENT = 6
+
+
+def _register_console_control_handler(
+    shutdown_requested: threading.Event,
+    shutdown_complete: threading.Event,
+):
+    control_events = {
+        CTRL_CLOSE_EVENT,
+        CTRL_LOGOFF_EVENT,
+        CTRL_SHUTDOWN_EVENT,
+    }
+
+    def handle_control_event(control_type):
+        if control_type not in control_events:
+            return False
+        shutdown_requested.set()
+        shutdown_complete.wait()
+        return True
+
+    try:
+        handler_type = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)
+        kernel32 = ctypes.windll.kernel32
+        callback = handler_type(handle_control_event)
+        if not kernel32.SetConsoleCtrlHandler(callback, True):
+            logger.warning("Could not register the Windows console control handler")
+            return None
+    except (AttributeError, OSError) as exc:
+        logger.debug("Windows console control handler is unavailable: %s", exc)
+        return None
+
+    def unregister():
+        try:
+            if not kernel32.SetConsoleCtrlHandler(callback, False):
+                logger.warning("Could not unregister the Windows console control handler")
+        except Exception:
+            logger.exception("Could not unregister the Windows console control handler")
+
+    return unregister
+
 
 def _is_admin() -> bool:
     try:
@@ -664,7 +709,12 @@ def start_monitoring():
     open_audit_watcher_started = False
     sync_started = False
     shutdown_status = "stopped"
+    shutdown_requested = threading.Event()
+    shutdown_complete = threading.Event()
     _save_heartbeat("started")
+    unregister_console_handler = _register_console_control_handler(
+        shutdown_requested, shutdown_complete
+    )
     try:
         sync_service.start_sync_service()
         sync_started = True
@@ -699,7 +749,8 @@ def start_monitoring():
         last_scan = time.monotonic()
         last_heartbeat = last_scan
         while True:
-            time.sleep(min(REGISTRY_RELOAD_INTERVAL_SECONDS, 1))
+            if shutdown_requested.wait(min(REGISTRY_RELOAD_INTERVAL_SECONDS, 1)):
+                raise KeyboardInterrupt
             reconcile()
             now = time.monotonic()
             if now - last_scan >= DISK_SCAN_INTERVAL_SECONDS:
@@ -753,4 +804,7 @@ def start_monitoring():
             except Exception:
                 logger.exception("Could not stop the sync service cleanly")
         _save_heartbeat(shutdown_status)
+        if unregister_console_handler is not None:
+            unregister_console_handler()
+        shutdown_complete.set()
         print("Monitoring stopped cleanly.")
