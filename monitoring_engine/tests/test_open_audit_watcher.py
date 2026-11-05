@@ -109,6 +109,88 @@ class TestOpenAuditWatcher(unittest.TestCase):
         watcher.check_once()
         self.assertEqual(len(recorded), 0)
 
+    def test_searchprotocolhost_does_not_record(self):
+        """Windows Search protocol host does not record Open."""
+        recorded = []
+        assets = [
+            {"path": r"C:\Data\secret.txt", "asset_type": "file", "classification": "Confidential"}
+        ]
+
+        def fake_read(seconds=5):
+            return [
+                (
+                    109,
+                    {
+                        "ObjectName": r"C:\Data\secret.txt",
+                        "AccessMask": "0x1",
+                        "ProcessName": r"C:\Windows\System32\searchprotocolhost.exe",
+                    },
+                )
+            ]
+
+        watcher = OpenAuditWatcher(
+            get_assets=lambda: assets,
+            record=lambda **kwargs: recorded.append(kwargs),
+            read=fake_read,
+        )
+        watcher.check_once()
+        self.assertEqual(len(recorded), 0)
+
+    def test_searchfilterhost_does_not_record(self):
+        """Windows Search filter host does not record Open."""
+        recorded = []
+        assets = [
+            {"path": r"C:\Data\secret.txt", "asset_type": "file", "classification": "Confidential"}
+        ]
+
+        def fake_read(seconds=5):
+            return [
+                (
+                    110,
+                    {
+                        "ObjectName": r"C:\Data\secret.txt",
+                        "AccessMask": "0x1",
+                        "ProcessName": r"C:\Windows\System32\searchfilterhost.exe",
+                    },
+                )
+            ]
+
+        watcher = OpenAuditWatcher(
+            get_assets=lambda: assets,
+            record=lambda **kwargs: recorded.append(kwargs),
+            read=fake_read,
+        )
+        watcher.check_once()
+        self.assertEqual(len(recorded), 0)
+
+    def test_notepad_still_records_open(self):
+        """Notepad still records Open."""
+        recorded = []
+        assets = [
+            {"path": r"C:\Data\secret.txt", "asset_type": "file", "classification": "Confidential"}
+        ]
+
+        def fake_read(seconds=5):
+            return [
+                (
+                    111,
+                    {
+                        "ObjectName": r"C:\Data\secret.txt",
+                        "AccessMask": "0x1",
+                        "ProcessName": r"C:\Windows\System32\notepad.exe",
+                    },
+                )
+            ]
+
+        watcher = OpenAuditWatcher(
+            get_assets=lambda: assets,
+            record=lambda **kwargs: recorded.append(kwargs),
+            read=fake_read,
+        )
+        watcher.check_once()
+        self.assertEqual(len(recorded), 1)
+        self.assertEqual(recorded[0]["action"], "Open")
+
     def test_unprotected_path_does_not_record(self):
         """An unprotected path does not record Open."""
         recorded = []

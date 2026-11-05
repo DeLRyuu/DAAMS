@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 IGNORED_PROCESSES = {
     "explorer.exe",
     "searchindexer.exe",
+    "searchprotocolhost.exe",
+    "searchfilterhost.exe",
     "msmpeng.exe",
     "python.exe",
     "pythonw.exe",
