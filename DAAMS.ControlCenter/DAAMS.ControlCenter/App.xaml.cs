@@ -9,12 +9,21 @@ public partial class App : Application
     public App()
     {
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-            File.WriteAllText("C:\\temp\\crash.txt", e.ExceptionObject?.ToString() ?? "null");
+            WriteCrashLog(e.ExceptionObject?.ToString() ?? "null");
         DispatcherUnhandledException += (_, e) =>
         {
-            File.WriteAllText("C:\\temp\\crash.txt", e.Exception.ToString());
+            WriteCrashLog(e.Exception.ToString());
             e.Handled = true;
         };
+    }
+
+    private static void WriteCrashLog(string text)
+    {
+        string logDirectory = Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+            "DAAMS", "logs");
+        Directory.CreateDirectory(logDirectory);
+        File.WriteAllText(Path.Combine(logDirectory, "crash.txt"), text);
     }
 
     protected override void OnStartup(StartupEventArgs e)

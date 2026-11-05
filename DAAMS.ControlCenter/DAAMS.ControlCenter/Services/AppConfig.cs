@@ -27,12 +27,6 @@ public static class AppConfig
 
     private static string? LoadProjectId()
     {
-        string? fromEnv = Environment.GetEnvironmentVariable("DAAMS_FIRESTORE_PROJECT_ID");
-        if (!string.IsNullOrWhiteSpace(fromEnv))
-        {
-            return fromEnv;
-        }
-
         try
         {
             string path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");

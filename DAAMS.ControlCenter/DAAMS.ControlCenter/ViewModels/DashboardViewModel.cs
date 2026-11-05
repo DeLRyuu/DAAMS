@@ -180,7 +180,9 @@ public class DashboardViewModel : ViewModelBase, IDataSection
         catch (Exception ex)
         {
             LoadState = DataLoadState.Error;
-            ErrorMessage = "Unable to load data from the local database.";
+            ErrorMessage = _db.DatabaseFound
+                ? "Unable to load data from the local database."
+                : "No local data yet. Start DAAMS Engine first.";
             Debug.WriteLine($"[Dashboard] Local database load failed: {ex}");
         }
     }

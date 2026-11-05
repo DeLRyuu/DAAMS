@@ -31,7 +31,18 @@
 
             <!-- ==================== 1. SYSTEM INFORMATION ==================== -->
             <Border Style="{StaticResource Surface.Card}" Margin="0,0,0,16">
-                <TextBlock Text="DAAMS Control Center 1.0 (prototype)" Style="{StaticResource Text.Body}" />
+                <StackPanel>
+                    <TextBlock Text="DAAMS Control Center 1.0 (prototype)" Style="{StaticResource Text.Body}" />
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding CloudStatusText}" Style="{StaticResource Text.Secondary}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="Refresh" Style="{StaticResource Button.Secondary}"
+                                Command="{Binding RefreshCloudConnectionCommand}" Height="30" />
+                    </Grid>
+                </StackPanel>
             </Border>
 
             <!-- ==================== 2. DISPLAY ==================== -->
@@ -410,6 +421,9 @@
                                        Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" TextWrapping="Wrap" />
                             <TextBlock Text="This computer only, backup is made."
                                        Style="{StaticResource Text.Secondary}" FontStyle="Italic" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="Requires DAAMS Engine on this PC."
+                                       Style="{StaticResource Text.Secondary}" Margin="0,2,0,0" TextWrapping="Wrap"
+                                       Visibility="{Binding RequiresEngineForLocalCleanup, Converter={StaticResource BoolToVis}}" />
                             <TextBlock Text="Removes every protected asset and resets the PIN to default."
                                        Foreground="{StaticResource Brush.RiskCritical}"
                                        FontWeight="SemiBold"
@@ -421,11 +435,11 @@
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
                             <Button Content="Clean Local Data" Style="{StaticResource Button.Secondary}"
                                     Command="{Binding CleanLocalDataCommand}"
-                                    IsEnabled="{Binding CanRunMaintenance}"
+                                    IsEnabled="{Binding CanRunLocalMaintenance}"
                                     HorizontalAlignment="Right" />
                             <CheckBox Margin="0,8,0,0"
                                       IsChecked="{Binding CleanLocalAll, Mode=TwoWay}"
-                                      IsEnabled="{Binding CanRunMaintenance}"
+                                      IsEnabled="{Binding CanRunLocalMaintenance}"
                                       HorizontalAlignment="Right">
                                 <TextBlock Text="Also delete protected assets and PIN settings (--all)"
                                            Foreground="{StaticResource Brush.RiskCritical}"

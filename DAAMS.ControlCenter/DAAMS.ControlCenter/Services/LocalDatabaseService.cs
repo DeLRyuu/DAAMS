@@ -67,8 +67,8 @@ public class LocalDatabaseService
         }
 
         return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "DAAMS", "daams.db");
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DAAMS", "data", "daams.db");
     }
 
     private SqliteConnection CreateConnection()

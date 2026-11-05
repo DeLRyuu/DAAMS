@@ -67,7 +67,7 @@ public class MainViewModel : ViewModelBase
     }
 
     /// <summary>Live Firestore connection status text for the shell footer.</summary>
-    public string FirestoreStatusText => "Firestore: not connected (using local database)";
+    public string FirestoreStatusText => _firestoreConnection.StatusMessage;
 
     /// <summary>Live Firestore connection state for the shell footer's status dot.</summary>
     public FirestoreConnectionState FirestoreState => _firestoreConnection.State;
@@ -95,12 +95,6 @@ public class MainViewModel : ViewModelBase
         };
         _dbService = new LocalDatabaseService();
         _firestoreConnection = new FirestoreConnectionService();
-        _firestoreConnection.StateChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(FirestoreStatusText));
-            OnPropertyChanged(nameof(FirestoreState));
-            _ = RefreshSyncStatusAsync();
-        };
 
         var firestoreService = new FirestoreService(_firestoreConnection);
 
@@ -109,7 +103,20 @@ public class MainViewModel : ViewModelBase
         CasesViewModel = new CasesViewModel(_dbService, NavigateWith, firestoreService);
         _ = CasesViewModel.RefreshAsync();
 
-        _settingsViewModel = new SettingsViewModel(_dbService, autoRefreshTimer, () => _firestoreConnection.StatusMessage);
+        _settingsViewModel = new SettingsViewModel(
+            _dbService,
+            autoRefreshTimer,
+            () => _firestoreConnection.StatusMessage,
+            _firestoreConnection.RefreshAsync,
+            firestoreService);
+        _firestoreConnection.StateChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(FirestoreStatusText));
+            OnPropertyChanged(nameof(FirestoreState));
+            _settingsViewModel.NotifyCloudStatusChanged();
+            _ = RefreshSyncStatusAsync();
+        };
+        _ = _firestoreConnection.RefreshAsync();
         ViewContext.Current.Range = _settingsViewModel.DefaultTimeRange;
 
         IncidentReportsViewModel = new IncidentReportsViewModel(_dbService, firestoreService);

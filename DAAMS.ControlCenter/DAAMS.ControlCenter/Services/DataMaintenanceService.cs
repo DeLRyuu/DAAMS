@@ -10,6 +10,23 @@ public sealed record MaintenanceScriptResult(int ExitCode, string Output, string
 
 public static class DataMaintenanceService
 {
+    public static string? ResolveInstalledLocalResetExecutable()
+    {
+        string candidate = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "Engine", "DAAMSResetLocal.exe"));
+        return File.Exists(candidate) ? candidate : null;
+    }
+
+    public static bool CanCleanLocalData()
+    {
+        if (ResolveInstalledLocalResetExecutable() != null)
+            return true;
+
+        string? engineDir = ResolveMonitoringEngineDirectory();
+        return !string.IsNullOrEmpty(engineDir) &&
+            File.Exists(Path.Combine(engineDir, "tools", "reset_test_data.py"));
+    }
+
     public static string? ResolveMonitoringEngineDirectory()
     {
         string? dir = AppContext.BaseDirectory;
@@ -49,6 +66,9 @@ public static class DataMaintenanceService
     {
         try
         {
+            if (Process.GetProcessesByName("DAAMSEngine").Length > 0)
+                return true;
+
             var pythonProcs = Process.GetProcessesByName("python")
                 .Concat(Process.GetProcessesByName("pythonw"))
                 .ToArray();
@@ -93,30 +113,50 @@ public static class DataMaintenanceService
         string? arguments,
         string? stdinInput)
     {
-        string? engineDir = ResolveMonitoringEngineDirectory();
-        if (string.IsNullOrEmpty(engineDir))
+        ProcessStartInfo psi;
+        string? installedExe = scriptName == "reset_test_data.py"
+            ? ResolveInstalledLocalResetExecutable()
+            : null;
+        if (installedExe != null)
         {
-            return new MaintenanceScriptResult(1, string.Empty, "Could not find monitoring_engine directory.");
+            psi = new ProcessStartInfo
+            {
+                FileName = installedExe,
+                Arguments = arguments ?? string.Empty,
+                WorkingDirectory = Path.GetDirectoryName(installedExe)!,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
         }
-
-        string pythonExe = ResolvePythonExecutable(engineDir);
-        string scriptPath = Path.Combine("tools", scriptName);
-
-        var args = string.IsNullOrWhiteSpace(arguments)
-            ? $"\"{scriptPath}\""
-            : $"\"{scriptPath}\" {arguments}";
-
-        var psi = new ProcessStartInfo
+        else
         {
-            FileName = pythonExe,
-            Arguments = args,
-            WorkingDirectory = engineDir,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+            string? engineDir = ResolveMonitoringEngineDirectory();
+            if (string.IsNullOrEmpty(engineDir))
+            {
+                return new MaintenanceScriptResult(1, string.Empty, "Could not find monitoring_engine directory.");
+            }
+
+            string pythonExe = ResolvePythonExecutable(engineDir);
+            string scriptPath = Path.Combine("tools", scriptName);
+            string args = string.IsNullOrWhiteSpace(arguments)
+                ? $"\"{scriptPath}\""
+                : $"\"{scriptPath}\" {arguments}";
+
+            psi = new ProcessStartInfo
+            {
+                FileName = pythonExe,
+                Arguments = args,
+                WorkingDirectory = engineDir,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+        }
 
         using var process = new Process { StartInfo = psi };
         process.Start();

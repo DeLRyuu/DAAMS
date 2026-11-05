@@ -26,6 +26,8 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     private readonly LocalDatabaseService? _dbService;
     private readonly DispatcherTimer? _autoRefreshTimer;
     private readonly Func<string>? _getFirestoreStatus;
+    private readonly Func<Task>? _refreshFirestoreConnection;
+    private readonly FirestoreService? _firestoreService;
     private DispatcherTimer? _savedIndicatorTimer;
     private bool _isInitializing;
 
@@ -61,7 +63,8 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         private set => SetProperty(ref _lastEventReceivedText, value);
     }
 
-    public string FirestoreConnectionStatus => "Not connected. This app reads the local database.";
+    public string CloudStatusText => _getFirestoreStatus?.Invoke() ?? "Cloud: unreachable";
+    public string FirestoreConnectionStatus => CloudStatusText;
     public string MonitoringSystemConnectionStatus => "Not Connected";
 
     // ============================================================
@@ -413,11 +416,14 @@ public class SettingsViewModel : ViewModelBase, IDataSection
             if (SetProperty(ref _isMaintenanceBusy, value))
             {
                 OnPropertyChanged(nameof(CanRunMaintenance));
+                OnPropertyChanged(nameof(CanRunLocalMaintenance));
             }
         }
     }
 
     public bool CanRunMaintenance => !IsMaintenanceBusy;
+    public bool CanRunLocalMaintenance => CanRunMaintenance && DataMaintenanceService.CanCleanLocalData();
+    public bool RequiresEngineForLocalCleanup => !DataMaintenanceService.CanCleanLocalData();
 
     private string? _maintenanceStatusText;
     public string? MaintenanceStatusText
@@ -442,6 +448,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
     public ICommand CleanLocalDataCommand { get; }
     public ICommand CleanCloudDataCommand { get; }
+    public ICommand RefreshCloudConnectionCommand { get; }
 
     private bool _cleanLocalAll;
     public bool CleanLocalAll
@@ -666,8 +673,10 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     public SettingsViewModel(
         LocalDatabaseService? dbService,
         DispatcherTimer? autoRefreshTimer = null,
-        Func<string>? getFirestoreStatus = null)
-        : this(new SettingsService(), dbService, autoRefreshTimer, getFirestoreStatus)
+        Func<string>? getFirestoreStatus = null,
+        Func<Task>? refreshFirestoreConnection = null,
+        FirestoreService? firestoreService = null)
+        : this(new SettingsService(), dbService, autoRefreshTimer, getFirestoreStatus, refreshFirestoreConnection, firestoreService)
     {
     }
 
@@ -675,12 +684,16 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         SettingsService settingsService,
         LocalDatabaseService? dbService = null,
         DispatcherTimer? autoRefreshTimer = null,
-        Func<string>? getFirestoreStatus = null)
+        Func<string>? getFirestoreStatus = null,
+        Func<Task>? refreshFirestoreConnection = null,
+        FirestoreService? firestoreService = null)
     {
         _settingsService = settingsService;
         _dbService = dbService;
         _autoRefreshTimer = autoRefreshTimer;
         _getFirestoreStatus = getFirestoreStatus;
+        _refreshFirestoreConnection = refreshFirestoreConnection;
+        _firestoreService = firestoreService;
 
         SaveChangesCommand = new RelayCommand(_ => SaveChanges());
         ResetToDefaultsCommand = new RelayCommand(_ => IsConfirmingReset = true);
@@ -693,8 +706,9 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         _notificationEmailInput = _savedNotificationEmail;
 
         SaveSmtpSettingsCommand = new RelayCommand(param => SaveSmtpSettings(param as System.Windows.Controls.PasswordBox));
-        CleanLocalDataCommand = RelayCommand.FromAsync(_ => CleanLocalDataAsync(), canExecute: _ => CanRunMaintenance);
+        CleanLocalDataCommand = RelayCommand.FromAsync(_ => CleanLocalDataAsync(), canExecute: _ => CanRunLocalMaintenance);
         CleanCloudDataCommand = RelayCommand.FromAsync(_ => CleanCloudDataAsync(), canExecute: _ => CanRunMaintenance);
+        RefreshCloudConnectionCommand = RelayCommand.FromAsync(_ => RefreshCloudConnectionAsync());
         var (smtpSender, smtpPwProt, smtpEnabled) = SettingsService.LoadSmtpSettings(_dbService?.DatabasePath);
         _savedSmtpSenderEmail = smtpSender;
         _savedSmtpPasswordProtected = smtpPwProt;
@@ -732,6 +746,8 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
     public async Task RefreshAsync()
     {
+        await RefreshCloudConnectionAsync();
+
         if (_dbService != null && _dbService.DatabaseFound)
         {
             try
@@ -749,7 +765,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
                 string? lastAttempt = await _dbService.GetLastSyncAttemptAsync();
                 LastUploadAttemptText = string.IsNullOrWhiteSpace(lastAttempt)
                     ? "No upload attempts recorded"
-                    : $"Last attempt {lastAttempt} (success)";
+                    : $"Last attempt {lastAttempt}";
             }
             catch
             {
@@ -781,8 +797,25 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         }
 
         OnPropertyChanged(nameof(FirestoreConnectionStatus));
+        OnPropertyChanged(nameof(CloudStatusText));
         OnPropertyChanged(nameof(DatabasePath));
         OnPropertyChanged(nameof(DatabaseStatusText));
+    }
+
+    private async Task RefreshCloudConnectionAsync()
+    {
+        if (_refreshFirestoreConnection != null)
+        {
+            await _refreshFirestoreConnection();
+        }
+        OnPropertyChanged(nameof(CloudStatusText));
+        OnPropertyChanged(nameof(FirestoreConnectionStatus));
+    }
+
+    public void NotifyCloudStatusChanged()
+    {
+        OnPropertyChanged(nameof(CloudStatusText));
+        OnPropertyChanged(nameof(FirestoreConnectionStatus));
     }
 
     private void TriggerSavedIndicator()
@@ -1407,22 +1440,37 @@ public class SettingsViewModel : ViewModelBase, IDataSection
             return;
         }
 
-        // 3.d Cloud only: first run reset_firestore.py --dry-run (add --all when the checkbox is checked so the counts match)
+        if (_firestoreService == null)
+        {
+            MaintenanceMessage = "Firestore service is unavailable.";
+            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+            return;
+        }
+
         IsMaintenanceBusy = true;
         MaintenanceStatusText = "Working...";
         MaintenanceMessage = null;
 
-        MaintenanceScriptResult dryRunResult;
+        string dryRunSummary;
         try
         {
-            dryRunResult = await DataMaintenanceService.RunScriptAsync("reset_firestore.py", isAll ? "--dry-run --all" : "--dry-run", null);
+            dryRunSummary = await _firestoreService.GetCloudDataSummaryAsync(isAll);
         }
-        catch (Exception ex)
+        catch
         {
             IsMaintenanceBusy = false;
             MaintenanceStatusText = null;
-            MaintenanceMessage = $"Error running dry run: {ex.Message}";
+            MaintenanceMessage = "Failed to connect to Firestore.";
             MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+            var errorDialog = new Views.CleanDataResultWindow(
+                "Clean Cloud Data",
+                "Connection / Credential Check Failed",
+                "Could not read the Firestore collection counts. Check the cloud connection status.",
+                isSuccess: false)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+            errorDialog.ShowDialog();
             return;
         }
         finally
@@ -1431,23 +1479,8 @@ public class SettingsViewModel : ViewModelBase, IDataSection
             MaintenanceStatusText = null;
         }
 
-        // On Firestore credential or internet failure, show the script's own message and do not retry.
-        if (dryRunResult.ExitCode != 0)
-        {
-            string error = !string.IsNullOrWhiteSpace(dryRunResult.Error) ? dryRunResult.Error.Trim() : dryRunResult.Output.Trim();
-            MaintenanceMessage = "Failed to connect to Firestore.";
-            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
-
-            var errorDialog = new Views.CleanDataResultWindow("Clean Cloud Data", "Connection / Credential Check Failed", error, isSuccess: false)
-            {
-                Owner = Application.Current?.MainWindow
-            };
-            errorDialog.ShowDialog();
-            return;
-        }
-
-        // 3.c & 3.d Confirmation dialog showing dry-run output; final button disabled until user types DELETE CLOUD DATA
-        var confirmDialog = new Views.CleanDataConfirmationWindow(isCloud: true, isAll: isAll, dryRunOutput: dryRunResult.Output.Trim())
+        // 3.c & 3.d Confirmation dialog showing counts; final button disabled until user types DELETE CLOUD DATA
+        var confirmDialog = new Views.CleanDataConfirmationWindow(isCloud: true, isAll: isAll, dryRunOutput: dryRunSummary)
         {
             Owner = Application.Current?.MainWindow
         };
@@ -1461,57 +1494,46 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
         try
         {
-            var result = await DataMaintenanceService.RunScriptAsync("reset_firestore.py", isAll ? "--all" : null, "DELETE CLOUD DATA");
+            string summary = await _firestoreService.DeleteCloudDataAsync(isAll);
 
-            if (result.ExitCode == 0)
+            if (DataResetCompleted != null)
             {
-                string summary = string.IsNullOrWhiteSpace(result.Output) ? "Cloud data cleaned successfully." : result.Output.Trim();
-                if (isAll)
-                {
-                    MaintenanceMessage = "Protected assets cleared and PIN reset to default.";
-                }
-                else
-                {
-                    MaintenanceMessage = "Cloud data cleanup completed.";
-                }
-                MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.StatusPositive") as Brush ?? Brushes.LightGreen;
+                await DataResetCompleted.Invoke();
+            }
 
-                if (DataResetCompleted != null)
-                {
-                    await DataResetCompleted.Invoke();
-                }
-
-                var resultDialog = new Views.CleanDataResultWindow(
-                    isAll ? "Clean Cloud Data (--all)" : "Clean Cloud Data",
-                    isAll ? "Protected assets cleared and PIN reset to default." : "Completed successfully",
-                    summary,
-                    isSuccess: true)
-                {
-                    Owner = Application.Current?.MainWindow
-                };
-                resultDialog.ShowDialog();
+            if (isAll)
+            {
+                MaintenanceMessage = "Protected assets cleared and PIN reset to default.";
             }
             else
             {
-                string error = !string.IsNullOrWhiteSpace(result.Error) ? result.Error.Trim() : result.Output.Trim();
-                MaintenanceMessage = "Cloud data cleanup failed.";
-                MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
-
-                var resultDialog = new Views.CleanDataResultWindow(
-                    isAll ? "Clean Cloud Data (--all)" : "Clean Cloud Data",
-                    "Execution failed",
-                    error,
-                    isSuccess: false)
-                {
-                    Owner = Application.Current?.MainWindow
-                };
-                resultDialog.ShowDialog();
+                MaintenanceMessage = "Cloud data cleanup completed.";
             }
+            MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.StatusPositive") as Brush ?? Brushes.LightGreen;
+
+            var resultDialog = new Views.CleanDataResultWindow(
+                isAll ? "Clean Cloud Data (--all)" : "Clean Cloud Data",
+                isAll ? "Protected assets cleared and PIN reset to default." : "Completed successfully",
+                summary,
+                isSuccess: true)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+            resultDialog.ShowDialog();
         }
-        catch (Exception ex)
+        catch
         {
-            MaintenanceMessage = $"Error running cleanup: {ex.Message}";
+            MaintenanceMessage = "Cloud data cleanup failed.";
             MaintenanceMessageBrush = Application.Current?.TryFindResource("Brush.RiskCritical") as Brush ?? Brushes.Salmon;
+            var resultDialog = new Views.CleanDataResultWindow(
+                isAll ? "Clean Cloud Data (--all)" : "Clean Cloud Data",
+                "Execution failed",
+                "Firestore could not delete the requested documents. Check the cloud connection status.",
+                isSuccess: false)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+            resultDialog.ShowDialog();
         }
         finally
         {

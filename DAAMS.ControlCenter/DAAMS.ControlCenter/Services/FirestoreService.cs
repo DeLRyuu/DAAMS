@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using ControlCenter.Models;
@@ -36,6 +37,7 @@ public class FirestoreService
     private const string ProtectedAssetsCollection = "protected_assets";
     private const string SecurityAlertsCollection = "security_alerts";
     private const string IncidentReportsCollection = "incident_reports";
+    private const string SecuritySettingsCollection = "security_settings";
 
     private readonly FirestoreConnectionService _connection;
 
@@ -80,6 +82,90 @@ public class FirestoreService
         FirestoreDb db = await _connection.GetDbAsync();
         QuerySnapshot snapshot = await db.Collection(IncidentReportsCollection).GetSnapshotAsync();
         return snapshot.Documents.Select(MapIncidentReport).ToList();
+    }
+
+    public async Task<string> GetCloudDataSummaryAsync(bool includeAll)
+    {
+        FirestoreDb db = await _connection.GetDbAsync();
+        string[] collections = includeAll
+            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection, SecuritySettingsCollection }
+            : new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection };
+        var summary = new StringBuilder();
+        summary.AppendLine($"Firebase project: {_connection.ProjectId}");
+        summary.AppendLine("Documents currently in the cloud:");
+
+        foreach (string collectionName in collections)
+        {
+            int count = await CountCollectionDocumentsAsync(db.Collection(collectionName));
+            summary.AppendLine($"  {collectionName}: {count}");
+        }
+
+        if (!includeAll)
+        {
+            summary.AppendLine("Keeping: protected_assets, security_settings");
+        }
+
+        return summary.ToString().TrimEnd();
+    }
+
+    public async Task<string> DeleteCloudDataAsync(bool includeAll)
+    {
+        FirestoreDb db = await _connection.GetDbAsync();
+        string[] collections = includeAll
+            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection, SecuritySettingsCollection }
+            : new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection };
+        int deletedTotal = 0;
+
+        foreach (string collectionName in collections)
+        {
+            int deletedCollection = 0;
+            CollectionReference collection = db.Collection(collectionName);
+            while (true)
+            {
+                QuerySnapshot snapshot = await collection
+                    .OrderBy(FieldPath.DocumentId)
+                    .Select(FieldPath.DocumentId)
+                    .Limit(400)
+                    .GetSnapshotAsync();
+                if (snapshot.Documents.Count == 0)
+                {
+                    break;
+                }
+
+                WriteBatch batch = db.StartBatch();
+                foreach (DocumentSnapshot document in snapshot.Documents)
+                {
+                    batch.Delete(document.Reference);
+                }
+                await batch.CommitAsync();
+                deletedCollection += snapshot.Documents.Count;
+            }
+
+            deletedTotal += deletedCollection;
+        }
+
+        return $"Deleted {deletedTotal} document(s) across {collections.Length} collection(s).";
+    }
+
+    private static async Task<int> CountCollectionDocumentsAsync(CollectionReference collection)
+    {
+        Query query = collection
+            .OrderBy(FieldPath.DocumentId)
+            .Select(FieldPath.DocumentId)
+            .Limit(400);
+        int count = 0;
+
+        while (true)
+        {
+            QuerySnapshot snapshot = await query.GetSnapshotAsync();
+            count += snapshot.Documents.Count;
+            if (snapshot.Documents.Count < 400)
+            {
+                return count;
+            }
+
+            query = query.StartAfter(snapshot.Documents[^1]);
+        }
     }
 
     // ------------------------------------------------------------------
