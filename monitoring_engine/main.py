@@ -33,6 +33,22 @@ if getattr(sys, "frozen", False):
         sys.stdout = _console_log
     if sys.stderr is None:
         sys.stderr = _console_log
+
+# --- Hide child-process console windows ---------------------------------------
+# A --noconsole exe has no console, so every console program the engine starts
+# (powershell, wevtutil, auditpol, icacls, ...) opens its own flashing window.
+# Make every subprocess.Popen start with CREATE_NO_WINDOW by default.
+if getattr(sys, "frozen", False) and os.name == "nt":
+    import subprocess
+
+    _CREATE_NO_WINDOW = 0x08000000
+    _orig_popen_init = subprocess.Popen.__init__
+
+    def _popen_init_no_window(self, *args, **kwargs):
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | _CREATE_NO_WINDOW
+        _orig_popen_init(self, *args, **kwargs)
+
+    subprocess.Popen.__init__ = _popen_init_no_window
 # ---------------------------------------------------------------------------
 
 _ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -54,4 +70,6 @@ def main():
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()  # needed if anything uses multiprocessing in the frozen exe
     main()
