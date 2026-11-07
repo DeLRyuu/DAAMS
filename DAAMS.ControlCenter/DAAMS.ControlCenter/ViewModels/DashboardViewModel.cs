@@ -182,7 +182,9 @@ public class DashboardViewModel : ViewModelBase, IDataSection
             LoadState = DataLoadState.Error;
             ErrorMessage = _db.DatabaseFound
                 ? "Unable to load data from the local database."
-                : "No local data yet. Start DAAMS Monitoring Engine first.";
+                : _db.CloudFallbackActive
+                    ? "No local data on this PC, and the cloud could not be reached. Check the internet connection and that serviceAccountKey.json is in the app folder."
+                    : "No local data yet. Start DAAMS Monitoring Engine first.";
             Debug.WriteLine($"[Dashboard] Local database load failed: {ex}");
         }
     }

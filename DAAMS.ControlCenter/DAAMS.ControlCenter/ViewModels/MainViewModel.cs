@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -97,6 +97,8 @@ public class MainViewModel : ViewModelBase
         _firestoreConnection = new FirestoreConnectionService();
 
         var firestoreService = new FirestoreService(_firestoreConnection);
+        // Offline-first: with no local database on this PC, reads fall back to Firestore.
+        LocalDatabaseService.CloudFallback = firestoreService;
 
         var autoRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
 
@@ -117,7 +119,9 @@ public class MainViewModel : ViewModelBase
             _ = RefreshSyncStatusAsync();
         };
         _ = _firestoreConnection.RefreshAsync();
-        ViewContext.Current.Range = _settingsViewModel.DefaultTimeRange;
+        // The range selector was removed from the UI, so a saved "Today" could never be changed
+        // and hid older activity. Start at All until a selector is restored.
+        ViewContext.Current.Range = TimeRange.All;
 
         IncidentReportsViewModel = new IncidentReportsViewModel(_dbService, firestoreService);
 
@@ -190,7 +194,9 @@ public class MainViewModel : ViewModelBase
     {
         if (!_dbService.DatabaseFound)
         {
-            LocalDbStatusText = "Local DB: NOT FOUND";
+            LocalDbStatusText = _dbService.CloudFallbackActive
+                ? "Local DB: none on this PC (reading from cloud)"
+                : "Local DB: NOT FOUND";
             return;
         }
 
@@ -214,7 +220,7 @@ public class MainViewModel : ViewModelBase
 
     private async Task CheckForNewAlertNotificationsAsync()
     {
-        if (!_dbService.DatabaseFound) return;
+        if (!_dbService.DatabaseFound && !_dbService.CloudFallbackActive) return;
 
         try
         {

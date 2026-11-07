@@ -30,4 +30,11 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\monitoring_engine\serviceAccountKey.json"
+          Link="serviceAccountKey.json"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('..\..\monitoring_engine\serviceAccountKey.json')" />
+  </ItemGroup>
+
 </Project>

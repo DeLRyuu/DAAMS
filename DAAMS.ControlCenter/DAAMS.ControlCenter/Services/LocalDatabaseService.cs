@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -69,6 +69,105 @@ public class LocalDatabaseService
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DAAMS", "data", "daams.db");
+    }
+
+    // =========================================================================
+    // Cloud fallback (Control Center on a PC that has no local database)
+    //
+    // Offline-first rule:
+    //   - Local database present  -> read local SQLite (works with no internet;
+    //                                the Monitoring Engine syncs it up to Firestore).
+    //   - Local database missing  -> read the same data from Firestore instead.
+    // Cloud mode is READ-ONLY: write methods below still need the local database.
+    // MainViewModel sets CloudFallback once at startup.
+    // =========================================================================
+
+    public static FirestoreService? CloudFallback { get; set; }
+
+    public bool CloudFallbackActive => !DatabaseFound && CloudFallback is not null;
+
+    private static FirestoreService RequireCloud() =>
+        CloudFallback ?? throw new FileNotFoundException("No local DAAMS database and no cloud connection configured.");
+
+    public async Task<List<ProtectedAsset>> GetProtectedAssetsAsync() =>
+        DatabaseFound ? await GetProtectedAssetsLocalAsync() : await RequireCloud().GetProtectedAssetsAsync();
+
+    public async Task<List<ActivityLog>> GetActivityLogsAsync() =>
+        DatabaseFound ? await GetActivityLogsLocalAsync() : await RequireCloud().GetActivityLogsAsync();
+
+    public async Task<List<SecurityAlert>> GetSecurityAlertsAsync() =>
+        DatabaseFound ? await GetSecurityAlertsLocalAsync() : await RequireCloud().GetSecurityAlertsAsync();
+
+    public async Task<List<IncidentReport>> GetIncidentReportsAsync() =>
+        DatabaseFound ? await GetIncidentReportsLocalAsync() : await RequireCloud().GetIncidentReportsAsync();
+
+    public async Task<List<CaseItem>> GetCasesAsync()
+    {
+        if (DatabaseFound)
+        {
+            return await GetCasesLocalAsync();
+        }
+
+        FirestoreService cloud = RequireCloud();
+        Task<List<SecurityAlert>> alertsTask = cloud.GetSecurityAlertsAsync();
+        Task<List<IncidentReport>> incidentsTask = cloud.GetIncidentReportsAsync();
+        await Task.WhenAll(alertsTask, incidentsTask);
+        return BuildCasesFromCloud(alertsTask.Result, incidentsTask.Result);
+    }
+
+    /// <summary>Same merge the SQL join in GetCasesLocalAsync does: one case per alert, using the linked incident's status when there is one.</summary>
+    private static List<CaseItem> BuildCasesFromCloud(List<SecurityAlert> alerts, List<IncidentReport> incidents)
+    {
+        var latestIncidentByAlert = incidents
+            .Where(i => !string.IsNullOrEmpty(i.RelatedAlertId))
+            .GroupBy(i => i.RelatedAlertId!)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.UpdatedAt).First());
+
+        var list = new List<CaseItem>();
+        foreach (SecurityAlert alert in alerts.OrderByDescending(a => a.CreatedAt))
+        {
+            latestIncidentByAlert.TryGetValue(alert.AlertId, out IncidentReport? incident);
+
+            CaseStatus status = incident is not null
+                ? incident.InvestigationStatus switch
+                {
+                    InvestigationStatus.UnderInvestigation => CaseStatus.Investigating,
+                    InvestigationStatus.Resolved => CaseStatus.Resolved,
+                    InvestigationStatus.Dismissed => CaseStatus.Dismissed,
+                    _ => CaseStatus.New
+                }
+                : alert.Status switch
+                {
+                    AlertStatus.Investigating => CaseStatus.Investigating,
+                    AlertStatus.Reviewed => CaseStatus.Dismissed,
+                    AlertStatus.Resolved => CaseStatus.Resolved,
+                    _ => CaseStatus.New
+                };
+
+            list.Add(new CaseItem
+            {
+                AlertId = alert.AlertId,
+                IncidentId = incident?.IncidentId,
+                User = alert.User,
+                Device = alert.Device,
+                Asset = alert.Asset,
+                Path = alert.Path,
+                Action = alert.Action,
+                Classification = alert.Classification,
+                RiskScore = alert.RiskScore,
+                RiskLevel = alert.RiskLevel,
+                Reason = alert.Reason,
+                RiskFactors = alert.RiskFactors,
+                DetectedAt = alert.CreatedAt,
+                Status = status,
+                Notes = incident?.Notes,
+                Resolution = incident?.Resolution,
+                DateResolved = incident?.DateResolved,
+                UpdatedAt = incident?.UpdatedAt ?? alert.CreatedAt,
+            });
+        }
+
+        return list;
     }
 
     private SqliteConnection CreateConnection()
@@ -220,7 +319,7 @@ public class LocalDatabaseService
     // Protected Assets
     // =========================================================================
 
-    public async Task<List<ProtectedAsset>> GetProtectedAssetsAsync()
+    private async Task<List<ProtectedAsset>> GetProtectedAssetsLocalAsync()
     {
         return await Task.Run(() =>
         {
@@ -321,7 +420,7 @@ public class LocalDatabaseService
     // Activity Logs
     // =========================================================================
 
-    public async Task<List<ActivityLog>> GetActivityLogsAsync()
+    private async Task<List<ActivityLog>> GetActivityLogsLocalAsync()
     {
         return await Task.Run(() =>
         {
@@ -371,7 +470,7 @@ public class LocalDatabaseService
     // Security Alerts
     // =========================================================================
 
-    public async Task<List<SecurityAlert>> GetSecurityAlertsAsync()
+    private async Task<List<SecurityAlert>> GetSecurityAlertsLocalAsync()
     {
         return await Task.Run(() =>
         {
@@ -445,7 +544,7 @@ public class LocalDatabaseService
     // Incident Reports
     // =========================================================================
 
-    public async Task<List<IncidentReport>> GetIncidentReportsAsync()
+    private async Task<List<IncidentReport>> GetIncidentReportsLocalAsync()
     {
         return await Task.Run(() =>
         {
@@ -597,7 +696,7 @@ public class LocalDatabaseService
     // Cases (Alert + Incident Merged)
     // =========================================================================
 
-    public async Task<List<CaseItem>> GetCasesAsync()
+    private async Task<List<CaseItem>> GetCasesLocalAsync()
     {
         return await Task.Run(() =>
         {
