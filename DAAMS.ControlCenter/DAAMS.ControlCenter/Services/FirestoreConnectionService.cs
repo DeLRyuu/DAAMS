@@ -25,14 +25,18 @@ public enum FirestoreConnectionState
 /// Owns the single FirestoreDb instance for the app and tracks connection
 /// status so the UI (shell footer, per-section error states) can reflect it.
 ///
-/// Credentials are resolved entirely through Google's Application Default
-/// Credentials chain — this class never reads, stores, or requests a
-/// credential file path itself. See README.md "Firestore setup".
+/// Credential lookup order (first match wins):
+///   1. GOOGLE_APPLICATION_CREDENTIALS environment variable
+///   2. %LOCALAPPDATA%\DAAMS\serviceAccountKey.json
+///   3. serviceAccountKey.json next to the exe (installed build)
+///   4. monitoring_engine\serviceAccountKey.json found by walking up from the exe (dev repo)
+///
+/// Connection errors are written to %LOCALAPPDATA%\DAAMS\controlcenter.log.
 /// </summary>
 public class FirestoreConnectionService
 {
     private const string KeyNotFoundStatus =
-        "Cloud: key not found (put serviceAccountKey.json in %LOCALAPPDATA%\\DAAMS)";
+        "Cloud: key not found (put serviceAccountKey.json next to the app or in %LOCALAPPDATA%\\DAAMS)";
     private readonly object _connectLock = new();
     private FirestoreDb? _db;
     private Task<FirestoreDb>? _connectTask;
@@ -95,8 +99,10 @@ public class FirestoreConnectionService
             SetState(FirestoreConnectionState.Connected, "Cloud: Connected");
             return db;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            LogError($"Firestore connect failed (key: {credentialsPath ?? "none"})", ex);
+
             lock (_connectLock)
             {
                 _connectTask = null;
@@ -123,20 +129,23 @@ public class FirestoreConnectionService
             await _db.Collection("protected_assets").Limit(1).GetSnapshotAsync(timeout.Token);
             SetState(FirestoreConnectionState.Connected, "Cloud: Connected");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            LogError("Firestore connection check failed", ex);
             Debug.WriteLine("[Firestore] Connection check failed.");
         }
     }
 
     private static string? ResolveCredentialsPath()
     {
+        // 1. Environment variable override
         string? configuredPath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
         if (!string.IsNullOrWhiteSpace(configuredPath) && File.Exists(configuredPath.Trim()))
         {
             return Path.GetFullPath(configuredPath.Trim());
         }
 
+        // 2. Per-user folder
         string localPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DAAMS", "serviceAccountKey.json");
@@ -145,6 +154,14 @@ public class FirestoreConnectionService
             return localPath;
         }
 
+        // 3. Next to the exe (installed build)
+        string besideExe = Path.Combine(AppContext.BaseDirectory, "serviceAccountKey.json");
+        if (File.Exists(besideExe))
+        {
+            return besideExe;
+        }
+
+        // 4. Dev repo: walk up looking for monitoring_engine\serviceAccountKey.json
         string? dir = AppContext.BaseDirectory;
         while (!string.IsNullOrEmpty(dir))
         {
@@ -176,12 +193,33 @@ public class FirestoreConnectionService
                 return projectId.GetString();
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            LogError("Could not read project ID from credential file", ex);
             Debug.WriteLine("[Firestore] Could not read project ID from credential file.");
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Appends an error to %LOCALAPPDATA%\DAAMS\controlcenter.log. Never throws.
+    /// </summary>
+    private static void LogError(string message, Exception ex)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DAAMS");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "controlcenter.log"),
+                $"{DateTime.Now:u} {message}: {ex}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Logging must never break the app.
+        }
     }
 
     private void SetState(FirestoreConnectionState state, string message)
