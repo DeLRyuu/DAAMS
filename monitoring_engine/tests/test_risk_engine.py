@@ -13,8 +13,14 @@ from core import risk_engine
 class TestRiskEngine(unittest.TestCase):
     def setUp(self):
         risk_engine._recent_activity.clear()
+        # These tests assume the default 07:00-19:00 working hours. Without this patch the
+        # risk engine reads the REAL data/admin_settings.json (whatever work hours the admin
+        # saved in the Control Center), so the scores change whenever those hours change.
+        self.work_hours_patch = patch.object(risk_engine, "get_work_hours", return_value=(7, 19))
+        self.work_hours_patch.start()
 
     def tearDown(self):
+        self.work_hours_patch.stop()
         risk_engine._recent_activity.clear()
 
     def test_create_has_explicit_moderate_action_weight(self):

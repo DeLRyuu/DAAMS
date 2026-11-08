@@ -210,29 +210,39 @@ def upload_protected_asset(record: dict) -> bool:
         return False
 
 
-def upload_security_settings(record: dict) -> bool:
+def fetch_pin_config() -> Tuple[str, dict]:
     """
-    Upsert the DAAMS PIN/security-settings document in Firestore's
-    'security_settings' collection at the fixed ID 'pin_config'.
+    Download the Passkey PIN document (security_settings/pin_config), written
+    ONLY by the Control Center. Never raises.
+
+    Returns (status, data):
+      ("found", {...doc fields...})  document exists
+      ("missing", {})                Firestore reached, but no Passkey generated yet
+      ("unreachable", {})            offline / no key / any error (NOT the same as missing)
     """
     client = get_firestore_client()
     if client is None:
-        return False
+        return "unreachable", {}
 
     try:
-        payload = {
-            "pin_hash": record.get("pin_hash"),
-            "salt": record.get("salt"),
-            "updated_at": record.get("updated_at"),
-            "updated_by": record.get("updated_by"),
-            "is_default": bool(record.get("is_default")),
-        }
-        client.collection(SECURITY_SETTINGS_COLLECTION).document("pin_config").set(payload, merge=True)
+        snapshot = client.collection(SECURITY_SETTINGS_COLLECTION).document("pin_config").get()
         _record_firestore_success()
-        return True
+        if not snapshot.exists:
+            return "missing", {}
+        return "found", snapshot.to_dict() or {}
     except Exception as e:
         _record_firestore_error(e)
-        return False
+        return "unreachable", {}
+
+
+def upload_security_settings(record: dict) -> bool:
+    """
+    DISABLED on purpose. The Passkey PIN is generated in the Control Center and
+    the Monitoring Engine is download-only (see pin_auth.py). Uploading from here
+    could overwrite the manager's Passkey, so this does nothing and reports
+    success so any leftover pending PIN row is simply marked as handled.
+    """
+    return True
 
 
 def upload_security_alert(alert: dict) -> bool:
@@ -261,6 +271,7 @@ def upload_security_alert(alert: dict) -> bool:
             "timestamp": alert.get("timestamp"),
             "status": alert.get("status", "New"),
             "investigation_status": alert.get("investigation_status", "Not Started"),
+            "updated_at": alert.get("updated_at"),
         }
         client.collection(SECURITY_ALERTS_COLLECTION).document(alert_id).set(payload, merge=True)
         _record_firestore_success()
@@ -332,6 +343,8 @@ def upload_activity(record: dict) -> bool:
             "risk_level": record.get("risk_level"),
             "risk_factors": record.get("risk_factors") or [],
             "advisory": record.get("advisory"),
+            "asset_path": record.get("asset_path"),
+            "protected_root": record.get("protected_root"),
         }
 
         if activity_id:

@@ -65,8 +65,9 @@ from config.settings import (
     is_disallowed_root,
     ENABLE_OPEN_DETECTION,
 )
+from cli import pin_auth
 from core import database
-from core.asset_registry import get_all_assets, relocate_asset
+from core.asset_registry import get_all_assets, relocate_asset, remove_protection
 from core.clipboard_watcher import ClipboardWatcher
 from core.open_audit_watcher import OpenAuditWatcher
 from core.event_aggregator import EventAggregator, FileIndex
@@ -273,6 +274,80 @@ class _Ticker(threading.Thread):
         self._halt.set()
 
 
+# Normalized paths of assets whose protection was switched off because the
+# file/folder was deleted. If one of them reappears on disk it is recovered
+# and becomes protected again.
+_DELETED_UNPROTECTED: set = set()
+
+
+def _mark_asset_unprotected_if_gone(asset: dict) -> None:
+    """
+    A protected asset that was really deleted is no longer protected: flip
+    its registry status to 'unprotected' (the row is kept, never removed,
+    so history and the asset_id stay intact). If the path exists again
+    (e.g. an editor's delete-and-recreate save), nothing is changed.
+    """
+    path = (asset or {}).get("path")
+    if not path or os.path.exists(path):
+        return
+    try:
+        ok, message = remove_protection(path)
+        if ok:
+            _DELETED_UNPROTECTED.add(_normalized_path(path))
+            logger.info("Protected asset deleted; status set to unprotected: %s", path)
+    except Exception as e:
+        logger.warning("Could not mark deleted asset as unprotected (%s): %s", path, e)
+
+
+def _recover_deleted_assets(initial: bool = False) -> None:
+    """
+    Re-protect assets that were deleted (status 'unprotected') and are back
+    on disk. On startup, also remember which unprotected assets are
+    currently missing so a later recovery is noticed.
+    """
+    try:
+        if initial:
+            for record in get_all_assets(only_protected=False):
+                path = record.get("path")
+                if (
+                    path
+                    and record.get("status") == "unprotected"
+                    and not os.path.exists(path)
+                ):
+                    _DELETED_UNPROTECTED.add(_normalized_path(path))
+        if not _DELETED_UNPROTECTED:
+            return
+        records = {
+            _normalized_path(r["path"]): r
+            for r in get_all_assets(only_protected=False) if r.get("path")
+        }
+        for key in list(_DELETED_UNPROTECTED):
+            record = records.get(key)
+            if record is None or record.get("status") == "protected":
+                _DELETED_UNPROTECTED.discard(key)
+                continue
+            path = record["path"]
+            if not os.path.exists(path):
+                continue
+            record["status"] = "protected"
+            if database.upsert_protected_asset(record):
+                _DELETED_UNPROTECTED.discard(key)
+                logger.info("Deleted asset recovered; protected again: %s", path)
+                try:
+                    sync_service.trigger_sync()
+                except Exception as e:
+                    logger.warning("Could not schedule sync after recovery: %s", e)
+                record_activity(
+                    asset_path=path,
+                    action="Create",
+                    classification=record.get("classification"),
+                    detection_note="Deleted protected asset was restored; protection reinstated.",
+                    protected_root=path,
+                )
+    except Exception:
+        logger.exception("Could not check for recovered assets")
+
+
 def _record_missing_asset(asset: dict) -> None:
     path = asset.get("path", "")
     logger.warning("Protected asset is missing from disk: %s", path)
@@ -284,6 +359,7 @@ def _record_missing_asset(asset: dict) -> None:
         protected_root=path,
         force_alert=True,
     )
+    _mark_asset_unprotected_if_gone(asset)
 
 
 def _validate_asset_for_watching(asset: dict) -> bool:
@@ -392,6 +468,13 @@ class _AssetRouter:
             detection_note=note,
             protected_root=chosen.get("path"),
         )
+        if (
+            action == "Delete"
+            and source_asset
+            and src
+            and _normalized_path(src) == _normalized_path(source_asset["path"])
+        ):
+            _mark_asset_unprotected_if_gone(source_asset)
         if (
             action in {"Rename", "Move"}
             and source_asset
@@ -579,6 +662,8 @@ def start_monitoring():
     watched = {}
     invalid_warned = set()
     observed_removals = set()
+    missing_since = {}
+    missing_grace = COALESCE_QUIET_SECONDS + MOVE_PAIRING_WINDOW_SECONDS + 2.0
     large_parents_warned = set()
     router = _AssetRouter(
         [],
@@ -601,8 +686,27 @@ def start_monitoring():
     previous_signature = None
     previous_assets = {}
 
+    def _still_explaining(path_key: str, asset: dict, initial: bool) -> bool:
+        """
+        A protected path that just vanished is usually a rename/move/cut-paste
+        whose events are still being coalesced (they are reported ~1-3 s later,
+        and the registry path is only relocated after that). Do not call it
+        "missing" until it has stayed gone past the grace period with no event
+        or pending aggregation that explains it.
+        """
+        if initial or path_key in observed_removals:
+            return False  # startup check, or the event stream already explained it
+        now = time.monotonic()
+        first_seen = missing_since.setdefault(path_key, now)
+        pending = getattr(aggregator, "has_pending_for", None)
+        if pending is not None and pending(asset["path"]):
+            missing_since[path_key] = now  # keep waiting while events resolve
+            return True
+        return now - first_seen < missing_grace
+
     def reconcile(initial: bool = False):
         nonlocal previous_signature, previous_assets
+        _recover_deleted_assets(initial)
         registry_records = get_all_assets(only_protected=True)
         registered_assets = {
             _normalized_path(asset["path"]): asset
@@ -614,6 +718,13 @@ def start_monitoring():
                 if is_disallowed_root(asset["path"]) or not os.path.exists(asset["path"]):
                     continue
                 invalid_warned.discard(path)
+            elif (
+                not is_disallowed_root(asset["path"])
+                and not os.path.exists(asset["path"])
+                and _still_explaining(path, asset, initial)
+            ):
+                valid_assets.append(asset)  # keep watching while the move/rename settles
+                continue
             elif not _validate_asset_for_watching(asset):
                 invalid_warned.add(path)
                 if (
@@ -625,6 +736,7 @@ def start_monitoring():
             valid_assets.append(asset)
             invalid_warned.discard(path)
             observed_removals.discard(path)
+            missing_since.pop(path, None)
         current_assets = {
             _normalized_path(asset["path"]): asset for asset in valid_assets
         }
@@ -708,6 +820,7 @@ def start_monitoring():
     clipboard_watcher_started = False
     open_audit_watcher_started = False
     sync_started = False
+    pin_sync_stop = threading.Event()
     shutdown_status = "stopped"
     shutdown_requested = threading.Event()
     shutdown_complete = threading.Event()
@@ -718,6 +831,8 @@ def start_monitoring():
     try:
         sync_service.start_sync_service()
         sync_started = True
+        # Download-only Passkey PIN sync (Control Center -> Firestore -> this PC).
+        pin_auth.start_background_sync(pin_sync_stop)
         observer.start()
         observer_started = True
         ticker.start()
@@ -729,6 +844,7 @@ def start_monitoring():
             open_audit_watcher = OpenAuditWatcher(
                 get_assets=lambda: get_all_assets(only_protected=True),
                 record=record_activity,
+                auto_setup=True,
             )
             open_audit_watcher.start()
             open_audit_watcher_started = True
@@ -770,6 +886,7 @@ def start_monitoring():
         shutdown_status = "failed"
         raise
     finally:
+        pin_sync_stop.set()
         if observer_started:
             try:
                 observer.stop()

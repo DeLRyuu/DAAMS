@@ -462,3 +462,20 @@ def test_large_file_changed_content_gives_modify(env):
     agg.on_modified(big)
     settle(clock, agg)
     assert actions(records) == ["Modify"]
+
+
+def test_has_pending_for_covers_path_and_rename_source(env):
+    tmp, clock, records, index, agg = env
+    src = write(tmp / "pc-02" / "A.txt", "hello")
+    dest = str(tmp / "pc-02" / "B.txt")
+    index.build_assets([{"path": str(tmp / "pc-02"), "asset_type": "folder"}])
+    os.rename(src, dest)
+
+    assert not agg.has_pending_for(src)
+    agg.on_moved(src, dest)
+    assert agg.has_pending_for(src)    # old name is still being explained
+    assert agg.has_pending_for(dest)
+
+    settle(clock, agg)
+    assert actions(records) == ["Rename"]
+    assert not agg.has_pending_for(src)

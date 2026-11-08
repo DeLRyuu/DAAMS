@@ -5,6 +5,7 @@ Detects file Open (read) events using the Windows Security Audit Log (Event ID 4
 Requires Administrator rights to read the Security log via wevtutil.
 """
 
+import base64
 import logging
 import ntpath
 import os
@@ -33,6 +34,67 @@ IGNORED_PROCESSES = {
 }
 
 EVENT_XML_NS = {"e": "http://schemas.microsoft.com/win/2004/08/events/event"}
+
+# "File System" audit subcategory GUID. The GUID works on every Windows language;
+# the display name "File System" is translated on non-English Windows.
+_AUDIT_FILE_SYSTEM_GUID = "{0CCE921D-69AE-11D9-BED3-505054503030}"
+
+# Applies a ReadData/Success audit rule for Everyone (SID S-1-1-0, language independent)
+# to one file or folder. Same rule as tools/enable_open_audit.ps1, built into the exe so
+# installed PCs do not depend on running that script by hand.
+_SACL_SCRIPT = """
+$ErrorActionPreference = 'Stop'
+$p = '{path}'
+$item = Get-Item -LiteralPath $p -Force
+if ($item -is [System.IO.DirectoryInfo]) {{
+    $inh = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+}} else {{
+    $inh = [System.Security.AccessControl.InheritanceFlags]::None
+}}
+$sid = New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0')
+$rule = New-Object System.Security.AccessControl.FileSystemAuditRule($sid, [System.Security.AccessControl.FileSystemRights]::ReadData, $inh, [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AuditFlags]::Success)
+$acl = Get-Acl -LiteralPath $p -Audit
+$acl.AddAuditRule($rule)
+Set-Acl -LiteralPath $p -AclObject $acl
+"""
+
+_wevtutil_warned = False
+
+
+def enable_file_system_auditing() -> bool:
+    """Turns on Success auditing for the Windows "File System" subcategory. Needs Administrator."""
+    for subcategory in (_AUDIT_FILE_SYSTEM_GUID, "File System"):
+        try:
+            res = subprocess.run(
+                ["auditpol", "/set", f"/subcategory:{subcategory}", "/success:enable"],
+                capture_output=True, text=True, check=False, timeout=30,
+            )
+        except Exception as e:
+            print(f"[OPEN AUDIT WARNING] Could not run auditpol: {e}")
+            continue
+        if res.returncode == 0:
+            return True
+        print(f"[OPEN AUDIT WARNING] auditpol failed ({res.returncode}): {(res.stderr or res.stdout).strip()}")
+    return False
+
+
+def apply_read_audit_rule(path: str) -> bool:
+    """Adds the ReadData/Success audit rule (SACL) to one protected file or folder. Needs Administrator."""
+    script = _SACL_SCRIPT.format(path=path.replace("'", "''"))
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    try:
+        res = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+             "-EncodedCommand", encoded],
+            capture_output=True, text=True, check=False, timeout=60,
+        )
+    except Exception as e:
+        print(f"[OPEN AUDIT WARNING] Could not set audit rule on '{path}': {e}")
+        return False
+    if res.returncode != 0:
+        print(f"[OPEN AUDIT WARNING] Audit rule failed for '{path}': {(res.stderr or res.stdout).strip()[:300]}")
+        return False
+    return True
 
 
 def _has_read_data_access(mask_val: Any) -> bool:
@@ -114,6 +176,12 @@ def read_recent_reads(seconds: float = 5.0) -> List[Tuple[Any, Dict[str, str]]]:
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if res.returncode != 0:
+            global _wevtutil_warned
+            if not _wevtutil_warned:
+                _wevtutil_warned = True
+                print(f"[OPEN AUDIT WARNING] Cannot read the Windows Security log "
+                      f"(wevtutil code {res.returncode}): {res.stderr.strip()}. "
+                      "Open detection needs the engine to run as Administrator.")
             logger.debug("wevtutil failed (code %d): %s", res.returncode, res.stderr.strip())
             return []
         output = res.stdout.strip()
@@ -138,6 +206,7 @@ class OpenAuditWatcher(threading.Thread):
         read: Optional[Callable[..., List[Tuple[Any, Dict[str, str]]]]] = None,
         interval: float = 2.0,
         daemon: bool = True,
+        auto_setup: bool = False,
     ):
         super().__init__(name="DAAMS-OpenAuditWatcher", daemon=daemon)
         self.get_assets = get_assets or (lambda: [])
@@ -147,6 +216,38 @@ class OpenAuditWatcher(threading.Thread):
         self._stop_event = threading.Event()
         self._seen_ids = set()
         self._recent_opens: Dict[str, float] = {}
+        # auto_setup: the engine turns on Windows file auditing and the per-asset audit rule
+        # itself (needed on installed PCs). Off by default so unit tests never touch Windows.
+        self._auto_setup = auto_setup
+        self._policy_ok = False
+        self._last_setup = 0.0
+        self._audited: set = set()
+        self._audit_failures: Dict[str, int] = {}
+
+    def _ensure_audit_setup(self) -> None:
+        """Makes sure Windows is actually logging Opens for every protected asset (throttled, retried)."""
+        now = time.monotonic()
+        if now - self._last_setup < 5.0:
+            return
+        self._last_setup = now
+
+        if not self._policy_ok:
+            self._policy_ok = enable_file_system_auditing()
+            if not self._policy_ok:
+                return
+            print("[OPEN AUDIT] Windows File System auditing is enabled.")
+
+        for asset in self.get_assets():
+            path = asset.get("path") if isinstance(asset, dict) else None
+            if not path or path in self._audited or not os.path.exists(path):
+                continue
+            if self._audit_failures.get(path, 0) >= 3:
+                continue
+            if apply_read_audit_rule(path):
+                self._audited.add(path)
+                print(f"[OPEN AUDIT] Open detection armed for: {path}")
+            else:
+                self._audit_failures[path] = self._audit_failures.get(path, 0) + 1
 
     def _get_record_function(self):
         if self._record_func is not None:
@@ -236,6 +337,8 @@ class OpenAuditWatcher(threading.Thread):
     def run(self) -> None:
         while not self._stop_event.wait(self._interval):
             try:
+                if self._auto_setup:
+                    self._ensure_audit_setup()
                 self.check_once()
             except Exception as e:
                 print(f"[OPEN AUDIT WARNING] Error in open audit check: {e}")

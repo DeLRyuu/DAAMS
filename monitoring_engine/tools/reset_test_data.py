@@ -4,7 +4,7 @@ reset_test_data.py -- clear DAAMS test history so a new test run starts clean.
 Run from the monitoring_engine folder, with main.py STOPPED:
 
     python tools/reset_test_data.py          # clear history only (recommended)
-    python tools/reset_test_data.py --all    # ALSO clear protected assets and the PIN
+    python tools/reset_test_data.py --all    # ALSO clear protected assets and the local Passkey copy
 
 By default this clears: activity_logs, security_alerts, incident_reports and
 sync_history in data/daams.db, and moves the matching .jsonl files in logs/
@@ -15,8 +15,9 @@ WHY THE FILES ARE MOVED TOO: core/database.py re-imports the legacy .jsonl /
 database tables would let the old records come straight back.
 
 By default it KEEPS: protected_assets (what you protected), security_settings
-(your PIN) and schema_migrations. With --all those are cleared too, which
-unprotects everything and resets the PIN to the default.
+(the local Passkey PIN copy) and schema_migrations. With --all those are cleared too,
+which unprotects everything and removes the local Passkey copy. There is no default
+PIN: the engine downloads the Passkey from Firestore again once it is online.
 
 Always makes a backup first. Only affects THIS computer: records that were
 already uploaded to Firestore stay in the cloud.
@@ -54,7 +55,8 @@ def main() -> int:
     print(f"Will move : {', '.join(JSONL_FILES)} (from {LOGS_DIR}) into a backup folder")
     if wipe_all:
         print(f"Will move : {', '.join(SETUP_JSON_FILES)} (from {DATA_DIR}) too")
-        print("WARNING   : --all also removes every protected asset and resets the PIN.")
+        print("WARNING   : --all also removes every protected asset and the local Passkey PIN copy.")
+        print("            (It is downloaded again from Firestore when this PC is online.)")
     print("Make sure main.py is NOT running.")
     if input("Type RESET to continue: ").strip() != "RESET":
         print("Cancelled. Nothing was changed.")

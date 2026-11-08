@@ -46,3 +46,6 @@ Thumbs.db
 installer/build/
 installer/output/
 installer/_tmp/
+daams_structure.txt
+installer/Monitoring_Engine-fixing/
+installer/Old Budling/

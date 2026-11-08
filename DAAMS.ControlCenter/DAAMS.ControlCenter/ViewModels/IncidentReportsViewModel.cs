@@ -178,7 +178,7 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
     /// </summary>
     public void AddLocalIncident(IncidentReport incident)
     {
-        _ = _db.SaveIncidentReportAsync(incident);
+        _ = RunAndPushAsync(_db.SaveIncidentReportAsync(incident));
 
         _locallyCreatedIncidents.Insert(0, incident);
         _allIncidents.Insert(0, incident);
@@ -249,7 +249,7 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
         RecomputeOpenCount();
 
         // Persist status change to local SQLite database
-        _ = _db.UpdateIncidentReportStatusAsync(incident.IncidentId, newStatus, incident.DateResolved);
+        _ = RunAndPushAsync(_db.UpdateIncidentReportStatusAsync(incident.IncidentId, newStatus, incident.DateResolved));
     }
 
     private void SaveResolution(IncidentReport incident)
@@ -268,7 +268,21 @@ public class IncidentReportsViewModel : DataSectionViewModelBase
         SelectedIncident = incident;
 
         // Persist resolution to local SQLite database
-        _ = _db.UpdateIncidentResolutionAsync(incident.IncidentId, incident.Resolution);
+        _ = RunAndPushAsync(_db.UpdateIncidentResolutionAsync(incident.IncidentId, incident.Resolution));
+    }
+
+    /// <summary>Waits for the local/cloud write, then pushes pending rows to Firestore. Never throws.</summary>
+    private async Task RunAndPushAsync(Task<bool> write)
+    {
+        try
+        {
+            await write;
+            await _db.TryPushPendingCasesAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[IncidentReportsViewModel] Write/push failed: {ex.Message}");
+        }
     }
 
     private bool FilterPredicate(object obj)

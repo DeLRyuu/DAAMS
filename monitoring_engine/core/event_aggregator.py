@@ -455,6 +455,15 @@ class EventAggregator:
                 for item in self._pending
             )
 
+    def has_pending_for(self, path: str) -> bool:
+        """True while any unresolved event involves `path` (as path or rename source)."""
+        key = _key(path)
+        with self._lock:
+            return any(
+                _key(item.path) == key or (item.src is not None and _key(item.src) == key)
+                for item in self._pending
+            )
+
     # ---------------------------------------------------------------- internals
     def _add(self, kind, path, now, src=None, neighbor=False):
         self._pending.append(_Pending(kind, path, now, now, src=src, neighbor=neighbor))

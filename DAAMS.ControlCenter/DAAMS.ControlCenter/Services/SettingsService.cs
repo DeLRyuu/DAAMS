@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
@@ -567,7 +567,7 @@ public class SettingsService
                 }.ToString());
                 conn.Open();
                 using var cmd = conn.CreateCommand();
-                cmd.CommandText = "SELECT pin_hash, salt FROM security_settings WHERE key = 'pin_config' LIMIT 1;";
+                cmd.CommandText = "SELECT pin_hash, salt FROM security_settings WHERE key = 'pin_config' AND COALESCE(is_default, 0) = 0 LIMIT 1;";
                 using var reader = cmd.ExecuteReader();
                 if (reader.Read())
                 {
@@ -590,7 +590,10 @@ public class SettingsService
             {
                 string json = File.ReadAllText(jsonPath);
                 using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                bool isDefault = doc.RootElement.ValueKind == JsonValueKind.Object
+                    && doc.RootElement.TryGetProperty("is_default", out var dProp)
+                    && dProp.ValueKind == JsonValueKind.True;
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && !isDefault)
                 {
                     string h = doc.RootElement.TryGetProperty("pin_hash", out var hProp) ? hProp.GetString() ?? "" : "";
                     string s = doc.RootElement.TryGetProperty("salt", out var sProp) ? sProp.GetString() ?? "" : "";
@@ -607,73 +610,58 @@ public class SettingsService
     }
 
     /// <summary>
-    /// Verifies candidate PIN against stored hash/salt matching pin_auth.py: SHA256(salt + candidate).
-    /// Never logs or prints candidate PIN, hash, or salt.
+    /// Verifies a PIN against the Passkey PIN: SHA256(salt + pin), same as pin_auth.py.
+    /// Online, Firestore is the authority (a regenerated Passkey works immediately);
+    /// offline, the local copy is used. There is NO default PIN any more.
+    /// Never logs or prints the candidate PIN, hash, or salt.
+    /// Blocks for up to a few seconds when offline, so call it off the UI thread.
     /// </summary>
     public static bool VerifyPin(string candidatePin, string? dbPath = null)
     {
         if (string.IsNullOrEmpty(candidatePin)) return false;
 
         var stored = LoadSecuritySettings(dbPath);
-        if (!stored.HasValue)
+        bool online = FirestoreConnectionService.Shared.State == FirestoreConnectionState.Connected;
+
+        if (online || !stored.HasValue)
         {
-            return candidatePin == "1234";
+            CloudPinResult cloud = PasskeyPinService.FetchBlocking(TimeSpan.FromSeconds(3));
+            if (cloud.Status == CloudPinStatus.Found)
+            {
+                return PasskeyPinService.Matches(candidatePin, cloud.PinHash, cloud.Salt);
+            }
         }
 
-        string pinHash = stored.Value.PinHash;
-        string salt = stored.Value.Salt;
-
-        using var sha256 = SHA256.Create();
-        byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(salt + candidatePin));
-        string computedHash = Convert.ToHexString(bytes).ToLowerInvariant();
-
-        return string.Equals(pinHash, computedHash, StringComparison.OrdinalIgnoreCase);
+        return stored.HasValue && PasskeyPinService.Matches(candidatePin, stored.Value.PinHash, stored.Value.Salt);
     }
 
     /// <summary>
-    /// Validates current PIN, new PIN format/match, and updates both SQLite and security_settings.json.
-    /// Never logs or prints candidate PIN, new PIN, or hash.
+    /// True if a Passkey PIN exists that this PC can check against: a local copy, or one in Firestore.
     /// </summary>
-    public static (bool Success, string Message) SaveNewPin(
-        string currentPin,
-        string newPin,
-        string confirmPin,
-        string? dbPath = null)
+    public static bool HasAnyPasskey(string? dbPath = null)
     {
-        if (!VerifyPin(currentPin, dbPath))
-        {
-            return (false, "Incorrect current PIN");
-        }
+        if (LoadSecuritySettings(dbPath).HasValue) return true;
+        return PasskeyPinService.FetchBlocking(TimeSpan.FromSeconds(2)).Status == CloudPinStatus.Found;
+    }
 
-        if (newPin != confirmPin)
-        {
-            return (false, "PINs do not match");
-        }
-
-        if (string.IsNullOrEmpty(newPin) || !newPin.All(char.IsDigit))
-        {
-            return (false, "PIN must contain digits only.");
-        }
-
-        if (newPin.Length < 4 || newPin.Length > 8)
-        {
-            return (false, "PIN must be 4-8 digits long.");
-        }
-
+    /// <summary>
+    /// Saves the Passkey PIN locally (SQLite + security_settings.json) on a PC that has a local DAAMS database.
+    /// Marked SYNCED: the PIN is managed in Firestore and the Engine never uploads it.
+    /// Does nothing on a Control Center-only PC (no local database); that PC reads the PIN from Firestore.
+    /// </summary>
+    public static void StoreLocalPin(string pinHash, string salt, string updatedBy, string? dbPath = null)
+    {
         try
         {
-            byte[] saltBytes = RandomNumberGenerator.GetBytes(16);
-            string salt = Convert.ToHexString(saltBytes).ToLowerInvariant();
-
-            using var sha256 = SHA256.Create();
-            byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(salt + newPin));
-            string pinHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+            string effectiveDb = !string.IsNullOrWhiteSpace(dbPath) ? dbPath : LocalDatabaseService.ResolveDatabasePath();
+            if (!File.Exists(effectiveDb))
+            {
+                return;
+            }
 
             string nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            string username = Environment.UserName;
 
-            // 1. Atomically write to security_settings.json
-            string jsonPath = ResolveSecuritySettingsPath(dbPath);
+            string jsonPath = ResolveSecuritySettingsPath(effectiveDb);
             string? dir = Path.GetDirectoryName(jsonPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
             {
@@ -685,71 +673,51 @@ public class SettingsService
                 ["pin_hash"] = pinHash,
                 ["salt"] = salt,
                 ["updated_at"] = nowStr,
-                ["updated_by"] = username,
+                ["updated_by"] = updatedBy,
                 ["is_default"] = false
             };
 
             string tempFile = Path.Combine(dir ?? ".", $"security_settings_{Guid.NewGuid():N}.tmp");
             try
             {
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                File.WriteAllText(tempFile, jsonObj.ToJsonString(options));
+                File.WriteAllText(tempFile, jsonObj.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
                 File.Move(tempFile, jsonPath, overwrite: true);
             }
             finally
             {
-                try
-                {
-                    if (File.Exists(tempFile))
-                    {
-                        File.Delete(tempFile);
-                    }
-                }
-                catch { }
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
             }
 
-            // 2. Upsert into SQLite security_settings table
-            string effectiveDb = !string.IsNullOrWhiteSpace(dbPath) ? dbPath : LocalDatabaseService.ResolveDatabasePath();
-            if (File.Exists(effectiveDb))
+            using var conn = new SqliteConnection(new SqliteConnectionStringBuilder
             {
-                try
-                {
-                    using var conn = new SqliteConnection(new SqliteConnectionStringBuilder
-                    {
-                        DataSource = effectiveDb,
-                        Mode = SqliteOpenMode.ReadWrite,
-                        DefaultTimeout = 5
-                    }.ToString());
-                    conn.Open();
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = @"
-                        INSERT INTO security_settings (key, pin_hash, salt, updated_at, updated_by, is_default, sync_status)
-                        VALUES ('pin_config', @hash, @salt, @updated_at, @updated_by, 0, 'PENDING')
-                        ON CONFLICT(key) DO UPDATE SET
-                            pin_hash = excluded.pin_hash,
-                            salt = excluded.salt,
-                            updated_at = excluded.updated_at,
-                            updated_by = excluded.updated_by,
-                            is_default = 0,
-                            sync_status = 'PENDING';";
-                    cmd.Parameters.AddWithValue("@hash", pinHash);
-                    cmd.Parameters.AddWithValue("@salt", salt);
-                    cmd.Parameters.AddWithValue("@updated_at", nowStr);
-                    cmd.Parameters.AddWithValue("@updated_by", username);
-                    cmd.ExecuteNonQuery();
-                }
-                catch (Exception dbEx)
-                {
-                    Debug.WriteLine($"[SettingsService] SQLite upsert warning: {dbEx.Message}");
-                }
-            }
-
-            return (true, "PIN changed successfully.");
+                DataSource = effectiveDb,
+                Mode = SqliteOpenMode.ReadWrite,
+                DefaultTimeout = 5
+            }.ToString());
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO security_settings (key, pin_hash, salt, updated_at, updated_by, is_default, sync_status, synced_at, sync_error)
+                VALUES ('pin_config', @hash, @salt, @updated_at, @updated_by, 0, 'SYNCED', @synced_at, NULL)
+                ON CONFLICT(key) DO UPDATE SET
+                    pin_hash = excluded.pin_hash,
+                    salt = excluded.salt,
+                    updated_at = excluded.updated_at,
+                    updated_by = excluded.updated_by,
+                    is_default = 0,
+                    sync_status = 'SYNCED',
+                    synced_at = excluded.synced_at,
+                    sync_error = NULL;";
+            cmd.Parameters.AddWithValue("@hash", pinHash);
+            cmd.Parameters.AddWithValue("@salt", salt);
+            cmd.Parameters.AddWithValue("@updated_at", nowStr);
+            cmd.Parameters.AddWithValue("@updated_by", updatedBy);
+            cmd.Parameters.AddWithValue("@synced_at", nowStr);
+            cmd.ExecuteNonQuery();
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[SettingsService] SaveNewPin error: {ex.Message}");
-            return (false, "Failed to save the new PIN. Check folder permissions.");
+            Debug.WriteLine($"[SettingsService] StoreLocalPin warning: {ex.Message}");
         }
     }
 }

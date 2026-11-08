@@ -37,6 +37,31 @@ public class FirestoreConnectionService
 {
     private const string KeyNotFoundStatus =
         "Cloud: key not found (put serviceAccountKey.json next to the app or in %LOCALAPPDATA%\\DAAMS)";
+    private static FirestoreConnectionService? _shared;
+
+    /// <summary>
+    /// The app's one shared connection. The first instance ever created becomes the shared one,
+    /// so the instance the app already creates at startup IS Shared (no second Firestore link).
+    /// Static helpers such as PasskeyPinService and SettingsService.VerifyPin use this.
+    /// </summary>
+    public static FirestoreConnectionService Shared
+    {
+        get
+        {
+            if (_shared is null)
+            {
+                _ = new FirestoreConnectionService(); // the constructor registers itself as Shared
+            }
+
+            return _shared!;
+        }
+    }
+
+    public FirestoreConnectionService()
+    {
+        Interlocked.CompareExchange(ref _shared, this, null);
+    }
+
     private readonly object _connectLock = new();
     private FirestoreDb? _db;
     private Task<FirestoreDb>? _connectTask;

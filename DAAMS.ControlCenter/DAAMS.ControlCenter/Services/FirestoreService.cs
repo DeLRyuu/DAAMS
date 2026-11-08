@@ -26,12 +26,12 @@ namespace ControlCenter.Services;
 /// places). See the per-collection notes above each Map* method for exactly
 /// what changed and why.
 ///
-/// This remains READ-ONLY on purpose: no write/delete/update methods exist
-/// here. The Monitoring Engine is the sole writer of activity_logs,
-/// protected_assets, and security_alerts; the Control Center displays that
-/// data, it doesn't alter it.
+/// Reads are served from a live in-memory cache fed by Firestore snapshot listeners
+/// (see FirestoreService.Live.cs). The Monitoring Engine still writes activity_logs,
+/// protected_assets and new security_alerts; the Control Center now also writes alert
+/// status changes and incident reports back (merge writes, so Engine fields are kept).
 /// </summary>
-public class FirestoreService
+public partial class FirestoreService
 {
     private const string ActivityLogsCollection = "activity_logs";
     private const string ProtectedAssetsCollection = "protected_assets";
@@ -48,6 +48,7 @@ public class FirestoreService
 
     public async Task<List<ProtectedAsset>> GetProtectedAssetsAsync()
     {
+        if (_liveAssets.Ready) return _liveAssets.Snapshot();
         FirestoreDb db = await _connection.GetDbAsync();
         QuerySnapshot snapshot = await db.Collection(ProtectedAssetsCollection).GetSnapshotAsync();
         return snapshot.Documents.Select(MapProtectedAsset).ToList();
@@ -55,6 +56,7 @@ public class FirestoreService
 
     public async Task<List<ActivityLog>> GetActivityLogsAsync()
     {
+        if (_liveActivity.Ready) return _liveActivity.Snapshot();
         FirestoreDb db = await _connection.GetDbAsync();
         QuerySnapshot snapshot = await db.Collection(ActivityLogsCollection).GetSnapshotAsync();
         return snapshot.Documents.Select(MapActivityLog).ToList();
@@ -62,6 +64,7 @@ public class FirestoreService
 
     public async Task<List<SecurityAlert>> GetSecurityAlertsAsync()
     {
+        if (_liveAlerts.Ready) return _liveAlerts.Snapshot();
         FirestoreDb db = await _connection.GetDbAsync();
         QuerySnapshot snapshot = await db.Collection(SecurityAlertsCollection).GetSnapshotAsync();
         return snapshot.Documents.Select(MapSecurityAlert).ToList();
@@ -79,6 +82,7 @@ public class FirestoreService
     /// </summary>
     public async Task<List<IncidentReport>> GetIncidentReportsAsync()
     {
+        if (_liveIncidents.Ready) return _liveIncidents.Snapshot();
         FirestoreDb db = await _connection.GetDbAsync();
         QuerySnapshot snapshot = await db.Collection(IncidentReportsCollection).GetSnapshotAsync();
         return snapshot.Documents.Select(MapIncidentReport).ToList();
@@ -88,7 +92,7 @@ public class FirestoreService
     {
         FirestoreDb db = await _connection.GetDbAsync();
         string[] collections = includeAll
-            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection, SecuritySettingsCollection }
+            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection }
             : new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection };
         var summary = new StringBuilder();
         summary.AppendLine($"Firebase project: {_connection.ProjectId}");
@@ -100,10 +104,9 @@ public class FirestoreService
             summary.AppendLine($"  {collectionName}: {count}");
         }
 
-        if (!includeAll)
-        {
-            summary.AppendLine("Keeping: protected_assets, security_settings");
-        }
+        summary.AppendLine(includeAll
+            ? "Keeping: security_settings (the Passkey PIN is never deleted here)"
+            : "Keeping: protected_assets, security_settings (Passkey PIN)");
 
         return summary.ToString().TrimEnd();
     }
@@ -112,7 +115,7 @@ public class FirestoreService
     {
         FirestoreDb db = await _connection.GetDbAsync();
         string[] collections = includeAll
-            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection, SecuritySettingsCollection }
+            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection }
             : new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection };
         int deletedTotal = 0;
 
@@ -270,6 +273,9 @@ public class FirestoreService
             RiskScore = GetNullableInt(doc, "risk_score"),
             RiskLevel = GetNullableEnum<RiskLevel>(doc, "risk_level"),
             RiskFactors = GetRiskFactors(doc),
+            AssetPath = GetOptionalString(doc, "asset_path"),
+            ProtectedRoot = GetOptionalString(doc, "protected_root"),
+            Advisory = GetOptionalString(doc, "advisory"),
         };
     }
 
@@ -302,6 +308,7 @@ public class FirestoreService
             RiskScore = GetNullableInt(doc, "risk_score") ?? 0,
             RiskLevel = GetEnum(doc, "risk_level", RiskLevel.Low),
             Reason = reason,
+            RiskFactors = riskFactors,
             Status = GetEnum(doc, "status", AlertStatus.New),
             CreatedAt = GetTimestamp(doc, "timestamp"),
         };
@@ -326,7 +333,9 @@ public class FirestoreService
         RiskLevel = GetEnum(doc, "risk_level", RiskLevel.Low),
         Description = GetString(doc, "description", string.Empty),
         InvestigationStatus = GetEnum(doc, "investigation_status", InvestigationStatus.New),
-        Notes = GetOptionalString(doc, "notes"),
+        Notes = GetOptionalString(doc, "investigation_notes") ?? GetOptionalString(doc, "notes"),
+        Path = GetOptionalString(doc, "asset_path"),
+        RiskScore = GetNullableInt(doc, "risk_score") ?? 0,
         Resolution = GetOptionalString(doc, "resolution"),
         DateResolved = GetNullableTimestamp(doc, "date_resolved"),
         CreatedAt = GetTimestamp(doc, "created_at"),
