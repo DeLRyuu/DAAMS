@@ -13,8 +13,8 @@
         <conv:RiskLevelToBrushConverter x:Key="RiskBrush" />
         <conv:ClassificationToBrushConverter x:Key="ClassBrush" />
         <conv:DataLoadStateToVisibilityConverter x:Key="LoadStateVis" />
+        <conv:ActivityAssetDisplayConverter x:Key="AssetDisplay" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
-        <vm:DateToDayGroupConverter x:Key="DateToDayGroupConverter" />
     </UserControl.Resources>
 
     <Grid Style="{StaticResource Layout.PageRoot}">
@@ -63,24 +63,6 @@
                             <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnRowPreviewMouseLeftButtonDown" />
                         </Style>
                     </DataGrid.RowStyle>
-                    <DataGrid.GroupStyle>
-                        <GroupStyle>
-                            <GroupStyle.Panel>
-                                <ItemsPanelTemplate>
-                                    <DataGridRowsPresenter />
-                                </ItemsPanelTemplate>
-                            </GroupStyle.Panel>
-                            <GroupStyle.HeaderTemplate>
-                                <DataTemplate>
-                                    <Border BorderBrush="{StaticResource Brush.SurfaceAlt}" BorderThickness="0,0,0,1" Margin="0,10,0,4" Padding="0,0,0,4">
-                                        <TextBlock Text="{Binding Name, Converter={StaticResource DateToDayGroupConverter}}"
-                                                   FontSize="13" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource Brush.TextSecondary}" />
-                                    </Border>
-                                </DataTemplate>
-                            </GroupStyle.HeaderTemplate>
-                        </GroupStyle>
-                    </DataGrid.GroupStyle>
 
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm'}" Width="1.2*"
@@ -88,10 +70,19 @@
 
                         <DataGridTextColumn Header="User" Binding="{Binding User}" Width="*" SortMemberPath="User" />
 
-                        <DataGridTextColumn Header="Asset" Binding="{Binding Asset}" Width="1.6*" SortMemberPath="Asset">
+                        <!-- Asset: Move shows the file name only; Rename shows "OldName → NewName".
+                             The full path stays in the tooltip and in the row details. -->
+                        <DataGridTextColumn Header="Asset" Width="1.6*" SortMemberPath="Asset" IsReadOnly="True">
+                            <DataGridTextColumn.Binding>
+                                <MultiBinding Converter="{StaticResource AssetDisplay}" Mode="OneWay">
+                                    <Binding Path="Asset" />
+                                    <Binding Path="Action" />
+                                </MultiBinding>
+                            </DataGridTextColumn.Binding>
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="ToolTip" Value="{Binding Path}" />
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>

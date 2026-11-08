@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,36 +13,6 @@ using ControlCenter.Models;
 using ControlCenter.Services;
 
 namespace ControlCenter.ViewModels;
-
-/// <summary>
-/// Value converter for day group headers in the Activity Logs time-ordered stream.
-/// Formats group dates as "Today", "Yesterday", or "dddd, MMM d" in sentence case.
-/// </summary>
-public class DateToDayGroupConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        if (value is DateTime dt)
-        {
-            DateTime date = dt.Date;
-            DateTime today = DateTime.Today;
-            if (date == today)
-            {
-                return "Today";
-            }
-            if (date == today.AddDays(-1))
-            {
-                return "Yesterday";
-            }
-            return date.ToString("dddd, MMM d", CultureInfo.CurrentCulture);
-        }
-
-        return value?.ToString() ?? string.Empty;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
-        throw new NotSupportedException();
-}
 
 /// <summary>
 /// Activity Logs: detected-activity history for protected assets, read from
@@ -223,9 +192,9 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
 
         RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.Collapsed;
 
+        // Flat, time-ordered list (newest first). No day grouping: the Timestamp column already shows the date.
         Activity = CollectionViewSource.GetDefaultView(_allActivity);
         Activity.Filter = FilterPredicate;
-        Activity.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ActivityLog.Date)));
         Activity.SortDescriptions.Add(new SortDescription(nameof(ActivityLog.Timestamp), ListSortDirection.Descending));
 
         ResetFiltersCommand = new RelayCommand(_ => ResetFilters());
@@ -545,10 +514,4 @@ public class ActivityLogsViewModel : DataSectionViewModelBase
 
         return value;
     }
-
-
-
-                     
-                                  
-        
 }

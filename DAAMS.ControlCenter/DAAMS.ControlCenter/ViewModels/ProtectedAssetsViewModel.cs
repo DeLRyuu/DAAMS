@@ -115,6 +115,22 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
         }
     }
 
+    // Rename history. When a protected file is renamed, the Monitoring Engine registers the
+    // NEW path as a fresh asset, while its earlier activity was logged under the OLD path.
+    // These let the new asset inherit that history (see GetRenameAliases).
+    private readonly record struct RenameStep(string Old, string New, DateTime At);
+    private readonly record struct RenameAlias(string AliasPath, DateTime Until);
+    private List<RenameStep> _renameSteps = new();
+    private readonly Dictionary<string, List<RenameAlias>> _aliasCache = new(StringComparer.OrdinalIgnoreCase);
+
+    // Classification changes the admin just made, keyed by normalized path.
+    // The Control Center writes the change to the local database and the Monitoring
+    // Engine pushes it to Firestore a moment later. Until the cloud copy catches up,
+    // a refresh would read the OLD value and the UI would snap back, so the pending
+    // value is re-applied after each load (and dropped once the cloud matches it).
+    private readonly Dictionary<string, (Classification Value, DateTime At)> _pendingClassifications
+        = new(StringComparer.OrdinalIgnoreCase);
+
     private ProtectedAsset? _selectedAsset;
     public ProtectedAsset? SelectedAsset
     {
@@ -212,9 +228,11 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
             string path = SelectedAsset.Path;
             string newClassification = DrawerSelectedClassification.ToString();
 
+            Classification chosenClassification = DrawerSelectedClassification;
             bool success = await _db.UpdateAssetClassificationAsync(path, newClassification);
             if (success)
             {
+                _pendingClassifications[NormalizePath(path)] = (chosenClassification, DateTime.Now);
                 await RefreshAsync();
             }
             else
@@ -337,7 +355,8 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
 
     protected override async Task<int> LoadFromFirestoreAsync()
     {
-        List<ProtectedAsset> assets = await _db.GetProtectedAssetsAsync();
+        List<ProtectedAsset> assets = DeduplicateByPath(await _db.GetProtectedAssetsAsync());
+        ApplyPendingClassifications(assets);
         try
         {
             var rawLogs = await _db.GetActivityLogsAsync();
@@ -359,6 +378,7 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
             _cachedCases = new();
         }
 
+        RebuildRenameSteps();
         ComputeUsageContext(assets);
         _registeredAssets = assets;
         await RefreshCurrentFolderAsync();
@@ -398,9 +418,28 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
         }
     }
 
-    private static bool MatchesAsset(ActivityLog log, ProtectedAsset asset)
+    private bool MatchesAsset(ActivityLog log, ProtectedAsset asset)
     {
-        if (MatchesAssetPath(log.ProtectedRoot, asset))
+        if (MatchesLogToPath(log, asset.Path, asset.AssetType))
+        {
+            return true;
+        }
+
+        // Activity logged under a previous name of this asset (only up to the moment it was renamed).
+        foreach (RenameAlias alias in GetRenameAliases(asset.Path))
+        {
+            if (log.Timestamp <= alias.Until && MatchesLogToPath(log, alias.AliasPath, asset.AssetType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MatchesLogToPath(ActivityLog log, string assetPath, AssetType assetType)
+    {
+        if (MatchesPathCore(log.ProtectedRoot, assetPath, assetType))
         {
             return true;
         }
@@ -413,7 +452,7 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
             }
 
             string[] paths = candidate.Split(" -> ", StringSplitOptions.TrimEntries);
-            if (paths.Any(path => MatchesAssetPath(path, asset)))
+            if (paths.Any(path => MatchesPathCore(path, assetPath, assetType)))
             {
                 return true;
             }
@@ -422,17 +461,20 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
         return false;
     }
 
-    private static bool MatchesAssetPath(string? path, ProtectedAsset asset)
+    private static bool MatchesAssetPath(string? path, ProtectedAsset asset) =>
+        MatchesPathCore(path, asset.Path, asset.AssetType);
+
+    private static bool MatchesPathCore(string? path, string assetPath, AssetType assetType)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
             return false;
         }
 
-        if (asset.AssetType == AssetType.Folder)
+        if (assetType == AssetType.Folder)
         {
             string normalizedPath = path.Replace('/', '\\').TrimEnd('\\');
-            string folderPath = asset.Path.Replace('/', '\\').TrimEnd('\\');
+            string folderPath = assetPath.Replace('/', '\\').TrimEnd('\\');
             string folderPrefix = folderPath + "\\";
             return normalizedPath.StartsWith(folderPrefix, StringComparison.OrdinalIgnoreCase)
                    || string.Equals(normalizedPath, folderPath,
@@ -441,28 +483,46 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
 
         return string.Equals(
             path.Replace('/', '\\').TrimEnd('\\'),
-            asset.Path.Replace('/', '\\').TrimEnd('\\'),
+            assetPath.Replace('/', '\\').TrimEnd('\\'),
             StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool MatchesCase(CaseItem c, ProtectedAsset asset)
+    private bool MatchesCase(CaseItem c, ProtectedAsset asset)
     {
-        if (!string.IsNullOrEmpty(c.Path) && MatchesAssetPath(c.Path, asset))
+        if (MatchesCaseCore(c, asset.Path, asset.AssetName, asset.AssetType))
+        {
+            return true;
+        }
+
+        foreach (RenameAlias alias in GetRenameAliases(asset.Path))
+        {
+            if (MatchesCaseCore(c, alias.AliasPath, Path.GetFileName(alias.AliasPath), asset.AssetType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MatchesCaseCore(CaseItem c, string assetPath, string assetName, AssetType assetType)
+    {
+        if (!string.IsNullOrEmpty(c.Path) && MatchesPathCore(c.Path, assetPath, assetType))
         {
             return true;
         }
 
         if (!string.IsNullOrEmpty(c.Asset))
         {
-            if (string.Equals(c.Asset, asset.AssetName, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(c.Asset, asset.Path, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(c.Asset, assetName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(c.Asset, assetPath, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            if (asset.AssetType == AssetType.Folder)
+            if (assetType == AssetType.Folder)
             {
-                string folderPrefix = asset.Path.TrimEnd('\\', '/') + "\\";
+                string folderPrefix = assetPath.TrimEnd('\\', '/') + "\\";
                 if (c.Asset.StartsWith(folderPrefix, StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
@@ -471,6 +531,75 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
         }
 
         return false;
+    }
+
+    // Collect every "old -> new" rename found in the activity logs.
+    private void RebuildRenameSteps()
+    {
+        _aliasCache.Clear();
+        _renameSteps = new List<RenameStep>();
+
+        foreach (ActivityLog log in _cachedLogs)
+        {
+            foreach (string? candidate in new[] { log.Path, log.AssetPath })
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    continue;
+                }
+
+                string[] parts = candidate.Split(" -> ", StringSplitOptions.TrimEntries);
+                if (parts.Length == 2 && parts[0].Length > 0 && parts[1].Length > 0)
+                {
+                    _renameSteps.Add(new RenameStep(parts[0], parts[1], log.Timestamp));
+                    break;
+                }
+            }
+        }
+    }
+
+    // Previous names of an asset, newest first, each with the time it stopped being used.
+    // Follows chains (A -> B -> C) backwards from the asset's current path.
+    private List<RenameAlias> GetRenameAliases(string assetPath)
+    {
+        string key = NormalizePath(assetPath);
+        if (_aliasCache.TryGetValue(key, out List<RenameAlias>? cached))
+        {
+            return cached;
+        }
+
+        var aliases = new List<RenameAlias>();
+        string current = key;
+        DateTime until = DateTime.MaxValue;
+
+        while (true)
+        {
+            RenameStep? step = _renameSteps
+                .Where(r => r.At <= until
+                            && string.Equals(NormalizePath(r.New), current, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(r => r.At)
+                .Select(r => (RenameStep?)r)
+                .FirstOrDefault();
+
+            if (step is null)
+            {
+                break;
+            }
+
+            string previous = NormalizePath(step.Value.Old);
+            if (aliases.Any(a => string.Equals(a.AliasPath, previous, StringComparison.OrdinalIgnoreCase))
+                || string.Equals(previous, key, StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            aliases.Add(new RenameAlias(previous, step.Value.At));
+            current = previous;
+            until = step.Value.At;
+        }
+
+        _aliasCache[key] = aliases;
+        return aliases;
     }
 
     private void Apply(List<ProtectedAsset> assets)
@@ -620,6 +749,55 @@ public class ProtectedAssetsViewModel : DataSectionViewModelBase
     }
 
     private static string NormalizePath(string path) => path.Replace('/', '\\').TrimEnd('\\');
+
+    // One row per asset path. If the registry holds several records for the same
+    // path (e.g. protection was removed and then re-applied and the engine wrote
+    // a new record), keep only the most recently protected one. On a tie,
+    // the Protected record wins.
+    private static List<ProtectedAsset> DeduplicateByPath(List<ProtectedAsset> assets) =>
+        assets
+            .GroupBy(a => NormalizePath(a.Path), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g
+                .OrderByDescending(a => a.ProtectedAt)
+                .ThenByDescending(a => a.Status == ProtectionStatus.Protected)
+                .First())
+            .ToList();
+
+    // Re-apply classification changes the cloud has not reflected yet.
+    // An entry is dropped once the loaded data matches it, or after 2 minutes.
+    private void ApplyPendingClassifications(List<ProtectedAsset> assets)
+    {
+        if (_pendingClassifications.Count == 0)
+        {
+            return;
+        }
+
+        foreach (ProtectedAsset asset in assets)
+        {
+            string key = NormalizePath(asset.Path);
+            if (!_pendingClassifications.TryGetValue(key, out var pending))
+            {
+                continue;
+            }
+
+            if (asset.Classification == pending.Value)
+            {
+                _pendingClassifications.Remove(key);
+            }
+            else
+            {
+                asset.Classification = pending.Value;
+            }
+        }
+
+        foreach (string key in _pendingClassifications
+                     .Where(kv => DateTime.Now - kv.Value.At > TimeSpan.FromMinutes(2))
+                     .Select(kv => kv.Key)
+                     .ToList())
+        {
+            _pendingClassifications.Remove(key);
+        }
+    }
 
     private bool FilterPredicate(object obj)
     {

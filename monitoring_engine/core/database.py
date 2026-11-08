@@ -819,7 +819,7 @@ def upsert_protected_asset(record: dict) -> bool:
         try:
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             path = record["path"]
-            asset_id = _asset_doc_id(path)
+            asset_id = record.get("asset_id") or _asset_doc_id(path)
 
             with conn:
                 conn.execute(
@@ -888,58 +888,74 @@ def get_protected_asset(path: str) -> Optional[dict]:
 
 
 def relocate_protected_asset(old_path: str, new_path: str) -> bool:
-    """Keep protection at the new path and retain the old path as unprotected history."""
+    """
+    Keep ONE registry row per asset when it is renamed or moved.
+
+    The existing row is UPDATED IN PLACE (path + asset_name). It is no longer
+    left behind as an 'unprotected' history row with a brand-new row inserted.
+    asset_id is deliberately NOT changed: it is the Firestore document ID, so
+    the cloud document is updated (path/name change) instead of a second
+    document being created. Status, classification, protected_at and
+    protected_by are preserved.
+    """
     with _DB_LOCK:
         conn = get_connection()
         try:
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            normalized_old = os.path.normcase(os.path.normpath(os.path.abspath(old_path)))
-            normalized_new = os.path.normcase(os.path.normpath(os.path.abspath(new_path)))
-            if normalized_old == normalized_new:
-                return False
+
+            def norm(p: str) -> str:
+                return os.path.normcase(os.path.normpath(os.path.abspath(p)))
+
+            normalized_old = norm(old_path)
+            normalized_new = norm(new_path)
 
             with conn:
                 rows = conn.execute("SELECT * FROM protected_assets;").fetchall()
                 old_row = next(
-                    (row for row in rows
-                     if os.path.normcase(os.path.normpath(os.path.abspath(row["path"])))
-                     == normalized_old),
+                    (row for row in rows if norm(row["path"]) == normalized_old),
                     None,
                 )
                 if old_row is None:
                     return False
-                if any(
-                    os.path.normcase(os.path.normpath(os.path.abspath(row["path"])))
-                    == normalized_new
-                    for row in rows
-                ):
+
+                # Same path ignoring case: only a case-only rename (Payroll -> payroll)
+                # needs the stored path/name refreshed; otherwise nothing to do.
+                if normalized_old == normalized_new and old_row["path"] == new_path:
                     return False
+
+                # A DIFFERENT row already occupies the destination path
+                # (path is the primary key, so it cannot coexist).
+                clash = next(
+                    (
+                        row for row in rows
+                        if row["path"] != old_row["path"]
+                        and norm(row["path"]) == normalized_new
+                    ),
+                    None,
+                )
+                if clash is not None:
+                    if clash["status"] == "protected":
+                        return False  # never overwrite a live protected asset
+                    # Stale unprotected leftover (e.g. from the old relocate behaviour).
+                    conn.execute(
+                        "DELETE FROM protected_assets WHERE path = ?;",
+                        (clash["path"],),
+                    )
 
                 conn.execute(
                     """
                     UPDATE protected_assets
-                    SET status = 'unprotected', sync_status = 'PENDING',
+                    SET path = ?,
+                        asset_name = ?,
+                        sync_status = 'PENDING',
                         updated_at = ?
                     WHERE path = ?;
                     """,
-                    (now_str, old_row["path"]),
-                )
-                conn.execute(
-                    """
-                    INSERT INTO protected_assets
-                    (path, asset_id, asset_name, asset_type, classification,
-                     protected_at, protected_by, status, sync_status, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'protected', 'PENDING', ?);
-                    """,
                     (
                         new_path,
-                        _asset_doc_id(new_path),
                         os.path.basename(os.path.normpath(new_path)),
-                        old_row["asset_type"],
-                        old_row["classification"],
-                        old_row["protected_at"],
-                        old_row["protected_by"],
                         now_str,
+                        old_row["path"],
                     ),
                 )
             return True

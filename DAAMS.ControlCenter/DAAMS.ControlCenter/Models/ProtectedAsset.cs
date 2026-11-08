@@ -14,7 +14,21 @@ public class ProtectedAsset : INotifyPropertyChanged
     public required string Path { get; init; }
     public required string AssetName { get; init; }
     public AssetType AssetType { get; init; }
-    public Classification Classification { get; init; }
+    private Classification _classification;
+    public Classification Classification
+    {
+        get => _classification;
+        set
+        {
+            if (_classification != value)
+            {
+                _classification = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(BaseRiskWeight));
+                OnPropertyChanged(nameof(BaseRiskText));
+            }
+        }
+    }
     public DateTime ProtectedAt { get; init; }
     public required string ProtectedBy { get; init; }
     public ProtectionStatus Status { get; init; }

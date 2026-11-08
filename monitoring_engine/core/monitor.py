@@ -67,7 +67,7 @@ from config.settings import (
 )
 from cli import pin_auth
 from core import database
-from core.asset_registry import get_all_assets, relocate_asset
+from core.asset_registry import get_all_assets, relocate_asset, remove_protection
 from core.clipboard_watcher import ClipboardWatcher
 from core.open_audit_watcher import OpenAuditWatcher
 from core.event_aggregator import EventAggregator, FileIndex
@@ -274,6 +274,80 @@ class _Ticker(threading.Thread):
         self._halt.set()
 
 
+# Normalized paths of assets whose protection was switched off because the
+# file/folder was deleted. If one of them reappears on disk it is recovered
+# and becomes protected again.
+_DELETED_UNPROTECTED: set = set()
+
+
+def _mark_asset_unprotected_if_gone(asset: dict) -> None:
+    """
+    A protected asset that was really deleted is no longer protected: flip
+    its registry status to 'unprotected' (the row is kept, never removed,
+    so history and the asset_id stay intact). If the path exists again
+    (e.g. an editor's delete-and-recreate save), nothing is changed.
+    """
+    path = (asset or {}).get("path")
+    if not path or os.path.exists(path):
+        return
+    try:
+        ok, message = remove_protection(path)
+        if ok:
+            _DELETED_UNPROTECTED.add(_normalized_path(path))
+            logger.info("Protected asset deleted; status set to unprotected: %s", path)
+    except Exception as e:
+        logger.warning("Could not mark deleted asset as unprotected (%s): %s", path, e)
+
+
+def _recover_deleted_assets(initial: bool = False) -> None:
+    """
+    Re-protect assets that were deleted (status 'unprotected') and are back
+    on disk. On startup, also remember which unprotected assets are
+    currently missing so a later recovery is noticed.
+    """
+    try:
+        if initial:
+            for record in get_all_assets(only_protected=False):
+                path = record.get("path")
+                if (
+                    path
+                    and record.get("status") == "unprotected"
+                    and not os.path.exists(path)
+                ):
+                    _DELETED_UNPROTECTED.add(_normalized_path(path))
+        if not _DELETED_UNPROTECTED:
+            return
+        records = {
+            _normalized_path(r["path"]): r
+            for r in get_all_assets(only_protected=False) if r.get("path")
+        }
+        for key in list(_DELETED_UNPROTECTED):
+            record = records.get(key)
+            if record is None or record.get("status") == "protected":
+                _DELETED_UNPROTECTED.discard(key)
+                continue
+            path = record["path"]
+            if not os.path.exists(path):
+                continue
+            record["status"] = "protected"
+            if database.upsert_protected_asset(record):
+                _DELETED_UNPROTECTED.discard(key)
+                logger.info("Deleted asset recovered; protected again: %s", path)
+                try:
+                    sync_service.trigger_sync()
+                except Exception as e:
+                    logger.warning("Could not schedule sync after recovery: %s", e)
+                record_activity(
+                    asset_path=path,
+                    action="Create",
+                    classification=record.get("classification"),
+                    detection_note="Deleted protected asset was restored; protection reinstated.",
+                    protected_root=path,
+                )
+    except Exception:
+        logger.exception("Could not check for recovered assets")
+
+
 def _record_missing_asset(asset: dict) -> None:
     path = asset.get("path", "")
     logger.warning("Protected asset is missing from disk: %s", path)
@@ -285,6 +359,7 @@ def _record_missing_asset(asset: dict) -> None:
         protected_root=path,
         force_alert=True,
     )
+    _mark_asset_unprotected_if_gone(asset)
 
 
 def _validate_asset_for_watching(asset: dict) -> bool:
@@ -393,6 +468,13 @@ class _AssetRouter:
             detection_note=note,
             protected_root=chosen.get("path"),
         )
+        if (
+            action == "Delete"
+            and source_asset
+            and src
+            and _normalized_path(src) == _normalized_path(source_asset["path"])
+        ):
+            _mark_asset_unprotected_if_gone(source_asset)
         if (
             action in {"Rename", "Move"}
             and source_asset
@@ -624,6 +706,7 @@ def start_monitoring():
 
     def reconcile(initial: bool = False):
         nonlocal previous_signature, previous_assets
+        _recover_deleted_assets(initial)
         registry_records = get_all_assets(only_protected=True)
         registered_assets = {
             _normalized_path(asset["path"]): asset
