@@ -271,6 +271,7 @@ def upload_security_alert(alert: dict) -> bool:
             "timestamp": alert.get("timestamp"),
             "status": alert.get("status", "New"),
             "investigation_status": alert.get("investigation_status", "Not Started"),
+            "updated_at": alert.get("updated_at"),
         }
         client.collection(SECURITY_ALERTS_COLLECTION).document(alert_id).set(payload, merge=True)
         _record_firestore_success()
@@ -342,6 +343,8 @@ def upload_activity(record: dict) -> bool:
             "risk_level": record.get("risk_level"),
             "risk_factors": record.get("risk_factors") or [],
             "advisory": record.get("advisory"),
+            "asset_path": record.get("asset_path"),
+            "protected_root": record.get("protected_root"),
         }
 
         if activity_id:

@@ -97,8 +97,12 @@ public class MainViewModel : ViewModelBase
         _firestoreConnection = new FirestoreConnectionService();
 
         var firestoreService = new FirestoreService(_firestoreConnection);
-        // Offline-first: with no local database on this PC, reads fall back to Firestore.
+        // Cloud-first: when online, screens read live Firestore data; when offline, the local database.
         LocalDatabaseService.CloudFallback = firestoreService;
+        // Bug 4: refresh the open screen as soon as Firestore reports a change (no waiting for the timer).
+        firestoreService.LiveDataChanged += (_, _) =>
+            Application.Current?.Dispatcher.BeginInvoke(new Action(() => { _ = OnLiveDataChangedAsync(); }));
+        _ = StartLiveSafeAsync(firestoreService);
 
         var autoRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
 
@@ -173,6 +177,9 @@ public class MainViewModel : ViewModelBase
 
         autoRefreshTimer.Tick += async (_, _) =>
         {
+            _ = StartLiveSafeAsync(firestoreService);          // retry listeners if they were not running
+            await _dbService.TryPushPendingCasesAsync();       // push any PENDING alert/incident rows
+
             if (Keyboard.FocusedElement is TextBox)
             {
                 return;
@@ -190,6 +197,37 @@ public class MainViewModel : ViewModelBase
         _ = CheckForNewAlertNotificationsAsync();
     }
 
+    private bool _liveRefreshQueued;
+
+    private static async Task StartLiveSafeAsync(FirestoreService firestoreService)
+    {
+        try
+        {
+            await firestoreService.EnsureLiveAsync();
+        }
+        catch
+        {
+            // Offline or no key: keep showing local data; the timer retries.
+        }
+    }
+
+    private async Task OnLiveDataChangedAsync()
+    {
+        if (_liveRefreshQueued) return;
+        _liveRefreshQueued = true;
+        await Task.Delay(750);   // merge a burst of changes into one refresh
+        _liveRefreshQueued = false;
+
+        if (Keyboard.FocusedElement is TextBox) return;
+
+        if (CurrentViewModel is IDataSection section)
+        {
+            await section.RefreshAsync();
+        }
+
+        await CheckForNewAlertNotificationsAsync();
+    }
+
     public async Task RefreshSyncStatusAsync()
     {
         if (!_dbService.DatabaseFound)
@@ -205,11 +243,11 @@ public class MainViewModel : ViewModelBase
             var (total, pending) = await _dbService.GetSyncSummaryAsync();
             if (pending > 0)
             {
-                LocalDbStatusText = $"Local DB: Active ({pending} pending sync)";
+                LocalDbStatusText = $"Local DB: Active ({pending} pending sync) · {_dbService.DataSourceText}";
             }
             else
             {
-                LocalDbStatusText = $"Local DB: Active ({total} records, Synced)";
+                LocalDbStatusText = $"Local DB: Active ({total} records, Synced) · {_dbService.DataSourceText}";
             }
         }
         catch

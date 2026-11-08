@@ -21,7 +21,7 @@ import json
 import os
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from config.settings import DATA_DIR, LOGS_DIR
@@ -1146,6 +1146,57 @@ def get_sync_summary() -> dict:
                         counts[status] = row["c"]
                 summary[t] = counts
             return summary
+        finally:
+            conn.close()
+
+
+def purge_synced_records(grace_seconds: int = 5) -> Dict[str, int]:
+    """
+    Bug 3: once a record is confirmed in Firestore, remove it from the local database.
+
+    Purged tables: activity_logs, security_alerts, incident_reports.
+    NEVER purged: security_settings (the Passkey PIN, needed for offline use) and
+    protected_assets (the Engine needs them to know what to monitor).
+
+    Safety rules:
+    - Only rows with sync_status = 'SYNCED' that have a SUCCESS entry in sync_history, meaning this
+      system really uploaded them. Rows migrated from the old JSON files are marked SYNCED without
+      ever being uploaded, so they have no SUCCESS entry and are kept.
+    - PENDING and FAILED rows are never touched.
+    - A short grace period (default 5 s) so save_activity() can still de-duplicate repeated
+      filesystem events that arrive within one second of each other.
+
+    Returns {table_name: rows_deleted}.
+    """
+    targets = (
+        ("activity_logs", "activity_id"),
+        ("security_alerts", "alert_id"),
+        ("incident_reports", "incident_id"),
+    )
+    deleted: Dict[str, int] = {}
+    with _DB_LOCK:
+        conn = get_connection()
+        try:
+            cutoff = (datetime.now() - timedelta(seconds=grace_seconds)).strftime("%Y-%m-%d %H:%M:%S")
+            with conn:
+                for table, id_column in targets:
+                    cur = conn.execute(
+                        f"""
+                        DELETE FROM {table}
+                        WHERE sync_status = 'SYNCED'
+                          AND synced_at IS NOT NULL
+                          AND synced_at <= ?
+                          AND EXISTS (
+                              SELECT 1 FROM sync_history h
+                              WHERE h.entity_type = ?
+                                AND h.entity_id = {table}.{id_column}
+                                AND h.status = 'SUCCESS'
+                          );
+                        """,
+                        (cutoff, table),
+                    )
+                    deleted[table] = cur.rowcount
+            return deleted
         finally:
             conn.close()
 

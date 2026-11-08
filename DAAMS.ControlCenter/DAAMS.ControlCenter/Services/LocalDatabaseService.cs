@@ -21,7 +21,7 @@ namespace ControlCenter.Services;
 /// the Python Monitoring Engine and the C# WPF Control Center.
 /// Uses WAL mode, parameterized queries, and safe concurrent access with busy_timeout.
 /// </summary>
-public class LocalDatabaseService
+public partial class LocalDatabaseService
 {
     private static readonly Regex RiskFactorTextPattern = new(@"^(?<description>.*?)\s*\(\+?(?<weight>-?\d+)\)\s*$", RegexOptions.Compiled);
     private readonly string _databasePath;
@@ -78,7 +78,7 @@ public class LocalDatabaseService
     //   - Local database present  -> read local SQLite (works with no internet;
     //                                the Monitoring Engine syncs it up to Firestore).
     //   - Local database missing  -> read the same data from Firestore instead.
-    // Cloud mode is READ-ONLY: write methods below still need the local database.
+    // Cloud-first reads, pushing PENDING rows, and cloud-only writes: see LocalDatabaseService.Cloud.cs.
     // MainViewModel sets CloudFallback once at startup.
     // =========================================================================
 
@@ -90,20 +90,20 @@ public class LocalDatabaseService
         CloudFallback ?? throw new FileNotFoundException("No local DAAMS database and no cloud connection configured.");
 
     public async Task<List<ProtectedAsset>> GetProtectedAssetsAsync() =>
-        DatabaseFound ? await GetProtectedAssetsLocalAsync() : await RequireCloud().GetProtectedAssetsAsync();
+        UseLocal ? await GetProtectedAssetsLocalAsync() : await RequireCloud().GetProtectedAssetsAsync();
 
     public async Task<List<ActivityLog>> GetActivityLogsAsync() =>
-        DatabaseFound ? await GetActivityLogsLocalAsync() : await RequireCloud().GetActivityLogsAsync();
+        UseLocal ? await GetActivityLogsLocalAsync() : await RequireCloud().GetActivityLogsAsync();
 
     public async Task<List<SecurityAlert>> GetSecurityAlertsAsync() =>
-        DatabaseFound ? await GetSecurityAlertsLocalAsync() : await RequireCloud().GetSecurityAlertsAsync();
+        UseLocal ? await GetSecurityAlertsLocalAsync() : await RequireCloud().GetSecurityAlertsAsync();
 
     public async Task<List<IncidentReport>> GetIncidentReportsAsync() =>
-        DatabaseFound ? await GetIncidentReportsLocalAsync() : await RequireCloud().GetIncidentReportsAsync();
+        UseLocal ? await GetIncidentReportsLocalAsync() : await RequireCloud().GetIncidentReportsAsync();
 
     public async Task<List<CaseItem>> GetCasesAsync()
     {
-        if (DatabaseFound)
+        if (UseLocal)
         {
             return await GetCasesLocalAsync();
         }
@@ -514,6 +514,12 @@ public class LocalDatabaseService
 
     public async Task<bool> UpdateAlertStatusAsync(string alertId, AlertStatus newStatus)
     {
+        if (WriteToCloud)
+        {
+            // If the cloud write fails (e.g. Wi-Fi connected but no internet), keep the change locally as PENDING.
+            bool cloudOk = await CloudUpdateAlertStatusAsync(alertId, newStatus);
+            if (cloudOk || !DatabaseFound) return cloudOk;
+        }
         return await Task.Run(() =>
         {
             try
@@ -590,6 +596,12 @@ public class LocalDatabaseService
 
     public async Task<bool> SaveIncidentReportAsync(IncidentReport incident)
     {
+        if (WriteToCloud)
+        {
+            // If the cloud write fails (e.g. Wi-Fi connected but no internet), keep the change locally as PENDING.
+            bool cloudOk = await CloudSaveIncidentAsync(incident);
+            if (cloudOk || !DatabaseFound) return cloudOk;
+        }
         return await Task.Run(() =>
         {
             try
@@ -634,6 +646,12 @@ public class LocalDatabaseService
 
     public async Task<bool> UpdateIncidentReportStatusAsync(string incidentId, InvestigationStatus status, DateTime? dateResolved)
     {
+        if (WriteToCloud)
+        {
+            // If the cloud write fails (e.g. Wi-Fi connected but no internet), keep the change locally as PENDING.
+            bool cloudOk = await CloudUpdateIncidentStatusAsync(incidentId, status, dateResolved);
+            if (cloudOk || !DatabaseFound) return cloudOk;
+        }
         return await Task.Run(() =>
         {
             try
@@ -665,6 +683,12 @@ public class LocalDatabaseService
 
     public async Task<bool> UpdateIncidentResolutionAsync(string incidentId, string? resolution)
     {
+        if (WriteToCloud)
+        {
+            // If the cloud write fails (e.g. Wi-Fi connected but no internet), keep the change locally as PENDING.
+            bool cloudOk = await CloudUpdateIncidentResolutionAsync(incidentId, resolution);
+            if (cloudOk || !DatabaseFound) return cloudOk;
+        }
         return await Task.Run(() =>
         {
             try
@@ -814,6 +838,20 @@ public class LocalDatabaseService
 
     public async Task ApplyCaseChangeAsync(string alertId, CaseStatus status, string? notes, string? resolution)
     {
+        if (WriteToCloud)
+        {
+            try
+            {
+                await CloudApplyCaseChangeAsync(alertId, status, notes, resolution);
+                return;
+            }
+            catch (Exception ex) when (DatabaseFound)
+            {
+                // Cloud unreachable: fall through and save locally as PENDING.
+                Debug.WriteLine($"[LocalDatabaseService] Cloud case change failed, saving locally: {ex.Message}");
+            }
+        }
+
         await Task.Run(() =>
         {
             using var conn = CreateConnection();
@@ -856,7 +894,10 @@ public class LocalDatabaseService
                     cmdAlert.Parameters.AddWithValue("@status", alertStatusStr);
                     cmdAlert.Parameters.AddWithValue("@now", nowStr);
                     cmdAlert.Parameters.AddWithValue("@alertId", alertId);
-                    cmdAlert.ExecuteNonQuery();
+                    if (cmdAlert.ExecuteNonQuery() == 0)
+                    {
+                        throw new InvalidOperationException("This alert is stored in the cloud only. Connect to the internet to change it.");
+                    }
                 }
 
                 // 2. Check if incident exists
@@ -982,6 +1023,9 @@ public class LocalDatabaseService
                 throw;
             }
         });
+
+        // Push the PENDING alert/incident rows to Firestore now (they stay PENDING if offline).
+        await TryPushPendingCasesAsync();
     }
 
     // =========================================================================
