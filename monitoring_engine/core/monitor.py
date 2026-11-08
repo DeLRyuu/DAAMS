@@ -580,6 +580,8 @@ def start_monitoring():
     watched = {}
     invalid_warned = set()
     observed_removals = set()
+    missing_since = {}
+    missing_grace = COALESCE_QUIET_SECONDS + MOVE_PAIRING_WINDOW_SECONDS + 2.0
     large_parents_warned = set()
     router = _AssetRouter(
         [],
@@ -602,6 +604,24 @@ def start_monitoring():
     previous_signature = None
     previous_assets = {}
 
+    def _still_explaining(path_key: str, asset: dict, initial: bool) -> bool:
+        """
+        A protected path that just vanished is usually a rename/move/cut-paste
+        whose events are still being coalesced (they are reported ~1-3 s later,
+        and the registry path is only relocated after that). Do not call it
+        "missing" until it has stayed gone past the grace period with no event
+        or pending aggregation that explains it.
+        """
+        if initial or path_key in observed_removals:
+            return False  # startup check, or the event stream already explained it
+        now = time.monotonic()
+        first_seen = missing_since.setdefault(path_key, now)
+        pending = getattr(aggregator, "has_pending_for", None)
+        if pending is not None and pending(asset["path"]):
+            missing_since[path_key] = now  # keep waiting while events resolve
+            return True
+        return now - first_seen < missing_grace
+
     def reconcile(initial: bool = False):
         nonlocal previous_signature, previous_assets
         registry_records = get_all_assets(only_protected=True)
@@ -615,6 +635,13 @@ def start_monitoring():
                 if is_disallowed_root(asset["path"]) or not os.path.exists(asset["path"]):
                     continue
                 invalid_warned.discard(path)
+            elif (
+                not is_disallowed_root(asset["path"])
+                and not os.path.exists(asset["path"])
+                and _still_explaining(path, asset, initial)
+            ):
+                valid_assets.append(asset)  # keep watching while the move/rename settles
+                continue
             elif not _validate_asset_for_watching(asset):
                 invalid_warned.add(path)
                 if (
@@ -626,6 +653,7 @@ def start_monitoring():
             valid_assets.append(asset)
             invalid_warned.discard(path)
             observed_removals.discard(path)
+            missing_since.pop(path, None)
         current_assets = {
             _normalized_path(asset["path"]): asset for asset in valid_assets
         }

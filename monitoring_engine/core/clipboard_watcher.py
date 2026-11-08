@@ -1,9 +1,11 @@
 """
 clipboard_watcher.py
 
-Detects file Copy and Cut operations through the Windows clipboard (CF_HDROP).
+Detects file Copy operations through the Windows clipboard (CF_HDROP).
 Windows Explorer puts file paths on the clipboard when a user copies or cuts
 files, along with a 'Preferred DropEffect' value (1 = copy, 2 = cut).
+A cut is ignored on purpose: nothing has moved yet, and the real Move is
+recorded by the filesystem watcher when the file is pasted.
 """
 
 import logging
@@ -165,14 +167,21 @@ class ClipboardWatcher(threading.Thread):
         if not paths:
             return
 
-        action = "Move" if (effect & 2) else "Copy"
+        # Ctrl+X (cut) changes nothing on disk. The file only moves when it is
+        # pasted, and the filesystem watcher reports that as the real Move
+        # (source -> destination). Logging at cut time produced a bogus
+        # arrow-less "Move", so a cut is intentionally NOT recorded here.
+        if effect & 2:
+            return
+
+        action = "Copy"
         assets = self.get_assets()
 
         for path in paths:
             covering = find_covering_asset(path, assets)
             if covering is not None:
                 classification = covering.get("classification")
-                note = "Detection: clipboard, reported at copy or cut time, before any paste"
+                note = "Detection: clipboard, reported at copy time, before any paste"
                 try:
                     record_fn(
                         asset_path=path,

@@ -1,7 +1,7 @@
 """
 test_clipboard_watcher.py
 
-Unit tests for clipboard copy and cut detection.
+Unit tests for clipboard copy detection (cut is intentionally not recorded).
 """
 
 import unittest
@@ -90,11 +90,11 @@ class TestClipboardWatcher(unittest.TestCase):
         self.assertEqual(recorded[0]["classification"], "Confidential")
         self.assertEqual(
             recorded[0]["detection_note"],
-            "Detection: clipboard, reported at copy or cut time, before any paste",
+            "Detection: clipboard, reported at copy time, before any paste",
         )
 
-    def test_cut_records_move(self):
-        """7. Cut records Move: drop effect with bit 2 (e.g. 2) records action='Move'."""
+    def test_cut_records_nothing(self):
+        """7. Cut records nothing: the real Move is reported by the filesystem watcher at paste time."""
         recorded = []
         assets = [{"path": r"C:\Safe\doc.txt", "asset_type": "file", "classification": "Confidential"}]
 
@@ -116,14 +116,9 @@ class TestClipboardWatcher(unittest.TestCase):
             record=fake_record,
         )
         watcher.poll()
-        self.assertEqual(len(recorded), 0)
-
         seq[0] = 21
         watcher.poll()
-        self.assertEqual(len(recorded), 1)
-        self.assertEqual(recorded[0]["action"], "Move")
-        self.assertEqual(recorded[0]["asset_path"], r"C:\Safe\doc.txt")
-        self.assertEqual(recorded[0]["classification"], "Confidential")
+        self.assertEqual(recorded, [])
 
     def test_unprotected_path_records_nothing(self):
         """8. Unprotected path records nothing: files outside protected assets are ignored."""
