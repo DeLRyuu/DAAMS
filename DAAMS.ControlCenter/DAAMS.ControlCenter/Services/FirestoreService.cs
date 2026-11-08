@@ -88,7 +88,7 @@ public class FirestoreService
     {
         FirestoreDb db = await _connection.GetDbAsync();
         string[] collections = includeAll
-            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection, SecuritySettingsCollection }
+            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection }
             : new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection };
         var summary = new StringBuilder();
         summary.AppendLine($"Firebase project: {_connection.ProjectId}");
@@ -100,10 +100,9 @@ public class FirestoreService
             summary.AppendLine($"  {collectionName}: {count}");
         }
 
-        if (!includeAll)
-        {
-            summary.AppendLine("Keeping: protected_assets, security_settings");
-        }
+        summary.AppendLine(includeAll
+            ? "Keeping: security_settings (the Passkey PIN is never deleted here)"
+            : "Keeping: protected_assets, security_settings (Passkey PIN)");
 
         return summary.ToString().TrimEnd();
     }
@@ -112,7 +111,7 @@ public class FirestoreService
     {
         FirestoreDb db = await _connection.GetDbAsync();
         string[] collections = includeAll
-            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection, SecuritySettingsCollection }
+            ? new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection, ProtectedAssetsCollection }
             : new[] { ActivityLogsCollection, SecurityAlertsCollection, IncidentReportsCollection };
         int deletedTotal = 0;
 

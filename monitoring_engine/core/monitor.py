@@ -65,6 +65,7 @@ from config.settings import (
     is_disallowed_root,
     ENABLE_OPEN_DETECTION,
 )
+from cli import pin_auth
 from core import database
 from core.asset_registry import get_all_assets, relocate_asset
 from core.clipboard_watcher import ClipboardWatcher
@@ -708,6 +709,7 @@ def start_monitoring():
     clipboard_watcher_started = False
     open_audit_watcher_started = False
     sync_started = False
+    pin_sync_stop = threading.Event()
     shutdown_status = "stopped"
     shutdown_requested = threading.Event()
     shutdown_complete = threading.Event()
@@ -718,6 +720,8 @@ def start_monitoring():
     try:
         sync_service.start_sync_service()
         sync_started = True
+        # Download-only Passkey PIN sync (Control Center -> Firestore -> this PC).
+        pin_auth.start_background_sync(pin_sync_stop)
         observer.start()
         observer_started = True
         ticker.start()
@@ -729,6 +733,7 @@ def start_monitoring():
             open_audit_watcher = OpenAuditWatcher(
                 get_assets=lambda: get_all_assets(only_protected=True),
                 record=record_activity,
+                auto_setup=True,
             )
             open_audit_watcher.start()
             open_audit_watcher_started = True
@@ -770,6 +775,7 @@ def start_monitoring():
         shutdown_status = "failed"
         raise
     finally:
+        pin_sync_stop.set()
         if observer_started:
             try:
                 observer.stop()

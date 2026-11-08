@@ -467,25 +467,6 @@ public class SettingsViewModel : ViewModelBase, IDataSection
     public event Func<Task>? DataResetCompleted;
 
     // ============================================================
-    // Admin PIN Management (Phase 9f)
-    // ============================================================
-    private string? _pinValidationMessage;
-    public string? PinValidationMessage
-    {
-        get => _pinValidationMessage;
-        private set => SetProperty(ref _pinValidationMessage, value);
-    }
-
-    private string? _pinSuccessMessage;
-    public string? PinSuccessMessage
-    {
-        get => _pinSuccessMessage;
-        private set => SetProperty(ref _pinSuccessMessage, value);
-    }
-
-    private DispatcherTimer? _pinSuccessIndicatorTimer;
-
-    // ============================================================
     // 4. Engine Defaults (Read-only reference)
     // ============================================================
     public string WorkingHoursText => EngineDefaults.WorkingHoursText;
@@ -702,6 +683,10 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         CancelChangesCommand = new RelayCommand(_ => CancelChanges());
         SaveWorkHoursCommand = new RelayCommand(_ => SaveWorkHours());
         SaveNotificationEmailCommand = new RelayCommand(_ => SaveNotificationEmail());
+        GeneratePasskeyCommand = RelayCommand.FromAsync(_ => GeneratePasskeyAsync(), ex => PasskeyError = ex.Message);
+        CopyPasskeyCommand = new RelayCommand(_ => CopyPasskey());
+        TogglePasskeyRevealCommand = new RelayCommand(_ => TogglePasskeyReveal());
+        _ = RefreshPasskeyStatusAsync();
         _savedNotificationEmail = SettingsService.LoadNotificationEmail(_dbService?.DatabasePath);
         _notificationEmailInput = _savedNotificationEmail;
 
@@ -1094,6 +1079,18 @@ public class SettingsViewModel : ViewModelBase, IDataSection
             return ConfirmPinCallback();
         }
 
+        if (!SettingsService.HasAnyPasskey(_dbService?.DatabasePath))
+        {
+            MessageBox.Show(
+                "No Passkey PIN is available on this PC yet.\n\n" +
+                "Go to Settings -> Passkey PIN and press \"Generate new Passkey PIN\" first " +
+                "(this needs a connection to Firestore).",
+                "Passkey PIN required",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
         try
         {
             var db = _dbService ?? new LocalDatabaseService();
@@ -1278,51 +1275,253 @@ public class SettingsViewModel : ViewModelBase, IDataSection
         }
     }
 
-    private void TriggerPinSuccessIndicator(string message)
+    // ============================================================
+    // Passkey PIN (generated here, saved to Firestore, downloaded by the Engines)
+    // ============================================================
+    public ICommand GeneratePasskeyCommand { get; }
+    public ICommand CopyPasskeyCommand { get; }
+    public ICommand TogglePasskeyRevealCommand { get; }
+
+    private const int PasskeyAutoHideSeconds = 30;
+
+    // The PIN itself, known only on the PC that generated it (kept encrypted on disk, see
+    // PasskeyPinService.SaveLocalPin). It is never sent anywhere; Firestore only holds the hash.
+    private string? _passkeyPlain;
+    private bool _isPasskeyRevealed;
+
+    public bool HasPasskeyToShow => !string.IsNullOrEmpty(_passkeyPlain);
+    public bool IsPasskeyRevealed => _isPasskeyRevealed;
+    public string PasskeyDisplayText => !HasPasskeyToShow ? string.Empty : _isPasskeyRevealed ? _passkeyPlain! : "\u2022\u2022\u2022\u2022";
+    /// <summary>Segoe MDL2 Assets glyph: open eye (show) or crossed eye (hide).</summary>
+    public string PasskeyEyeGlyph => _isPasskeyRevealed ? "\uED1A" : "\uE7B3";
+
+    private string? _passkeyMessage;
+    public string? PasskeyMessage
     {
-        PinSuccessMessage = message;
-        _pinSuccessIndicatorTimer?.Stop();
-        _pinSuccessIndicatorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-        _pinSuccessIndicatorTimer.Tick += (_, _) =>
-        {
-            _pinSuccessIndicatorTimer?.Stop();
-            PinSuccessMessage = null;
-        };
-        _pinSuccessIndicatorTimer.Start();
+        get => _passkeyMessage;
+        private set => SetProperty(ref _passkeyMessage, value);
     }
 
-    public async Task<bool> ChangePinAsync(string currentPin, string newPin, string confirmPin)
+    private string? _passkeyError;
+    public string? PasskeyError
     {
-        PinValidationMessage = null;
-        PinSuccessMessage = null;
+        get => _passkeyError;
+        private set => SetProperty(ref _passkeyError, value);
+    }
 
-        if (string.IsNullOrEmpty(currentPin))
+    private string? _passkeyHiddenNote;
+    /// <summary>Why the PIN cannot be shown on this PC (empty when it can, or when there is nothing to explain).</summary>
+    public string? PasskeyHiddenNote
+    {
+        get => _passkeyHiddenNote;
+        private set => SetProperty(ref _passkeyHiddenNote, value);
+    }
+
+    private bool _isGeneratingPasskey;
+    private DispatcherTimer? _passkeyHideTimer;
+
+    private void SetPasskeyPlain(string? pin)
+    {
+        _passkeyPlain = string.IsNullOrEmpty(pin) ? null : pin;
+        if (_passkeyPlain is null)
         {
-            PinValidationMessage = "Enter your current PIN.";
-            return false;
+            _isPasskeyRevealed = false;
+            _passkeyHideTimer?.Stop();
         }
 
-        if (string.IsNullOrEmpty(newPin))
+        NotifyPasskeyDisplayChanged();
+    }
+
+    private void NotifyPasskeyDisplayChanged()
+    {
+        OnPropertyChanged(nameof(HasPasskeyToShow));
+        OnPropertyChanged(nameof(IsPasskeyRevealed));
+        OnPropertyChanged(nameof(PasskeyDisplayText));
+        OnPropertyChanged(nameof(PasskeyEyeGlyph));
+    }
+
+    private void TogglePasskeyReveal()
+    {
+        if (!HasPasskeyToShow)
         {
-            PinValidationMessage = "Enter a new PIN.";
-            return false;
+            return;
         }
 
-        var (success, message) = await Task.Run(() =>
-            SettingsService.SaveNewPin(currentPin, newPin, confirmPin, _dbService?.DatabasePath));
-
-        if (success)
+        if (_isPasskeyRevealed)
         {
-            PinValidationMessage = null;
-            TriggerPinSuccessIndicator("PIN changed successfully.");
-            return true;
+            HidePasskey();
         }
         else
         {
-            PinValidationMessage = message;
-            return false;
+            RevealPasskey();
         }
     }
+
+    private void RevealPasskey()
+    {
+        _isPasskeyRevealed = true;
+        NotifyPasskeyDisplayChanged();
+        StartPasskeyHideTimer();
+    }
+
+    private void HidePasskey()
+    {
+        _passkeyHideTimer?.Stop();
+        ClearClipboardIfHolds(_passkeyPlain);
+        _isPasskeyRevealed = false;
+        NotifyPasskeyDisplayChanged();
+    }
+
+    public async Task GeneratePasskeyAsync()
+    {
+        if (_isGeneratingPasskey)
+        {
+            return;
+        }
+
+        PasskeyError = null;
+        PasskeyMessage = null;
+        _isGeneratingPasskey = true;
+
+        try
+        {
+            CloudPinResult cloud = await PasskeyPinService.FetchAsync();
+            if (cloud.Status == CloudPinStatus.Unreachable)
+            {
+                PasskeyError = "Cannot reach Firestore. Check the internet connection and that serviceAccountKey.json is installed, then try again.";
+                return;
+            }
+
+            // A Passkey PIN already exists (here or in Firestore): confirm the current PIN first.
+            bool hasLocal = await Task.Run(() => SettingsService.LoadSecuritySettings(_dbService?.DatabasePath).HasValue);
+            if ((hasLocal || cloud.Status == CloudPinStatus.Found)
+                && !ConfirmAdminPin("Enter the current PIN to generate a new Passkey PIN."))
+            {
+                PasskeyError = "Passkey PIN was not changed.";
+                return;
+            }
+
+            string pin = PasskeyPinService.GeneratePin();
+            string updatedBy = Environment.UserName;
+            var (hash, salt) = await PasskeyPinService.PublishAsync(pin, updatedBy);
+            await Task.Run(() => SettingsService.StoreLocalPin(hash, salt, updatedBy, _dbService?.DatabasePath));
+            await Task.Run(() => PasskeyPinService.SaveLocalPin(pin));
+
+            SetPasskeyPlain(pin);
+            PasskeyHiddenNote = null;
+            RevealPasskey(); // show it right after generating; it hides again by itself
+            await RefreshPasskeyStatusAsync();
+            PasskeyMessage = "New Passkey PIN saved to Firestore. Monitoring Engines download it automatically (within about 30 seconds) and the old one stops working.";
+        }
+        catch (Exception ex)
+        {
+            PasskeyError = "Could not save the Passkey PIN to Firestore. Check the internet connection and try again.";
+            System.Diagnostics.Debug.WriteLine($"[Settings] Passkey PIN failed: {ex}");
+        }
+        finally
+        {
+            _isGeneratingPasskey = false;
+        }
+    }
+
+    private void CopyPasskey()
+    {
+        if (!HasPasskeyToShow)
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(_passkeyPlain!);
+            PasskeyMessage = $"Copied to the clipboard (cleared when the PIN is hidden, about {PasskeyAutoHideSeconds} seconds after you reveal it).";
+        }
+        catch
+        {
+            PasskeyError = "Could not copy to the clipboard.";
+        }
+    }
+
+    /// <summary>Removes the PIN from the clipboard when it is hidden, but only if the clipboard still holds it.</summary>
+    private static void ClearClipboardIfHolds(string? pin)
+    {
+        if (string.IsNullOrEmpty(pin))
+        {
+            return;
+        }
+
+        try
+        {
+            if (Clipboard.ContainsText() && Clipboard.GetText() == pin)
+            {
+                Clipboard.Clear();
+            }
+        }
+        catch
+        {
+            // The clipboard can be locked by another app; not worth surfacing.
+        }
+    }
+
+    private string _passkeyStatusText = "Checking Passkey PIN status...";
+    /// <summary>One line telling the manager whether a Passkey PIN exists and when it last changed.</summary>
+    public string PasskeyStatusText
+    {
+        get => _passkeyStatusText;
+        private set => SetProperty(ref _passkeyStatusText, value);
+    }
+
+    public async Task RefreshPasskeyStatusAsync()
+    {
+        CloudPinResult cloud = await PasskeyPinService.FetchAsync();
+        PasskeyStatusText = cloud.Status switch
+        {
+            CloudPinStatus.Found => string.IsNullOrWhiteSpace(cloud.UpdatedAt)
+                ? "A Passkey PIN is set."
+                : $"A Passkey PIN is set. Last changed {cloud.UpdatedAt} by {cloud.UpdatedBy}.",
+            CloudPinStatus.Missing => "No Passkey PIN has been generated yet. Monitoring PCs cannot protect files until you generate one.",
+            _ => "Cannot reach Firestore, so the Passkey PIN status is unknown."
+        };
+
+        string? local = await Task.Run(PasskeyPinService.LoadLocalPin);
+        switch (cloud.Status)
+        {
+            case CloudPinStatus.Found:
+                // Only show the saved PIN if it is still the CURRENT one (another PC may have regenerated it).
+                if (local is not null && PasskeyPinService.Matches(local, cloud.PinHash, cloud.Salt))
+                {
+                    SetPasskeyPlain(local);
+                    PasskeyHiddenNote = null;
+                }
+                else
+                {
+                    SetPasskeyPlain(null);
+                    PasskeyHiddenNote = "The current PIN was not generated on this PC, so it cannot be shown here " +
+                                        "(only a hash is stored in the cloud). Generate a new Passkey PIN to see it on this PC.";
+                }
+                break;
+
+            case CloudPinStatus.Missing:
+                SetPasskeyPlain(null);
+                PasskeyPinService.DeleteLocalPin();
+                PasskeyHiddenNote = null;
+                break;
+
+            default: // Unreachable: show what this PC has, but say it is unverified
+                SetPasskeyPlain(local);
+                PasskeyHiddenNote = local is null ? null : "Not verified with Firestore right now (offline).";
+                break;
+        }
+    }
+
+    private void StartPasskeyHideTimer()
+    {
+        _passkeyHideTimer?.Stop();
+        _passkeyHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(PasskeyAutoHideSeconds) };
+        _passkeyHideTimer.Tick += (_, _) => HidePasskey();
+        _passkeyHideTimer.Start();
+    }
+
     // ============================================================
     // Data Maintenance Execution (Local & Cloud)
     // ============================================================
@@ -1367,7 +1566,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
                 string summary = string.IsNullOrWhiteSpace(result.Output) ? "Local data cleaned successfully." : result.Output.Trim();
                 if (isAll)
                 {
-                    MaintenanceMessage = "Protected assets cleared and PIN reset to default.";
+                    MaintenanceMessage = "Protected assets cleared.";
                 }
                 else
                 {
@@ -1382,7 +1581,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
                 var resultDialog = new Views.CleanDataResultWindow(
                     isAll ? "Clean Local Data (--all)" : "Clean Local Data",
-                    isAll ? "Protected assets cleared and PIN reset to default." : "Completed successfully",
+                    isAll ? "Protected assets cleared." : "Completed successfully",
                     summary,
                     isSuccess: true)
                 {
@@ -1503,7 +1702,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
             if (isAll)
             {
-                MaintenanceMessage = "Protected assets cleared and PIN reset to default.";
+                MaintenanceMessage = "Protected assets cleared.";
             }
             else
             {
@@ -1513,7 +1712,7 @@ public class SettingsViewModel : ViewModelBase, IDataSection
 
             var resultDialog = new Views.CleanDataResultWindow(
                 isAll ? "Clean Cloud Data (--all)" : "Clean Cloud Data",
-                isAll ? "Protected assets cleared and PIN reset to default." : "Completed successfully",
+                isAll ? "Protected assets cleared." : "Completed successfully",
                 summary,
                 isSuccess: true)
             {

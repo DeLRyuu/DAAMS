@@ -79,7 +79,8 @@ public partial class PinPromptWindow : Window
         ConfirmButton.IsEnabled = false;
         try
         {
-            bool isValid = await _db.VerifyPinAsync(pin);
+            // Same Passkey check as everywhere else (Firestore when online, local copy offline).
+            bool isValid = await Task.Run(() => SettingsService.VerifyPin(pin, _db.DatabasePath));
             if (isValid)
             {
                 DialogResult = true;
