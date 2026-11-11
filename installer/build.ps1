@@ -2,6 +2,8 @@
   DAAMS release build script
   Location:  <repo root>\installer\build.ps1      (repo root = folder containing monitoring_engine\)
   Run:       powershell -ExecutionPolicy Bypass -File .\installer\build.ps1
+             add -Console  to build the Engine with a visible console window (debugging)
+             add -Compile  to also run Inno Setup's command-line compiler (ISCC.exe) on DAAMS.iss
 
   Produces (consumed by DAAMS.iss):
     installer\build\engine\          DAAMSEngine.exe, DAAMSProtect.exe, DAAMSResetLocal.exe, _internal\
@@ -12,6 +14,12 @@
 
   Prerequisites: monitoring_engine\venv with requirements.txt installed; .NET 10 SDK (global.json).
 #>
+
+[CmdletBinding()]
+param(
+    [switch]$Console,
+    [switch]$Compile
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -25,6 +33,20 @@ $icon      = Join-Path $PSScriptRoot "daams.ico"
 
 if (-not (Test-Path $py)) { throw "Engine venv not found at $py" }
 if (-not (Test-Path $icon)) { throw "Icon not found at $icon" }
+
+# ---- checks against the code of the current branch ----
+$mainText     = Get-Content (Join-Path $engineDir "main.py") -Raw
+$settingsText = Get-Content (Join-Path $engineDir "config\settings.py") -Raw
+
+if (-not $Console -and ($mainText -notmatch "engine_console\.log")) {
+    throw "Hidden mode needs the no-console guard in main.py (it redirects stdout/stderr to engine_console.log). This branch does not have it. Run with -Console, or add the guard first."
+}
+if ($settingsText -notmatch "LOCALAPPDATA|DAAMS_HOME") {
+    Write-Warning ("This branch's settings.py has no installed-build paths (%LOCALAPPDATA%\DAAMS). " +
+                   "Once installed under Program Files the engine would try to store its data next to the program, " +
+                   "and the right-click helper (runs as a normal user) cannot write there. " +
+                   "Build continues, but expect problems when testing the installer.")
+}
 
 foreach ($d in @($out, $tmp)) { if (Test-Path $d) { Remove-Item $d -Recurse -Force } }
 New-Item -ItemType Directory -Path "$out\engine", "$out\controlcenter", "$tmp\dist", "$tmp\work", "$tmp\spec" | Out-Null
@@ -81,7 +103,8 @@ function Build-Exe([string]$name, [string]$script, [string]$mode, [string]$desc)
 
 # Engine runs hidden (no console window). Its prints/errors go to %LOCALAPPDATA%\DAAMS\logs\engine_console.log
 # (see the sys.stdout guard at the top of main.py). To debug with a visible console, temporarily use "--console".
-Build-Exe "DAAMSEngine"     "main.py"                   "--noconsole" "DAAMS Monitoring Engine"
+$engineMode = if ($Console) { "--console" } else { "--noconsole" }
+Build-Exe "DAAMSEngine"     "main.py"                   $engineMode   "DAAMS Monitoring Engine"
 # Right-click helper: used to run under pythonw.exe (no console) -> --windowed.
 Build-Exe "DAAMSProtect"    "cli\protect_asset_cli.py"  "--windowed"  "DAAMS Protect Asset"
 # "Clean Local Data" tool. Reads RESET from stdin, so it needs --console.
@@ -109,4 +132,23 @@ Get-ChildItem $out -Recurse -Include "serviceAccountKey*.json", "protected_asset
     "admin_settings.json", "smtp_settings.json", "*.db", "*.db-wal", "*.db-shm", "*.jsonl" |
     ForEach-Object { Write-Warning "Removing from build: $($_.FullName)"; Remove-Item $_.FullName -Force }
 
-Write-Host "`nBuild finished. Open installer\DAAMS.iss in Inno Setup and press Compile (F9)." -ForegroundColor Green
+Write-Host "`nBuild finished (Engine mode: $(if ($Console) { 'console' } else { 'hidden' }))." -ForegroundColor Green
+
+# ---- optional: compile with Inno's command-line compiler ----
+$iss = Join-Path $PSScriptRoot "DAAMS.iss"
+if ($Compile) {
+    if (-not (Test-Path $iss)) { throw "DAAMS.iss not found at $iss" }
+    $iscc = @(
+        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+    if (-not $iscc) { throw "ISCC.exe not found. Install Inno Setup 6, or open installer\DAAMS.iss and press F9." }
+    & $iscc $iss
+    if ($LASTEXITCODE -ne 0) { throw "Inno Setup compile failed" }
+    Write-Host "`nInstaller is in: $PSScriptRoot\output" -ForegroundColor Green
+}
+else {
+    Write-Host "Next: open installer\DAAMS.iss in Inno Setup and press Compile (F9), or re-run with -Compile." -ForegroundColor Green
+}

@@ -1,5 +1,6 @@
-; DAAMS installer - Inno Setup 6.x
-; Location: <repo root>\installer\DAAMS.iss  (run build.ps1 first)
+; DAAMS installer - Inno Setup 6.x  (Monitoring Engine + Control Center in ONE setup)
+; Location: <repo root>\installer\DAAMS.iss  (run build.ps1 first, then compile this file)
+; Setup types: Full (both, default) / Engine only (monitored PC) / Control Center only (admin PC) / Custom.
 ;
 ; Data model (already in your code): everything the apps write lives in %LOCALAPPDATA%\DAAMS
 ;   data\daams.db, data\protected_assets.json, ...   logs\...   serviceAccountKey.json
@@ -81,12 +82,16 @@ Root: HKLM; Subkey: "Software\Classes\Directory\shell\DAAMS\shell\01ProtectAsset
 ; Engine scheduled task: elevated (needed to read the Security log for "Open" detection) and in the
 ; signed-in user's interactive session (needed by the clipboard watcher). Always registered when the Engine
 ; is installed; it only gets a sign-in trigger if the "startup" task was ticked.
+; With the sign-in trigger: starts 15 s after sign-in (network/Explorer ready) and restarts up to 3 times, 1 min apart, if the Engine crashes.
+; Note: it starts at SIGN-IN, not at power-on, because the clipboard watcher needs the user's interactive session.
 Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$a = New-ScheduledTaskAction -Execute '{app}\Engine\{#EngineExe}' -WorkingDirectory '{app}\Engine'; $t = New-ScheduledTaskTrigger -AtLogOn -User '{username}'; $p = New-ScheduledTaskPrincipal -UserId '{username}' -LogonType Interactive -RunLevel Highest; $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero); Register-ScheduledTask -TaskName '{#TaskName}' -Action $a -Trigger $t -Principal $p -Settings $s -Force | Out-Null"""; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$a = New-ScheduledTaskAction -Execute '{app}\Engine\{#EngineExe}' -WorkingDirectory '{app}\Engine'; $t = New-ScheduledTaskTrigger -AtLogOn -User '{username}'; $t.Delay = 'PT15S'; $p = New-ScheduledTaskPrincipal -UserId '{username}' -LogonType Interactive -RunLevel Highest; $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero); Register-ScheduledTask -TaskName '{#TaskName}' -Action $a -Trigger $t -Principal $p -Settings $s -Force | Out-Null"""; \
   Flags: runhidden; Components: engine; Tasks: startup; StatusMsg: "Registering Engine startup task..."
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$a = New-ScheduledTaskAction -Execute '{app}\Engine\{#EngineExe}' -WorkingDirectory '{app}\Engine'; $p = New-ScheduledTaskPrincipal -UserId '{username}' -LogonType Interactive -RunLevel Highest; $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero); Register-ScheduledTask -TaskName '{#TaskName}' -Action $a -Principal $p -Settings $s -Force | Out-Null"""; \
   Flags: runhidden; Components: engine; Tasks: not startup; StatusMsg: "Registering Engine task..."
+; Starts the elevated Engine task right away (needed for Open detection), so no manual start is needed after install.
+Filename: "{sys}\schtasks.exe"; Parameters: "/Run /TN ""{#TaskName}"""; Description: "Start the DAAMS Monitoring Engine now"; Flags: postinstall runhidden nowait skipifsilent; Components: engine
 Filename: "{app}\ControlCenter\{#CCExe}"; Description: "Launch DAAMS Control Center"; Flags: nowait postinstall skipifsilent; Components: controlcenter
 
 [UninstallRun]
@@ -99,6 +104,18 @@ Filename: "taskkill.exe"; Parameters: "/IM {#CCExe} /F";     Flags: runhidden; R
 [Code]
 var
   KeyPage: TInputFileWizardPage;
+
+{ Reinstall / upgrade: the hidden Engine and the Control Center lock their files, so stop them first. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/End /TN "{#TaskName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#EngineExe} /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#ProtectExe} /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#CCExe} /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
 
 procedure InitializeWizard;
 begin
