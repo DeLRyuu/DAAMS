@@ -53,8 +53,5 @@ A complete 5-minute step-by-step presentation script, scoring calculations, pre-
 The system is being developed incrementally. Features and components are documented through Git commits.
 
 ## Team
-- Project Leader / Developer — Whindell
-- UI/UX Designer — Cyy Opiz
-- Researcher — Joy Aguirre Jasar eno
-- Documentation Lead — Elna
-- Testing / QA — Melisa Mae Franes
+- Project Leader / Developer / UI/UX Designer / Testing & QA — Whindell
+- Documentation Team — Cyy Opiz, Joy Aguirre Jasar eno, Elna, Melisa Mae Franes
